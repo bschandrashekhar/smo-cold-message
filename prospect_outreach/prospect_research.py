@@ -9,6 +9,23 @@ from typing import Dict, List, Tuple, Callable, Optional
 
 from . import config, brand_knowledge, case_study_match
 
+MAX_RETRIES = 3
+RETRY_DELAY = 65
+
+
+def _call_claude_with_retry(client, **kwargs):
+    """Call Claude API with automatic retry on rate limit errors."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return client.messages.create(**kwargs)
+        except anthropic.RateLimitError:
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_DELAY * (attempt + 1)
+                print(f"Rate limited. Waiting {wait}s before retry {attempt + 2}/{MAX_RETRIES}...")
+                time.sleep(wait)
+            else:
+                raise
+
 
 def validate_prospects_sheet(df: pd.DataFrame) -> bool:
     required = [
@@ -41,7 +58,8 @@ Find and summarize:
 Be specific and cite real findings. If you can't find information on a topic, say so.
 Return a structured summary with clear bullet points."""
 
-    response = client.messages.create(
+    response = _call_claude_with_retry(
+        client,
         model="claude-sonnet-4-20250514",
         max_tokens=2048,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
@@ -79,7 +97,8 @@ Find and summarize:
 
 Return 3-4 concise bullet points tailored to this person's role."""
 
-    response = client.messages.create(
+    response = _call_claude_with_retry(
+        client,
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
@@ -163,7 +182,8 @@ Intent scoring criteria:
 
 Return ONLY the JSON object."""
 
-    response = client.messages.create(
+    response = _call_claude_with_retry(
+        client,
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],

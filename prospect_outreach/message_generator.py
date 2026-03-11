@@ -9,9 +9,24 @@ from typing import Optional, Callable, List, Dict
 import anthropic
 from . import config, brand_knowledge, case_study_match
 
-
+MAX_RETRIES = 3
+RETRY_DELAY = 65
 BATCH_SIZE = 5
 BATCH_DELAY = 3
+
+
+def _call_claude_with_retry(client, **kwargs):
+    """Call Claude API with automatic retry on rate limit errors."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return client.messages.create(**kwargs)
+        except anthropic.RateLimitError:
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_DELAY * (attempt + 1)
+                print(f"Rate limited. Waiting {wait}s before retry {attempt + 2}/{MAX_RETRIES}...")
+                time.sleep(wait)
+            else:
+                raise
 
 
 def format_date(date_value):
@@ -104,7 +119,8 @@ IMPORTANT:
 - Do NOT include a subject line — just the message body
 - Do NOT add a sign-off/signature — just the 3 paragraphs"""
 
-    response = client.messages.create(
+    response = _call_claude_with_retry(
+        client,
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],

@@ -5,12 +5,30 @@ from . import config
 import anthropic
 
 
+MAX_RETRIES = 3
+RETRY_DELAY = 65  # seconds — wait out the 1-minute rate limit window
+
+
 def are_brand_files_present():
     """Return a dict showing which brand profile files currently exist."""
     status = {}
     for name, path in config.BRAND_JSONS.items():
         status[name] = path.exists()
     return status
+
+
+def _call_claude_with_retry(client, **kwargs):
+    """Call Claude API with automatic retry on rate limit errors."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return client.messages.create(**kwargs)
+        except anthropic.RateLimitError as e:
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_DELAY * (attempt + 1)
+                print(f"Rate limited. Waiting {wait}s before retry {attempt + 2}/{MAX_RETRIES}...")
+                time.sleep(wait)
+            else:
+                raise
 
 
 def _scrape_brand_with_claude(website_url: str, brand_name: str) -> dict:
@@ -36,7 +54,8 @@ Extract the following information and return it as a JSON object:
 
 Search their website thoroughly — look at services pages, about pages, case studies, and any other relevant content. Return ONLY the JSON object, no other text."""
 
-    response = client.messages.create(
+    response = _call_claude_with_retry(
+        client,
         model="claude-sonnet-4-20250514",
         max_tokens=4096,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
@@ -60,7 +79,6 @@ Search their website thoroughly — look at services pages, about pages, case st
     try:
         return json.loads(full_text)
     except json.JSONDecodeError:
-        # If parsing fails, return a basic structure with the raw text
         return {
             "name": brand_name,
             "website": website_url,
@@ -89,7 +107,7 @@ def refresh_brand_profiles():
         path = config.BRAND_JSONS[name]
         with open(path, "w", encoding="utf-8") as f:
             json.dump(profile, f, indent=2)
-        time.sleep(2)  # Small delay between brand scrapes
+        time.sleep(65)  # Wait between brands to avoid rate limits
 
     return are_brand_files_present()
 

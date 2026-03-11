@@ -1,0 +1,61 @@
+{
+  "name": "CloudChillies",
+  "website": "https://www.cloudchillies.com",
+  "services": [
+    "Salesforce Multi-Cloud Implementation & End-to-End Rollouts",
+    "Salesforce Custom Development, Mobile Solutions & IoT",
+    "Salesforce Integrations with Disparate Systems",
+    "AppExchange Development & Publishing",
+    "Salesforce Managed Services & Ongoing Optimization",
+    "Snowflake Data Foundation Setup & Adoption",
+    "Data Stack Modernization with ELT Pipelines",
+    "Legacy Warehouse Migrations & Cross-Cloud Transfers",
+    "Enterprise Analytics & BI Integration (Tableau, Power BI, Looker)",
+    "Salesforce + Snowflake Unified Intelligence",
+    "AI/ML via Snowpark & Cortex with Governance",
+    "Agentforce Implementation & Einstein GPT Workflows",
+    "Lead Scoring Models & Auto-Generated Analytics",
+    "Agent Assist Bots & Conversational UI",
+    "Dynamic Approval & Risk Logic Automation"
+  ],
+  "verticals": [
+    "Finance & Fintech (lending, banking, wealth management, employee benefits, insurance)",
+    "Nonprofits (donor management, community fundraising, mission scaling)",
+    "Healthcare",
+    "Manufacturing",
+    "Real Estate",
+    "Hi-Tech",
+    "Education"
+  ],
+  "tech_stack": [
+    "Salesforce (Sales Cloud, Service Cloud, Marketing Cloud, Experience Cloud, Financial Services Cloud, Nonprofit Cloud)",
+    "Snowflake (Data Warehousing, Snowpark, Cortex AI)",
+    "Tableau",
+    "Power BI",
+    "Looker",
+    "Azure",
+    "AWS",
+    "GCP",
+    "Einstein GPT & Agentforce"
+  ],
+  "differentiators": [
+    "Specialized teams for Finance & Nonprofits — no one-size-fits-all solutions",
+    "20+ years of industry experience with 150+ experts on staff",
+    "200+ Salesforce Certifications and 5000+ TrailHead Badges",
+    "400+ projects delivered across multiple countries",
+    "ISO 27001 certified — enterprise-grade security focus",
+    "Dual Salesforce + Snowflake expertise for unified data intelligence",
+    "Proven measurable impact: up to 70% manual workload reduction, 20% cost decrease, 83% efficiency increase"
+  ],
+  "tone_and_positioning": "Professional yet conversational and approachable. Positions itself as a consultative partner that 'powers intelligent enterprises' through AI, data, and Salesforce. Uses confident, impact-oriented language with emphasis on transformation, innovation, and measurable ROI. Slightly more playful than traditional consulting firms — uses phrases like 'Unf(AI)r advantage' and 'Turn Your Challenges Into Success Stories'. Emphasizes partnership over vendor relationship.",
+  "target_audience": "Financial services institutions (lenders, banks, fintechs, insurers), nonprofit organizations focused on mission scaling, and mid-to-large enterprises requiring regulated, secure, industry-specific solutions. Organizations undergoing digital transformation, legacy system modernization, or data platform migration.",
+  "tagline": "Powering Intelligent Enterprises — We give an Unf(AI)r advantage to your Business and Maximize the ROI",
+  "case_study_highlights": [
+    "Brickworks (manufacturing) — Digitized new product development and plant onboarding",
+    "Capify (fintech) — Enabled business loan extension across Australia and UK",
+    "Regents Capital (equipment financing) — Redefined leasing business operations",
+    "Raise Foundation (nonprofit) — Digitized mentorship and youth empowerment programs",
+    "Smartgroup (fintech) — Streamlined salary packaging and payroll services",
+    "Caritas Australia (nonprofit) — Built 'Compassion at Scale' donor management system"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "LendingLogik",
+  "website": "https://www.lendinglogik.com",
+  "services": [
+    "AI-powered Credit Decisioning & Risk Analysis",
+    "Lender Matching & Borrower Lead Routing",
+    "Statement Data Automation & Bank Statement Visualizer",
+    "Marketing Logik & Cross-Selling Logik",
+    "Bad Debt Analyzer & Compliance Logik",
+    "Salesforce Consulting & Advisory",
+    "Salesforce Implementation & Custom Development",
+    "Salesforce Managed Services",
+    "AppExchange Development",
+    "System Integrations (50+ partner products — lead aggregation, document management, banking data, payments, accounting, SMS/email)"
+  ],
+  "verticals": [
+    "Consumer Lending (student, personal, medical, payday, debt consolidation, home improvement)",
+    "Business Lending (working capital, lines of credit, term loans, invoice factoring, bridge loans, revenue-based financing)",
+    "Asset Financing (auto, fleet, equipment)",
+    "Leasing (technology, construction, machinery)",
+    "Homeownership (mortgages, home equity, HELOC)"
+  ],
+  "tech_stack": [
+    "Salesforce Financial Services Cloud",
+    "Salesforce Sales Cloud",
+    "Salesforce Service Cloud",
+    "Salesforce Marketing Cloud",
+    "Salesforce Experience Cloud",
+    "Tableau",
+    "Slack",
+    "AI/ML (credit decisioning, default prediction, auto-decisioning)"
+  ],
+  "differentiators": [
+    "Deep specialization in lending industry — not a generalist consultancy",
+    "Proprietary AI-powered 'Logik' suite purpose-built for lenders",
+    "50+ pre-built integrations with lending ecosystem partners",
+    "Multi-country presence (USA, India, Australia) serving global lending companies",
+    "End-to-end coverage from loan origination to compliance and bad debt analysis"
+  ],
+  "tone_and_positioning": "Professional, data-driven, and industry-expert tone. Positions itself as a specialized lending technology partner that understands the complex and ever-changing lending industry. Messaging emphasizes transformational value, AI-powered efficiency, and deep domain expertise. Uses confident, outcome-oriented language focused on measurable lending outcomes.",
+  "target_audience": "Lending institutions (consumer, business, asset financing, leasing, mortgage) seeking to digitize operations, improve approval rates, streamline underwriting, implement modern loan management systems, and adopt AI-powered decisioning. Typically mid-to-large lending companies undergoing digital transformation.",
+  "tagline": "Delivering Transformational Value To Lending Companies",
+  "case_study_highlights": [
+    "Capify (Australia/UK) — Enabled business loan extension across multiple countries",
+    "Regents Capital — Redefined equipment financing and leasing operations",
+    "Total Processing — Transformed auto leasing business processes",
+    "MoneySpot — Built multi-country loan management system",
+    "IFT Solutions — Modernized auto lending platform"
+  ]
+}
