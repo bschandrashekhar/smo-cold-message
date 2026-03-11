@@ -1,170 +1,625 @@
 {
   "name": "CloudChillies",
   "website": "https://www.cloudchillies.com",
-  "tagline": "Powering Intelligent Enterprises — We give an Unf(AI)r advantage to your Business and Maximize the ROI",
-  "mission": "Helping organizations transform through AI, data, and Salesforce with specialized, industry-specific solutions — not one-size-fits-all.",
+  "tagline": "Powering Intelligent Enterprises",
+  "additional_taglines": [
+    "Unlock the Full Potential of Salesforce for Your Business.",
+    "AI with Salesforce: Making Every Workflow Faster & More Intelligent.",
+    "Automate what matters. Predict what's next.",
+    "Scale with data-driven outcomes",
+    "We give an Unf(AI)r advantage to your Business and Maximise the ROI.",
+    "Give Your Business an UnfAIr Advantage",
+    "Maximize Value from Your Salesforce Investment",
+    "Let's Maximise the ROI for your Finance Business",
+    "Let's Turn Your Challenges Into Success Stories",
+    "20+ Years of Salesforce & AI Expertise, Powering Revenue Growth Across Industries",
+    "20+ Years of Delivering Transformational Value to Financial Companies",
+    "20+ Years of Empowering Leading Nonprofits achieve their goals and drive impact",
+    "Building Smarter AI Systems & Real Results For More Than 20 Years!"
+  ],
+  "mission": "A trusted force in scalable innovation, delivering impact through human-centred solutions and deep technical excellence.",
+  "what_they_do": "We deliver transformational value through end-to-end Salesforce services and AI, empowering businesses to streamline operations, enhance efficiency, and accelerate growth.",
+  "who_we_are": "We're a global team of Salesforce and AI specialists with deep technical roots and practical business insight. Our focus is simple: help organisations increase revenue, reduce manual overhead, and deliver better services using scalable technology. We've led hundreds of transformation projects across industries-with special strength in financial services and nonprofits-giving us the hands-on knowledge to solve real-world challenges, not just system requirements. What sets us apart? A commitment to precision, reliability, and solutions that actually make life easier for your teams.",
   "leadership": {
-    "CEO": "Shishir Danani",
-    "CTO": "Sateesh Chandrashekar",
-    "COO": "Avinash Kumar",
-    "background": "All three are ex-Infosys leaders and alumni of top engineering and business schools in USA and India, collectively bringing 30+ years of enterprise IT experience"
+    "CEO": {
+      "name": "Shishir Danani",
+      "title": "CEO",
+      "background": "30+ years of enterprise IT experience, Ex-Infosys leader, Alumni of top engineering & business schools in USA & India"
+    },
+    "CTO": {
+      "name": "Sateesh Chandrashekar",
+      "title": "CTO",
+      "background": "30+ years of enterprise IT experience, Ex-Infosys leader, Alumni of top engineering & business schools in USA & India"
+    },
+    "COO": {
+      "name": "Avinash Kumar",
+      "title": "COO",
+      "background": "30+ years of enterprise IT experience, Ex-Infosys leader, Alumni of top engineering & business schools in USA & India"
+    }
   },
   "locations": ["USA", "Canada", "Australia", "UK", "Middle East"],
+  "contact": {
+    "email": "info@cloudchillies.com",
+    "phone_australia": "+61-280-155-723",
+    "phone_usa": "+1-732-654-9056",
+    "contact_form_fields": ["Name", "Email", "Phone Number", "Query/Message", "reCAPTCHA"],
+    "physical_address": "Not publicly listed (map displayed on contact page)"
+  },
   "credentials": {
-    "team_size": "150+ experts",
-    "experience": "20+ years industry expertise",
-    "certifications": "200+ Salesforce Certifications",
-    "trailhead": "5,000+ TrailHead Badges, 200+ Super Badges",
-    "projects": "400+ projects delivered",
+    "team_size": "150+ Experts",
+    "experience": "20+ Years of Industrial Expertise",
+    "salesforce_certifications": "200+",
+    "trailhead_badges": "5000+",
+    "super_badges": "200+",
+    "projects_delivered": "400+",
     "security": "ISO 27001 certified",
-    "partnerships": "Trusted Salesforce & Snowflake Partner"
+    "partnerships": ["Salesforce Partner", "Snowflake Partner"],
+    "nonprofit_certifications": "100+ Salesforce Certifications across NPSP, Experience Cloud, Marketing Cloud"
+  },
+  "awards": {
+    "deloitte": {
+      "d50": "2 Times",
+      "d500": "5 Times"
+    },
+    "louisiana_state_university": "6 Times",
+    "njtc": "1 Time (New Jersey Technology Council)",
+    "mp": "2 Times"
   },
   "values": [
-    "Build for Impact — solutions designed to drive efficiency and revenue growth",
-    "Clarity Over Complexity — straightforward, practical approaches without jargon",
-    "Own the Outcome — full accountability from kickoff through completion",
-    "Adapt to Fit — customized solutions for each organization's unique needs",
-    "Partner With Purpose — long-term relationships, not quick wins"
+    {
+      "name": "Build for Impact",
+      "description": "We craft solutions that aren't just functional—they're made to drive efficiency, scale confidently, and grow revenue where it counts."
+    },
+    {
+      "name": "Clarity Over Complexity",
+      "description": "No jargon, no mystery—just straightforward & practical solutions that make sense and deliver results."
+    },
+    {
+      "name": "Own the Outcome",
+      "description": "We're in it with you. From kickoff to completion, we stay accountable for real-world results—not just checkboxes."
+    },
+    {
+      "name": "Adapt to Fit",
+      "description": "No two organisations are the same. We tailor our solutions and approach to your industry, workflows, and working methods."
+    },
+    {
+      "name": "Partner With Purpose",
+      "description": "We invest in long-term relationships, not quick wins. Many of our clients stick with us for years—and that's by design."
+    }
   ],
   "services": {
     "salesforce": {
-      "implementation": "End-to-end multi-cloud rollouts — fast, secure, scalable deployments",
-      "integrations": "Connecting Salesforce to ERPs, marketing platforms, finance tools, donation platforms, email tools, grant portals, and case systems",
-      "development": "Custom applications including mobile solutions, IoT, and Lightning components",
-      "managed_services": "Performance tuning, admin work, feature enhancements, org health checks",
-      "appexchange": "Full lifecycle from ideation through Salesforce marketplace publishing",
-      "supported_clouds": [
-        "Financial Services Cloud",
+      "multi_cloud_implementation": {
+        "description": "End-to-End Salesforce Implementation Services - for Fast, Easy & Seamless Salesforce Rollout in Your Enterprise."
+      },
+      "integrations": {
+        "description": "Carefully crafted integration of your disparate systems, services and software with Salesforce."
+      },
+      "development": {
+        "description": "Mobilizing Your Business with Powerful Next Generation Solutions - Custom Development, Mobile Development, IoT."
+      },
+      "managed_services": {
+        "description": "Helping you keep your Salesforce Org in sync with Changing Times & Demands, by Optimizing & Managing Your Intelligent Systems."
+      },
+      "appexchange_development": {
+        "description": "Bringing Your Ideas to Life on Salesforce AppExchange - Ideation, Wireframing, Development, Testing, Packaging, Publishing."
+      },
+      "consulting_and_advisory": {
+        "description": "Helping you make informed architectural decisions that align Salesforce with your lending, insurance, or wealth operations- no guesswork, just domain-aligned guidance."
+      },
+      "clouds_and_products": [
         "Nonprofit Cloud",
-        "Sales Cloud",
-        "Service Cloud",
-        "Marketing Cloud & Pardot",
         "Experience Cloud",
-        "Data Cloud",
-        "CRM Analytics",
-        "MuleSoft (integrations)"
+        "Marketing Cloud",
+        "NPSP (Nonprofit Success Pack)",
+        "Sales Cloud",
+        "Service Cloud"
       ]
     },
     "snowflake": {
-      "data_foundation": "Production-ready environments with data ingestion, modeling, governance, and BI connectivity",
-      "modernization": "Scalable ELT pipelines from enterprise systems and CRMs, replacing traditional ETL",
-      "migration": "Low-risk transfers from legacy warehouses, post-merger consolidations, cross-cloud migrations (AWS/Azure/GCP) with minimal downtime",
-      "analytics": "Dashboard and reporting via Tableau, Power BI, Looker for revenue analytics and executive visibility",
-      "salesforce_integration": "Customer 360, revenue intelligence, churn analysis — combining CRM with enterprise data",
-      "ai_ml": "Snowpark and Cortex for forecasting, risk detection, anomaly analysis in regulated industries. In-database LLM functions for text processing and predictive analytics",
-      "governance": "Native role-based access, PII protection, cost monitoring, audit capabilities",
-      "managed_services": "Ongoing performance optimization and cost governance as data scales"
+      "data_foundation_and_adoption": {
+        "description": "Production-ready environments from day one: full setup including cloud config, ingestion, modeling, governance, and BI connectivity. Ideal for legacy warehouse migrations or teams lacking expertise."
+      },
+      "data_stack_modernization": {
+        "description": "Build scalable ELT pipelines from enterprise systems/CRMs into Snowflake, replacing brittle ETL with native, high-performance patterns."
+      },
+      "snowflake_migration": {
+        "description": "Low-risk migrations: legacy warehouses to Snowflake, Snowflake consolidations (post-M&A), or cross-cloud (AWS ↔ Azure ↔ GCP) with minimal downtime and cost."
+      },
+      "enterprise_analytics_and_bi": {
+        "description": "Actionable insights via Tableau, Power BI, Looker: revenue/pipeline analytics, financial reporting, and executive dashboards for leaders and ops teams."
+      },
+      "salesforce_snowflake_intelligence": {
+        "description": "Unify Salesforce CRM with enterprise data in Snowflake for Customer 360, revenue intelligence, churn analysis, and forecasting—insights embedded in sales/service workflows."
+      },
+      "ai_and_predictive_intelligence": {
+        "description": "Governed AI/ML via Snowpark/Cortex: predictive forecasting, risk detection, anomaly analysis. Enterprise-safe for regulated industries like fintech.",
+        "cortex_capabilities": [
+          "In-database LLM functions for text summarisation, classification, and generation",
+          "Predictive forecasting and trend analysis",
+          "Anomaly and risk detection on live enterprise data"
+        ]
+      },
+      "data_governance_security_cost_control": {
+        "description": "Snowflake-native controls: role-based access, PII protection, usage monitoring, cost governance, auditability, and data quality."
+      },
+      "managed_snowflake_services": {
+        "description": "Ongoing optimization: performance tuning, cost control, and governance for sustained value as data scales."
+      },
+      "bi_tools": ["Tableau", "Power BI", "Looker"]
     },
     "ai": {
-      "agentforce": "Agent workspace implementation with compliance guardrails",
-      "einstein_gpt": "Personalized response generation, content creation, natural language-driven flow automation",
-      "lead_scoring": "Intent-based scoring using actual sales/donor behavioral data, not assumptions",
-      "smart_approvals": "Auto-decision workflows for loans, grants, or purchases with dynamic thresholds and pattern recognition",
-      "knowledge_retrieval": "Internal document querying for instant answers, AI-suggested responses for support",
-      "tableau_automation": "AI-driven dashboard creation without manual setup, intelligent tracking suggestions",
-      "agent_bots": "Response suggestions for faster support, internal knowledge base integration, conversational UI"
+      "overview": "AI-first solutions that learn and adapt that help your team move faster — from loan decisions to donor engagement, increasing your revenue along the way.",
+      "agentforce": {
+        "description": "Smart, Salesforce-core Agent workspace powered by AI",
+        "context": "For Your Execution-ready Frontline",
+        "features": [
+          "Unified Inbox",
+          "Automated Routing",
+          "Performance Dashboards"
+        ],
+        "cta": "Let's build your Agentforce POC"
+      },
+      "lead_scoring": {
+        "description": "Score leads using your real sales or donor data. Prioritise follow-ups based on intent, not guesswork.",
+        "detail": "Predictive models integrated into Sales Cloud workflows."
+      },
+      "einstein_gpt_custom_llm_workflows": {
+        "description": "Generate personalised responses, content, or summaries. Automate data updates and trigger flows with natural language.",
+        "detail": "Intelligent flows trained on org-specific data."
+      },
+      "smart_approvals_and_risk_logic": {
+        "description": "Auto-decision flows for loans, grants, or purchases. AI checks against dynamic thresholds and patterns.",
+        "detail": "AI-enhanced decision gates in loan origination, grants, etc."
+      },
+      "agent_assist_bots": {
+        "description": "Suggest best responses for faster support handling.",
+        "detail": "Knowledge retrieval + response suggestion for support teams."
+      },
+      "auto_generated_analytics_tableau": {
+        "description": "AI suggests what to track — no manual setup needed."
+      },
+      "conversational_ui_with_guardrails": {
+        "description": "Natural, chat-style interactions within Salesforce."
+      },
+      "data_privacy": {
+        "description": "Instantly retrieve answers from internal docs. Suggest best responses for faster support handling."
+      },
+      "finance_ai_applications": [
+        "Lender Matching",
+        "Credit decisioning",
+        "Bad Debt Analysis",
+        "Statement Visualization"
+      ],
+      "nonprofit_ai_applications": {
+        "fundraising_and_donor_engagement": "Donors are there but unengaged. AI helps you prioritise outreach, personalise asks, and re-engage supporters who've gone quiet.",
+        "volunteer_management": "AI matches roles, flags disengagement, and keeps volunteers in the loop.",
+        "marketing_and_communication": "AI assists with content, timing, and targeting — no heavy lifting.",
+        "impact_reporting": "AI drafts dashboards and insights so your story gets shared, not shelved.",
+        "program_delivery_and_casework": "AI streamlines intake, detects urgency, and routes tasks instantly."
+      }
     }
   },
   "verticals": {
     "finance": {
-      "segments": ["Lending", "Banking", "Wealth Management", "Employee Benefits & Salary Packaging", "Insurance", "Fintech", "Invoice Factoring"],
-      "ai_use_cases": ["Credit decisioning and dynamic scoring", "Lender matching based on borrower profiles", "Statement visualization into actionable dashboards", "Bad debt prediction and mitigation", "Fraud detection", "Customer journey automation", "Dynamic loan approval workflows"],
-      "metrics": "Manual workload reduced up to 70%, customer satisfaction up to 70%, revenue growth up to 20%, costs decreased 20%, efficiency up to 83%, time-to-market reduced 30%"
+      "headline": "End-to-end CRM, lending workflows, Automation, and compliance-Salesforce that speaks fluent finance.",
+      "ai_overview": "From credit approvals to risk analysis, we help financial institutions apply AI where it truly delivers — reducing manual efforts, increasing accuracy, and scaling smarter decisions.",
+      "segments": [
+        "Lending",
+        "Employee Benefits & Salary Packaging",
+        "Wealth Management",
+        "Fintech",
+        "Insurance",
+        "Banking"
+      ],
+      "lending_subtypes": [
+        "Business Loans",
+        "Equipment Financing & Leasing",
+        "Rent Roll Loans",
+        "Trail Book Loans",
+        "Pay Day Loans",
+        "Personal Loans",
+        "Invoice Factoring/Invoice Loans",
+        "Automobile Leasing"
+      ],
+      "logik_ai_products": {
+        "credit_decisioning_logik": {
+          "name": "Credit Decisioning Logik",
+          "description": "Traditional credit checks are slow and rigid. AI accelerates approvals with dynamic scoring, alternative data, and real-time risk signals."
+        },
+        "lender_matching_logik": {
+          "name": "Lender Matching Logik",
+          "description": "Finding the right lending product for every borrower can be complex. AI automates matching based on borrower profiles, needs, and risk appetite."
+        },
+        "statement_visualization_logik": {
+          "name": "Statement Visualization Logik",
+          "description": "High-volume financial data is often messy and unreadable. AI transforms statements into clear, actionable dashboards with anomaly detection."
+        },
+        "bad_debt_analysis_logik": {
+          "name": "Bad Debt Analysis Logik",
+          "description": "Collections and defaults strain margins. AI predicts high-risk accounts, flags early warning signs, and suggests mitigation strategies."
+        }
+      },
+      "service_offerings": {
+        "consulting_and_advisory": "Helping you make informed architectural decisions that align Salesforce with your lending, insurance, or wealth operations- no guesswork, just domain-aligned guidance.",
+        "implementation": "Helping you simplify onboarding, servicing, claims, or loan management with tailored Salesforce-enabled process flows that reduce friction and improve outcomes.",
+        "development": "Helping you design and build custom workflows, decision logic, and user interfaces that reflect the way your finance teams actually operate — not how the default system behaves.",
+        "managed_services": "Ensuring your continued wins after Salesforce implementation with streamlined loan management journeys."
+      },
+      "metrics": {
+        "manual_workload_decrease": "Up to 70%",
+        "customer_satisfaction_increase": "Up to 70%",
+        "revenue_growth_rate_increase": "Up to 20%",
+        "operational_cost_decrease": "By 20%",
+        "process_efficiency_increase": "Up to 83%",
+        "time_to_market_reduction": "By 30%"
+      },
+      "why_choose_us": [
+        "Finance-Focused Expertise",
+        "20+ Years of Experience",
+        "100+ Salesforce Certifications",
+        "AI-Powered Impact",
+        "Trusted Salesforce Partner",
+        "Certified Salesforce Experts (200+ certifications)",
+        "ISO 27001 certified",
+        "Flexible Engagement Models"
+      ]
     },
     "nonprofits": {
-      "segments": ["Donor Management", "Community Fundraising", "Mission Scaling", "Youth Programs", "Food Distribution", "Health Services"],
-      "capabilities": ["Multi-Cloud Implementation (Nonprofit Cloud, Experience Cloud, Marketing Cloud)", "Donor churn prediction and re-engagement via AI", "Volunteer scheduling and disengagement detection", "Program intake automation with urgency detection", "Impact reporting with AI-drafted dashboards", "Grant portal and case system integrations"],
-      "credentials": "100+ Salesforce certifications, 20+ years nonprofit experience, ISO 27001 certified"
+      "headline": "From donors to doers-we help missions scale impact, not just systems.",
+      "segments": [
+        "Community Services",
+        "International Aid",
+        "Youth Mentoring",
+        "Health/Disease Advocacy",
+        "Religious/Faith-based",
+        "Food Security"
+      ],
+      "service_offerings": {
+        "multi_cloud_implementation": "Nonprofit Cloud, Experience Cloud, Marketing Cloud — set up right, the first time.",
+        "integrations": "Connect your donation platforms, email tools, grant portals, and case systems.",
+        "custom_development": "Automate the manual, connect the disconnected, and build what off-the-shelf can't.",
+        "managed_services": "Get admin, enhancement, and data support — without hiring in-house.",
+        "org_health_check_and_optimization": "Clean up messy Salesforce orgs, legacy workflows, and access chaos."
+      },
+      "ai_capabilities": {
+        "fundraising_and_donor_engagement": "Donors are there but unengaged. AI helps you prioritise outreach, personalise asks, and re-engage supporters who've gone quiet.",
+        "volunteer_management": "AI matches roles, flags disengagement, and keeps volunteers in the loop.",
+        "marketing_and_communication": "AI assists with content, timing, and targeting — no heavy lifting.",
+        "impact_reporting": "AI drafts dashboards and insights so your story gets shared, not shelved.",
+        "program_delivery_and_casework": "AI streamlines intake, detects urgency, and routes tasks instantly."
+      },
+      "ai_section_intro": "From fundraising to reporting, we help nonprofits apply AI where it actually helps-reducing manual effort, surfacing insights, and keeping people engaged.",
+      "clients": [
+        "Our Big Kitchen (OBK)",
+        "Caritas Australia",
+        "Raise Foundation",
+        "Pope/Vatican (Prayers & Donations)",
+        "MND Australia (Motor Neurone Disease)",
+        "United Way",
+        "Huntington Australia",
+        "Neuroblastoma Australia"
+      ],
+      "client_stories": {
+        "obk": "Feeding Communities with Salesforce - From pantry to portal, we enabled OBK to manage people, meals, and donations on Salesforce — turning compassion into operations.",
+        "caritas_australia": "Compassion at Scale-Fueled by Salesforce - Helping Caritas Australia reach millions of lives with AI-driven fundraising, outreach & program systems.",
+        "raise_foundation": "Digitizing Mentorship. Empowering Youth. Powered by Salesforce. With Tailored Salesforce Development, Raise can say 'yes' more often.",
+        "vatican_pope": "Sending Powerful Messages to Pope-Powered by Salesforce - Enabling Hope through Prayers & Donations.",
+        "mnd_australia": "Reducing Admin Burden to Improve MND Care with Salesforce."
+      },
+      "credentials": [
+        "100% Nonprofit-Focused",
+        "20+ Years in the Nonprofits Sector",
+        "100+ Salesforce Certifications (across NPSP, Experience Cloud, Marketing Cloud)",
+        "AI-Enabled Impact",
+        "Strategy + Delivery",
+        "Nonprofit Cloud Experts (Certified consultants)",
+        "ISO 27001 certified",
+        "Flexible Engagement Models"
+      ],
+      "salesforce_products": [
+        "Nonprofit Cloud",
+        "Experience Cloud",
+        "Marketing Cloud",
+        "NPSP (Nonprofit Success Pack)"
+      ]
     },
-    "other": ["Healthcare", "Manufacturing", "Real Estate", "Hi-Tech", "Education"]
+    "other_industries": {
+      "description": "From EdTech to HealthTech, Manufacturing to IT-if relationships drive it, we're in.",
+      "segments": [
+        "Healthcare",
+        "Manufacturing",
+        "Real Estate",
+        "HiTech",
+        "Education"
+      ]
+    }
+  },
+  "clients": {
+    "featured_logos_trust_section": [
+      "Smartgroup",
+      "Compare Club",
+      "Life Insurance",
+      "Autopia",
+      "FlexEquip",
+      "PaySmart",
+      "Treysta",
+      "Bullrun",
+      "Cellulant",
+      "Circle Black",
+      "Homevestors",
+      "Nomupay",
+      "Penn Capital"
+    ],
+    "additional_unidentified_logos": [
+      "logo1", "logo2", "logo3", "logo4", "logo6", "logo7", "logo9", "logo10",
+      "logo13", "logo14", "logo15", "logo16", "logo17", "logo18", "logo19", "logo20", "logo21", "logo22"
+    ],
+    "finance_clients": [
+      "Capify",
+      "Regents Capital",
+      "Smartgroup",
+      "Australian Business Credit",
+      "THN Capital",
+      "Homevestors of America",
+      "Swift Loans",
+      "OZ Cash Loans",
+      "Speedy Business Finance",
+      "IFT Solutions",
+      "Smart Leasing"
+    ],
+    "nonprofit_clients": [
+      "Our Big Kitchen (OBK)",
+      "Caritas Australia",
+      "Raise Foundation",
+      "Pope/Vatican",
+      "MND Australia (MND of NSW)",
+      "United Way",
+      "Huntington Australia",
+      "Neuroblastoma Australia"
+    ],
+    "other_clients": [
+      "Brickworks",
+      "Alsco"
+    ]
   },
   "tech_stack": [
-    "Salesforce (Financial Services Cloud, Nonprofit Cloud, Sales Cloud, Service Cloud, Marketing Cloud, Pardot, Experience Cloud, Data Cloud, CRM Analytics)",
-    "MuleSoft (integrations)",
-    "Snowflake (Data Warehousing, Snowpark, Cortex AI)",
+    "Salesforce (Sales Cloud, Service Cloud, Nonprofit Cloud, Experience Cloud, Marketing Cloud, NPSP)",
+    "Snowflake",
+    "Snowpark",
+    "Snowflake Cortex",
+    "Einstein GPT",
+    "Agentforce",
     "Tableau",
     "Power BI",
     "Looker",
     "Azure",
     "AWS",
     "GCP",
-    "Einstein GPT & Agentforce",
-    "Custom LLM Workflows",
-    "JD Edwards (manufacturing integrations)"
+    "AppExchange",
+    "JD Edwards (client integration)",
+    "IoT integrations",
+    "Custom LLM Workflows"
   ],
   "differentiators": [
-    "Specialized teams for Finance & Nonprofits — no one-size-fits-all solutions",
-    "20+ years of industry experience with 150+ experts",
-    "200+ Salesforce Certifications, 5,000+ TrailHead Badges, 200+ Super Badges",
-    "400+ projects delivered across USA, Canada, Australia, UK, Middle East",
-    "ISO 27001 certified — enterprise-grade security for regulated industries",
-    "Dual Salesforce + Snowflake expertise — unified CRM + data warehouse intelligence",
-    "AI-first approach embedding Custom GPT + Einstein workflows inside Salesforce",
-    "Leadership team with 30+ years enterprise IT experience (ex-Infosys)",
-    "Proven measurable impact: up to 70% workload reduction, 83% efficiency increase, 30% time-to-market reduction"
+    {
+      "name": "Sector-Focused Experts",
+      "description": "Specialized teams for Finance & Nonprofits & other industries -no one-size-fits-all solutions."
+    },
+    {
+      "name": "20+ Years of Industry Experience",
+      "description": "Deep domain knowledge and implementation success across global financial enterprises and mission-driven NPOs."
+    },
+    {
+      "name": "200+ Certifications and Trusted Salesforce & Snowflake Partners",
+      "description": "From architecture to support certified pros aligned with your goals."
+    },
+    {
+      "name": "AI-Driven Solutions",
+      "description": "Smart automations and predictive insights — purpose-built for lending, donor journeys, grant tracking & more."
+    },
+    {
+      "name": "Trusted Salesforce & Snowflake Partner",
+      "description": "Proven track record with purpose-aligned tech for finance and social impact organizations."
+    },
+    {
+      "name": "Certified Implementation Teams",
+      "description": "Expert consultants across Salesforce Cloud, Snowflake & Other Technologies."
+    },
+    {
+      "name": "ISO 27001 certified",
+      "description": "Enterprise-Grade Security — essential for regulated sectors and donor data protection."
+    },
+    {
+      "name": "Flexible Engagement Models",
+      "description": "Scale your team up/down with our dedicated or shared resource models."
+    }
   ],
-  "tone_and_positioning": "Professional yet conversational and approachable. Positions itself as a consultative partner that 'powers intelligent enterprises' through AI, data, and Salesforce. Uses confident, impact-oriented language with emphasis on transformation, innovation, and measurable ROI. Slightly more playful than traditional consulting firms — uses phrases like 'Unf(AI)r advantage', 'Turn Your Challenges Into Success Stories', and 'Compassion at Scale'. Emphasizes partnership over vendor relationship. Speaks to both technical stakeholders (data architecture, Snowpark, Cortex) and business leaders (ROI, efficiency, revenue growth). Strong nonprofit empathy — understands mission-driven organizations. Every message should feel consultative, outcome-focused, and warmly professional.",
-  "target_audience": "Financial services institutions (lenders, banks, fintechs, insurers, salary packaging companies), nonprofit organizations focused on mission scaling and donor management, and mid-to-large enterprises in healthcare, manufacturing, real estate, education, and tech. Organizations undergoing digital transformation, legacy system modernization, data platform migration, or AI adoption. Decision-makers include CTOs, CIOs, VP Data, VP Operations, Heads of IT, and Executive Directors at nonprofits.",
+  "roi_metrics": {
+    "manual_workload_reduction": "Up to 70%",
+    "operational_cost_decrease": "Up to 20%",
+    "process_efficiency_increase": "Up to 83%",
+    "time_to_market_reduction": "Up to 30%",
+    "customer_satisfaction_increase": "Up to 70%",
+    "revenue_growth_rate_increase": "Up to 20%"
+  },
+  "tone_and_positioning": "Confident, results-oriented, domain-expert positioning. Uses phrases like 'UnfAIr advantage', 'speaks fluent finance', 'compassion into operations'. Emphasizes practical outcomes over theoretical capabilities. Balances technical depth with accessible language. Strong focus on measurable ROI and sector specialization. Australian/global perspective with ex-Infosys enterprise credibility.",
+  "target_audience": "Mid-to-large financial services companies (lenders, insurers, wealth managers, fintech, banks) and nonprofit organizations seeking Salesforce implementation, optimization, or AI-powered automation. Secondary audience includes manufacturing, healthcare, education, real estate, and tech companies needing CRM transformation.",
   "case_studies": {
     "Brickworks": {
-      "industry": "Manufacturing (Australia's largest brick manufacturer)",
-      "solution": "Salesforce + JD Edwards integration",
-      "focus": "Digitized new product development and plant onboarding processes"
+      "industry": "Manufacturing / Building Materials",
+      "tagline": "Digitizing new product development and plant onboarding for Australia's largest brick manufacturer Brickworks",
+      "background": "Brickworks Limited is Australia's largest brickmaker with operations in the U.S. and NZ. It offers building products and services, backed by design studios and a modern digital stack including Salesforce and JD Edwards.",
+      "solution_focus": "New product development and plant onboarding digitization",
+      "technologies": ["Salesforce", "JD Edwards"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Capify": {
-      "industry": "Business Lending (Australia/UK)",
-      "solution": "Salesforce partner onboarding platform",
-      "focus": "Enabled business loan extension across multiple markets"
+      "industry": "Financial Services / Business Lending",
+      "tagline": "Enabling Capify to extend Business Loans in Australia & UK with Salesforce",
+      "background": "Capify needed a way to streamline the partner onboarding process, enhance the overall partner experience, and increase business process efficiencies.",
+      "solution_focus": "Partner onboarding, partner experience enhancement, business process efficiencies",
+      "lending_type": "Business Loans (Australia & UK)",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Regents Capital": {
-      "industry": "Equipment Financing & Leasing",
-      "solution": "Salesforce Lightning implementation",
-      "focus": "Redefined leasing and equipment financing operations"
-    },
-    "Raise Foundation": {
-      "industry": "Nonprofit (Youth Mentorship)",
-      "solution": "Salesforce Nonprofit Cloud",
-      "focus": "Digitized mentorship programs and youth empowerment initiatives"
-    },
-    "Smartgroup": {
-      "industry": "Fintech / Salary Packaging (ASX:SIQ)",
-      "solution": "Salesforce + Azure integration",
-      "focus": "Digitized salary packaging, novated leasing, fleet management, and payroll services"
+      "industry": "Financial Services / Equipment Financing",
+      "tagline": "Redefining Regents Capital's Equipment Financing & Leasing business with Salesforce",
+      "background": "Regents Capital innovates its business and automates decision making for loan applications using real-time aggregated data to meet the growing needs of Financial Services markets with our Salesforce solutions.",
+      "solution_focus": "Equipment financing and leasing automation, decision making for loan applications, real-time data aggregation",
+      "lending_type": "Equipment Financing & Leasing",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Caritas Australia": {
-      "industry": "Nonprofit (serving 1.5M people across 36 countries)",
-      "solution": "Salesforce Nonprofit Cloud",
-      "focus": "Built 'Compassion at Scale' donor management and community fundraising system"
+      "industry": "Nonprofit / International Aid",
+      "tagline": "Compassion at Scale-Fueled by Salesforce",
+      "background": "Caritas Australia is a Catholic international aid agency supporting over 1.5 million people across 36 countries. It focuses on poverty, education, health, and social justice, with outreach through dioceses, schools, and parishes nationwide.",
+      "solution_focus": "Donor management, community fundraising, AI-driven fundraising, outreach & program systems",
+      "scale": "Over 1.5 million people across 36 countries",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "Smartgroup": {
+      "industry": "Financial Services / Employee Benefits",
+      "tagline": "Digitizing salary packaging, leasing, and payroll services for Smartgroup with Salesforce and Azure",
+      "background": "Digitizing and streamlining salary packaging, novated leasing, and fleet management processes. The project aimed to integrate quoting, credit checks, and application portals seamlessly, simplify claims and vehicle administration for employees, and build a unified CRM for lead capture, finance, and payroll coordination.",
+      "solution_focus": "Salary packaging, novated leasing, fleet management, quoting, credit checks, application portals, claims, vehicle administration, unified CRM, lead capture, finance and payroll coordination",
+      "technologies": ["Salesforce", "Azure"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "Raise Foundation": {
+      "industry": "Nonprofit / Youth Mentoring",
+      "tagline": "Digitizing Mentorship. Empowering Youth. Powered by Salesforce.",
+      "background": "Raise Foundation is Australia's leading provider of youth mentoring programs, offering early intervention in schools to connect young people with trained mentors for improved wellbeing and life outcomes.",
+      "solution_focus": "Digitizing mentorship programs, youth empowerment, tailored Salesforce development enabling Raise to say 'yes' more often",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Alsco": {
-      "industry": "Uniform & Linen Rental (multi-continent)",
-      "solution": "Self-service customer portal via Salesforce",
-      "focus": "Recurring, one-time, and direct sales orders"
+      "industry": "Services / Uniform & Linen Rental",
+      "tagline": "Empowering Alsco customers with a self-service portal for recurring, onetime, and direct sales orders",
+      "background": "Alsco is a global leader in uniform and linen rental, serving healthcare, hospitality, automotive, and manufacturing with tailored rental and hygiene services across Australia, North America, Europe, Asia, and South America.",
+      "solution_focus": "Self-service portal for recurring, onetime, and direct sales orders",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Australian Business Credit": {
-      "industry": "Business Lending",
-      "solution": "Salesforce automation",
-      "focus": "Rent roll and trail book loans with process automation in data collection, onboarding, and lead management"
+      "industry": "Financial Services / Specialty Lending",
+      "tagline": "Assisting Australian Business Credit to give Rent Roll Loans & Trail Book Loans with Salesforce",
+      "background": "Australian Business Credit achieves process automation in data collection, customer onboarding, and lead management using Salesforce products and custom development to ensure fast approval of loans for businesses, especially commission-based businesses.",
+      "solution_focus": "Process automation in data collection, customer onboarding, lead management, fast loan approvals",
+      "lending_type": "Rent Roll Loans & Trail Book Loans",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "THN Capital": {
-      "industry": "Invoice Factoring",
-      "solution": "Salesforce implementation",
-      "focus": "Extended lending to small businesses based on outstanding invoices"
+      "industry": "Financial Services / Invoice Finance",
+      "tagline": "Helping THN Capital offer Invoice Factoring/Invoice Loans with Salesforce",
+      "background": "THN Capital extends lending facilities to many more small businesses based on their outstanding invoices, without the pressure of administrative challenges.",
+      "solution_focus": "Invoice factoring, invoice loans, reducing administrative challenges for small business lending",
+      "lending_type": "Invoice Factoring / Invoice Loans",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "Homevestors of America": {
-      "industry": "Real Estate Franchise",
-      "solution": "Salesforce",
-      "focus": "Franchise management"
+      "industry": "Real Estate / Property Buying",
+      "tagline": "Helping America's No. 1 home buyer optimize & simplify its processes using Salesforce",
+      "background": "Homevestors of America moves to a simplified and seamless way to manage its franchisees on a single platform and be more effective in its markets.",
+      "solution_focus": "Franchisee management on single platform, process optimization and simplification",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
-    "Our Big Kitchen": {
-      "industry": "Nonprofit (Food Distribution)",
-      "solution": "Salesforce",
-      "focus": "Volunteer management for 250,000+ meals daily"
+    "Our Big Kitchen (OBK)": {
+      "industry": "Nonprofit / Food Security",
+      "tagline": "Enabling Our Big Kitchen to scale volunteer and food delivery impact with Salesforce",
+      "background": "Our Big Kitchen (OBK) is a community-run industrial kitchen based in Sydney, Australia. OBK has empowered thousands of volunteers to prepare and distribute 250,000+ meals everyday to individuals and families in need.",
+      "solution_focus": "Volunteer management, food delivery scaling, managing people, meals, and donations - turning compassion into operations",
+      "scale": "250,000+ meals distributed, thousands of volunteers",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     },
     "MND of NSW": {
-      "industry": "Nonprofit (Health Services)",
-      "solution": "Salesforce",
-      "focus": "Motor neurone disease support services management"
+      "industry": "Nonprofit / Health Advocacy",
+      "tagline": "Reducing Admin Burden to Improve MND Care with Salesforce",
+      "background": "MND of NSW, an NDIS registered provider, has been providing benefits for and services to members of the Association with Motor Neurone Disease, their families and carers without discrimination in NSW, ACT & NT.",
+      "solution_focus": "Admin burden reduction, improved care delivery, NDIS compliance",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "Swift Loans": {
+      "industry": "Financial Services / Consumer Lending",
+      "tagline": "Enhancing Swift Loans' ability to provide fast easy Pay Day Loans with Salesforce",
+      "background": "Swift Loans achieving prosperity in a dynamic market through tailored solutions leveraging Salesforce products.",
+      "solution_focus": "Fast and easy payday loan processing, tailored solutions for dynamic market",
+      "lending_type": "Pay Day Loans",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "OZ Cash Loans": {
+      "industry": "Financial Services / Consumer Lending",
+      "tagline": "Facilitating OZ Cash Loans' underwriting & disbursal of Personal Loans with Salesforce",
+      "background": "Oz Cash Loans pursues paperless processing to staying agile and relevant in a dynamic financial market.",
+      "solution_focus": "Underwriting automation, loan disbursal, paperless processing",
+      "lending_type": "Personal Loans",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "Speedy Business Finance": {
+      "industry": "Financial Services / Business Lending",
+      "tagline": "Helping Speedy Business Finance grant Businesses Loans at speed with Salesforce",
+      "background": "Speedy Business Finance grants business loans through strategic incorporation of technology integrations and solutions.",
+      "solution_focus": "Speed of loan granting, technology integrations",
+      "lending_type": "Business Loans",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "IFT Solutions": {
+      "industry": "Financial Services / Auto Lending",
+      "tagline": "Driving IFT Solutions' Auto Lending & Auctioning business with Salesforce",
+      "background": "Integrated Financial Technologies streamlines processes with a custom servicing solution designed for lenders.",
+      "solution_focus": "Auto lending, auctioning, custom servicing solution for lenders",
+      "lending_type": "Auto Lending & Auctioning",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
+    },
+    "Smart Leasing": {
+      "industry": "Financial Services / Vehicle Leasing",
+      "tagline": "Assisting Smart Leasing to manage Automobile Leasing smartly with Salesforce",
+      "background": "Smartleasing streamlines leasing procedures to provide a more efficient, user-friendly, and customer-focused experience for all parties involved.",
+      "solution_focus": "Automobile leasing procedure streamlining, efficiency, customer experience",
+      "lending_type": "Automobile Leasing",
+      "technologies": ["Salesforce"],
+      "detailed_case_study": "Gated behind download form - full PDF available on request"
     }
-  }
+  },
+  "success_stories_page": {
+    "headline": "Success Stories",
+    "tagline": "Amplified growth-Salesforce catalyzed success stories, fostering innovation and expansion",
+    "total_case_studies": 17,
+    "note": "Individual case study pages are gated behind download forms requiring name and email to access full PDF content"
+  },
+  "navigation": [
+    "Salesforce",
+    "Snowflake",
+    "AI",
+    "Fintech",
+    "Nonprofit Organization",
+    "Success Stories",
+    "About Us",
+    "Contact Us"
+  ],
+  "privacy_policy": {
+    "url": "https://www.cloudchillies.com/privacy-policy",
+    "note": "Privacy policy page redirected to homepage during scraping. No formal privacy policy text was extractable. The site references ISO 27001 certification as their primary security credential."
+  },
+  "certifications_summary": [
+    "ISO 27001 certified",
+    "Salesforce Partner",
+    "Snowflake Partner",
+    "200+ Salesforce Certifications",
+    "5000+ Trailhead Badges",
+    "200+ Super Badges"
+  ]
 }
