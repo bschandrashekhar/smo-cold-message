@@ -234,12 +234,6 @@ def main():
                 except Exception as e:
                     st.error(f"Failed to refresh brand profiles: {e}")
 
-        st.divider()
-        st.subheader("API Configuration")
-        st.text(f"Anthropic API Key: {'configured' if config.ANTHROPIC_API_KEY else 'MISSING'}")
-        st.text(f"Voyage AI API Key: {'configured' if config.VOYAGE_API_KEY else 'MISSING'}")
-        st.text(f"Supabase URL: {'configured' if config.SUPABASE_URL else 'MISSING'}")
-        st.text(f"Supabase Key: {'configured' if config.SUPABASE_SERVICE_KEY else 'MISSING'}")
 
 
 if __name__ == "__main__":
