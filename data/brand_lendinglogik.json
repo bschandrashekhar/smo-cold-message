@@ -1,50 +1,131 @@
 {
   "name": "LendingLogik",
   "website": "https://www.lendinglogik.com",
-  "services": [
-    "AI-powered Credit Decisioning & Risk Analysis",
-    "Lender Matching & Borrower Lead Routing",
-    "Statement Data Automation & Bank Statement Visualizer",
-    "Marketing Logik & Cross-Selling Logik",
-    "Bad Debt Analyzer & Compliance Logik",
-    "Salesforce Consulting & Advisory",
-    "Salesforce Implementation & Custom Development",
-    "Salesforce Managed Services",
-    "AppExchange Development",
-    "System Integrations (50+ partner products — lead aggregation, document management, banking data, payments, accounting, SMS/email)"
-  ],
+  "tagline": "Delivering Transformational Value To Lending Companies",
+  "mission": "Trusted Salesforce partner dedicated to helping lending companies leverage Salesforce and AI to increase loan volumes, create efficiencies, and ensure superior borrower experience.",
+  "locations": {
+    "USA": "+1-732-654-9056",
+    "India": "+91-731-292-7999 (development center)",
+    "Australia": "+61-280-155-723",
+    "Also serving": "Canada, UK"
+  },
+  "services": {
+    "ai_for_lending": {
+      "loan_origination": [
+        "Credit Decisioning Logik — AI models that improve accuracy of predicting default risk, support fair lending by mitigating decision-making biases",
+        "Lender Matching Logik — analyzes borrower profiles against lender criteria in real-time to match applicants with suitable lenders",
+        "Statement Data Automation Logik — extracts financial data from multiple formats (PDF, CSV, JSON, Excel, XML, HTML) into standardized structures",
+        "Bank Statement Visualizer Logik — transforms raw statement data into charts and graphs displaying income, expenses, and cash flow patterns"
+      ],
+      "sales_and_marketing": [
+        "Marketing Logik — segments users and matches loan products to borrower needs for targeted campaigns",
+        "Cross-Selling Logik — identifies opportunities for additional loans to existing borrowers using historical performance data",
+        "Borrower Lead Routing Logik — distributes applications by workload, geography, and officer availability",
+        "Flexible Funding Logik — dynamically adjusts interest rates, repayment periods, and loan amounts based on borrower profiles"
+      ],
+      "collections_and_compliance": [
+        "Bad Debt Analyzer Logik — identifies default patterns and anomalies to refine underwriting models",
+        "Compliance Logik — rules-engine validates applications against regulatory standards with audit documentation"
+      ],
+      "technology": "ML models trained on historical lending data, deployed via API on AWS/Azure/Google Cloud, supports federated learning and data anonymization"
+    },
+    "salesforce_services": [
+      "Advisory & Consulting — select the right Salesforce products, reimagine and automate lending processes",
+      "Implementation — automated workflows, custom integrations for account management, lending-specific process setup",
+      "Custom Development — unify, connect, and automate entire loan lifecycle from application through collections",
+      "Managed Services — strategic planning, health checks, ongoing enhancement and optimization",
+      "AppExchange Development — Salesforce security review and Lightning-ready app listing"
+    ],
+    "salesforce_clouds": {
+      "Financial Services Cloud": "Loan origination, servicing, and collections. Streamlines credit checks, risk assessment, eligibility criteria, pre-approval offers. Unified customer view with loan portfolios, interactions, and creditworthiness analysis. Guided applications with conversational UI.",
+      "Sales Cloud": "Processes leads from all channels (lead marketplaces, website, digital, email, phone). Mobile-optimized forms, self-serve portals. Intelligent Decision Engine for underwriting automation. Loan offer generation with customizable terms.",
+      "Service Cloud": "Borrower pulse tracking for personalized service. Case management integrated with loan origination and payment gateways. Omni-channel support with self-service FAQs. Metrics on loan volumes, approval rates, delinquency, agent performance.",
+      "Marketing Cloud": "Consolidated borrower data from website analytics and mobile apps. Borrower segmentation by loan type, creditworthiness, repayment behavior. Automated engagement workflows across email, SMS. Cross-sell and upsell landing pages.",
+      "Experience Cloud": "Branded borrower portals for loan portfolio, payment history, installment tracking. Self-service applications, document access, support requests. Omni-channel responsive interfaces. Behavior analytics for upselling opportunities.",
+      "Tableau": "Interactive dashboards for lending business metrics. KPI monitoring including delinquent and defaulted loans. Forecasting and trend analysis for loan types and revenue drivers. Customer segmentation and portfolio management analytics.",
+      "Slack": "Digital HQ for lending teams. Chatbots for instant loan status inquiries. Document sharing (loan docs, reports, visualizations). Cross-timezone collaboration with video, audio, screen sharing."
+    },
+    "remote_salesforce_team": "Certified developers and admins based in India. Full-time or part-time, long-term or short-term. Quickly scale up/down. Specialists across Sales Cloud, Service Cloud, FSC, Experience Cloud, Marketing Cloud, and Tableau.",
+    "integrations": {
+      "lead_aggregation": ["Phonexa", "Lead Market", "eBroker", "Overflow", "Zero Parallel", "Clear Nexus", "PingYo"],
+      "document_management": ["Conga", "DocuSign", "Nintex", "Webmerge", "A5 Doc Merge"],
+      "bank_data": ["Plaid", "Credit Sense", "Proviso", "TaleFin"],
+      "credit_and_identity": ["Equifax", "Experian", "Illion", "DataX", "Green Id", "Aply Id"],
+      "accounting": ["QuickBooks", "Xero", "MYOB", "Zoho Books"],
+      "payment_processors": ["Zepto", "PayPal", "IntegraPay", "Bpoint", "Loan Payment Pro", "Checkout", "Peach Payments"],
+      "sms": ["Twilio", "Mogli", "Solutions by Text", "SMS-Magic"],
+      "email_and_surveys": ["MailChimp", "SendGrid", "Survey Monkey", "Survey Vista"],
+      "data_enrichment": ["D&B Hoovers", "ZoomInfo"],
+      "process_mining": ["Seriously Compliant Software"]
+    }
+  },
   "verticals": [
-    "Consumer Lending (student, personal, medical, payday, debt consolidation, home improvement)",
+    "Consumer Lending (student loans, personal loans, medical loans, payday loans, debt consolidation, home improvement loans)",
     "Business Lending (working capital, lines of credit, term loans, invoice factoring, bridge loans, revenue-based financing)",
-    "Asset Financing (auto, fleet, equipment)",
-    "Leasing (technology, construction, machinery)",
-    "Homeownership (mortgages, home equity, HELOC)"
+    "Asset Financing (auto loans, fleet financing, equipment financing)",
+    "Leasing (technology leasing, construction equipment, machinery leasing)",
+    "Homeownership (mortgages, home equity, HELOC)",
+    "Also: online lending platforms, credit unions, alternate lending"
   ],
   "tech_stack": [
-    "Salesforce Financial Services Cloud",
-    "Salesforce Sales Cloud",
-    "Salesforce Service Cloud",
-    "Salesforce Marketing Cloud",
-    "Salesforce Experience Cloud",
-    "Tableau",
-    "Slack",
-    "AI/ML (credit decisioning, default prediction, auto-decisioning)"
+    "Salesforce (Financial Services Cloud, Sales Cloud, Service Cloud, Marketing Cloud, Pardot, Experience Cloud, Tableau, Slack)",
+    "AI/ML models trained on historical lending data",
+    "Cloud deployment: AWS, Azure, Google Cloud",
+    "Federated learning and data anonymization",
+    "API-based integrations with 50+ partners",
+    ".Net integrations (lease management systems)"
   ],
   "differentiators": [
-    "Deep specialization in lending industry — not a generalist consultancy",
-    "Proprietary AI-powered 'Logik' suite purpose-built for lenders",
-    "50+ pre-built integrations with lending ecosystem partners",
-    "Multi-country presence (USA, India, Australia) serving global lending companies",
-    "End-to-end coverage from loan origination to compliance and bad debt analysis"
+    "Deep specialization exclusively in the lending industry — not a generalist consultancy",
+    "Proprietary AI-powered 'Logik' micro-solution suite purpose-built for every stage of the lending lifecycle",
+    "50+ pre-built integrations with lending ecosystem partners (lead aggregators, credit bureaus, payment processors, bank data, document management)",
+    "Multi-country presence: USA, India, Australia, Canada, UK",
+    "End-to-end coverage from loan origination through servicing, collections, and compliance",
+    "ML models that support fair lending by mitigating decision-making biases",
+    "Cost-effective delivery model with flexible engagement options (remote team in India)",
+    "Commitment to diversity, equity, inclusion, and environmental sustainability"
   ],
-  "tone_and_positioning": "Professional, data-driven, and industry-expert tone. Positions itself as a specialized lending technology partner that understands the complex and ever-changing lending industry. Messaging emphasizes transformational value, AI-powered efficiency, and deep domain expertise. Uses confident, outcome-oriented language focused on measurable lending outcomes.",
-  "target_audience": "Lending institutions (consumer, business, asset financing, leasing, mortgage) seeking to digitize operations, improve approval rates, streamline underwriting, implement modern loan management systems, and adopt AI-powered decisioning. Typically mid-to-large lending companies undergoing digital transformation.",
-  "tagline": "Delivering Transformational Value To Lending Companies",
-  "case_study_highlights": [
-    "Capify (Australia/UK) — Enabled business loan extension across multiple countries",
-    "Regents Capital — Redefined equipment financing and leasing operations",
-    "Total Processing — Transformed auto leasing business processes",
-    "MoneySpot — Built multi-country loan management system",
-    "IFT Solutions — Modernized auto lending platform"
-  ]
+  "tone_and_positioning": "Professional, data-driven, and deeply specialized lending industry expert tone. Positions itself as THE lending technology partner that understands the complex and ever-changing lending industry inside out. Messaging emphasizes transformational value, AI-powered efficiency, and deep domain expertise. Uses confident, outcome-oriented language focused on measurable lending outcomes — increased approval rates, reduced processing time, enhanced compliance. Authoritative but not stuffy; speaks the language of lending professionals (underwriting, origination, servicing, collections). Every message should demonstrate intimate knowledge of lending workflows.",
+  "target_audience": "Lending institutions across consumer, business, asset financing, leasing, and mortgage verticals. Typically mid-to-large lending companies seeking to digitize operations, improve approval rates, streamline underwriting, implement modern loan management systems, adopt AI-powered decisioning, or migrate to Salesforce. Decision-makers include CTOs, VP Engineering, VP Operations, and Heads of Lending at financial institutions.",
+  "case_studies": {
+    "Capify": {
+      "industry": "Business Lending (Australia/UK/USA)",
+      "background": "Alternative unsecured small business lender operating since 2008",
+      "challenges": "Slow lead capture, extended processing timelines, complex partner onboarding, fragmented post-submission communication",
+      "solution": "Self-service partner portal via Experience Cloud, automated application sync into Sales Cloud, multi-source lead management, Pardot marketing automation",
+      "integrations": ["eBroker", "Lending Express", "SMS Magic", "Pardot", "Calendly"],
+      "outcomes": "Processing time reduced from days to minutes, real-time partner visibility, eliminated lead loss risk"
+    },
+    "Regents Capital": {
+      "industry": "Equipment Financing (California, USA)",
+      "background": "Commercial equipment financing company est. 2013, serving mid-market clients ($10-250M revenue)",
+      "challenges": "Legacy Salesforce Classic inadequate, insufficient application vetting, needed role-specific access, cumbersome partner onboarding",
+      "solution": "Lightning migration with custom UI, Experian/Paynet credit integration for auto-decisioning, automated Final Disclosure Process, Experience Cloud vendor portal",
+      "integrations": ["Experian Commercial", "Paynet", "SMS Magic", "Pardot", "LoansOne", "Calendly"],
+      "outcomes": "Improved productivity post-Lightning, accelerated credit assessment, enhanced departmental workflows, streamlined vendor interactions"
+    },
+    "MoneySpot": {
+      "industry": "Loan Technology (USA/Australia/South Africa)",
+      "background": "Loan technology company est. 2015 providing short-term borrowing solutions across 3 countries",
+      "challenges": "Inconsistent risk management across regions, excessive manual processing, customer experience inconsistencies, lead conversion limitations",
+      "solution": "Assessor Toolkit, automated decision engine, lead-assignment automation, Bank Report Visualizer, early warning systems, mobile app for real-time loan status",
+      "integrations": ["Plaid", "Twilio", "Checkout.com", "illion", "GreenID", "12+ third-party services"],
+      "outcomes": "70% manual workload reduction, 50% faster loan processing, 25% fewer support inquiries, 23% increase in lead conversion, 15% improvement in portfolio health"
+    },
+    "Smart Leasing (SmartGroup)": {
+      "industry": "Vehicle Leasing / Salary Packaging (Australia, ASX:SIQ)",
+      "background": "Australian financial services org delivering salary packaging, novated leasing, fleet management, and payroll admin",
+      "challenges": "Needed employer-employee-dealer connection system, comprehensive lease lifecycle management, lease transfer capabilities",
+      "solution": "Multi-faceted Salesforce system with dealer operations module, vehicle selection features, .Net lease management integration, digital lease transfer processes",
+      "outcomes": "70% manual workload reduction, 50% faster processing, 25% fewer support inquiries, 23% lead conversion increase"
+    },
+    "IFT Solutions": {
+      "industry": "Auto Lending BPO (Vancouver, Canada)",
+      "background": "Financial services BPO est. 2016, managed $10B+ in capital, provides lending management for auto-lenders",
+      "challenges": "Needed multi-tenant platform for multiple lenders, banking system integration with consent-driven data, application tracking and backend automation",
+      "solution": "Partner Portal for loan validation, Customer Portal for applications, Omni-Channel Routing via Service Cloud, multi-system integrations",
+      "integrations": ["Twilio", "DocuSign", "Conga", "Adobe Sign", "Postgrid", "Smartly"],
+      "outcomes": "Scalable multi-lender platform, improved data consistency via APIs, streamlined operations and agent efficiency"
+    }
+  }
 }

@@ -1,34 +1,86 @@
 {
   "name": "CloudChillies",
   "website": "https://www.cloudchillies.com",
-  "services": [
-    "Salesforce Multi-Cloud Implementation & End-to-End Rollouts",
-    "Salesforce Custom Development, Mobile Solutions & IoT",
-    "Salesforce Integrations with Disparate Systems",
-    "AppExchange Development & Publishing",
-    "Salesforce Managed Services & Ongoing Optimization",
-    "Snowflake Data Foundation Setup & Adoption",
-    "Data Stack Modernization with ELT Pipelines",
-    "Legacy Warehouse Migrations & Cross-Cloud Transfers",
-    "Enterprise Analytics & BI Integration (Tableau, Power BI, Looker)",
-    "Salesforce + Snowflake Unified Intelligence",
-    "AI/ML via Snowpark & Cortex with Governance",
-    "Agentforce Implementation & Einstein GPT Workflows",
-    "Lead Scoring Models & Auto-Generated Analytics",
-    "Agent Assist Bots & Conversational UI",
-    "Dynamic Approval & Risk Logic Automation"
+  "tagline": "Powering Intelligent Enterprises — We give an Unf(AI)r advantage to your Business and Maximize the ROI",
+  "mission": "Helping organizations transform through AI, data, and Salesforce with specialized, industry-specific solutions — not one-size-fits-all.",
+  "leadership": {
+    "CEO": "Shishir Danani",
+    "CTO": "Sateesh Chandrashekar",
+    "COO": "Avinash Kumar",
+    "background": "All three are ex-Infosys leaders and alumni of top engineering and business schools in USA and India, collectively bringing 30+ years of enterprise IT experience"
+  },
+  "locations": ["USA", "Canada", "Australia", "UK", "Middle East"],
+  "credentials": {
+    "team_size": "150+ experts",
+    "experience": "20+ years industry expertise",
+    "certifications": "200+ Salesforce Certifications",
+    "trailhead": "5,000+ TrailHead Badges, 200+ Super Badges",
+    "projects": "400+ projects delivered",
+    "security": "ISO 27001 certified",
+    "partnerships": "Trusted Salesforce & Snowflake Partner"
+  },
+  "values": [
+    "Build for Impact — solutions designed to drive efficiency and revenue growth",
+    "Clarity Over Complexity — straightforward, practical approaches without jargon",
+    "Own the Outcome — full accountability from kickoff through completion",
+    "Adapt to Fit — customized solutions for each organization's unique needs",
+    "Partner With Purpose — long-term relationships, not quick wins"
   ],
-  "verticals": [
-    "Finance & Fintech (lending, banking, wealth management, employee benefits, insurance)",
-    "Nonprofits (donor management, community fundraising, mission scaling)",
-    "Healthcare",
-    "Manufacturing",
-    "Real Estate",
-    "Hi-Tech",
-    "Education"
-  ],
+  "services": {
+    "salesforce": {
+      "implementation": "End-to-end multi-cloud rollouts — fast, secure, scalable deployments",
+      "integrations": "Connecting Salesforce to ERPs, marketing platforms, finance tools, donation platforms, email tools, grant portals, and case systems",
+      "development": "Custom applications including mobile solutions, IoT, and Lightning components",
+      "managed_services": "Performance tuning, admin work, feature enhancements, org health checks",
+      "appexchange": "Full lifecycle from ideation through Salesforce marketplace publishing",
+      "supported_clouds": [
+        "Financial Services Cloud",
+        "Nonprofit Cloud",
+        "Sales Cloud",
+        "Service Cloud",
+        "Marketing Cloud & Pardot",
+        "Experience Cloud",
+        "Data Cloud",
+        "CRM Analytics",
+        "MuleSoft (integrations)"
+      ]
+    },
+    "snowflake": {
+      "data_foundation": "Production-ready environments with data ingestion, modeling, governance, and BI connectivity",
+      "modernization": "Scalable ELT pipelines from enterprise systems and CRMs, replacing traditional ETL",
+      "migration": "Low-risk transfers from legacy warehouses, post-merger consolidations, cross-cloud migrations (AWS/Azure/GCP) with minimal downtime",
+      "analytics": "Dashboard and reporting via Tableau, Power BI, Looker for revenue analytics and executive visibility",
+      "salesforce_integration": "Customer 360, revenue intelligence, churn analysis — combining CRM with enterprise data",
+      "ai_ml": "Snowpark and Cortex for forecasting, risk detection, anomaly analysis in regulated industries. In-database LLM functions for text processing and predictive analytics",
+      "governance": "Native role-based access, PII protection, cost monitoring, audit capabilities",
+      "managed_services": "Ongoing performance optimization and cost governance as data scales"
+    },
+    "ai": {
+      "agentforce": "Agent workspace implementation with compliance guardrails",
+      "einstein_gpt": "Personalized response generation, content creation, natural language-driven flow automation",
+      "lead_scoring": "Intent-based scoring using actual sales/donor behavioral data, not assumptions",
+      "smart_approvals": "Auto-decision workflows for loans, grants, or purchases with dynamic thresholds and pattern recognition",
+      "knowledge_retrieval": "Internal document querying for instant answers, AI-suggested responses for support",
+      "tableau_automation": "AI-driven dashboard creation without manual setup, intelligent tracking suggestions",
+      "agent_bots": "Response suggestions for faster support, internal knowledge base integration, conversational UI"
+    }
+  },
+  "verticals": {
+    "finance": {
+      "segments": ["Lending", "Banking", "Wealth Management", "Employee Benefits & Salary Packaging", "Insurance", "Fintech", "Invoice Factoring"],
+      "ai_use_cases": ["Credit decisioning and dynamic scoring", "Lender matching based on borrower profiles", "Statement visualization into actionable dashboards", "Bad debt prediction and mitigation", "Fraud detection", "Customer journey automation", "Dynamic loan approval workflows"],
+      "metrics": "Manual workload reduced up to 70%, customer satisfaction up to 70%, revenue growth up to 20%, costs decreased 20%, efficiency up to 83%, time-to-market reduced 30%"
+    },
+    "nonprofits": {
+      "segments": ["Donor Management", "Community Fundraising", "Mission Scaling", "Youth Programs", "Food Distribution", "Health Services"],
+      "capabilities": ["Multi-Cloud Implementation (Nonprofit Cloud, Experience Cloud, Marketing Cloud)", "Donor churn prediction and re-engagement via AI", "Volunteer scheduling and disengagement detection", "Program intake automation with urgency detection", "Impact reporting with AI-drafted dashboards", "Grant portal and case system integrations"],
+      "credentials": "100+ Salesforce certifications, 20+ years nonprofit experience, ISO 27001 certified"
+    },
+    "other": ["Healthcare", "Manufacturing", "Real Estate", "Hi-Tech", "Education"]
+  },
   "tech_stack": [
-    "Salesforce (Sales Cloud, Service Cloud, Marketing Cloud, Experience Cloud, Financial Services Cloud, Nonprofit Cloud)",
+    "Salesforce (Financial Services Cloud, Nonprofit Cloud, Sales Cloud, Service Cloud, Marketing Cloud, Pardot, Experience Cloud, Data Cloud, CRM Analytics)",
+    "MuleSoft (integrations)",
     "Snowflake (Data Warehousing, Snowpark, Cortex AI)",
     "Tableau",
     "Power BI",
@@ -36,26 +88,83 @@
     "Azure",
     "AWS",
     "GCP",
-    "Einstein GPT & Agentforce"
+    "Einstein GPT & Agentforce",
+    "Custom LLM Workflows",
+    "JD Edwards (manufacturing integrations)"
   ],
   "differentiators": [
     "Specialized teams for Finance & Nonprofits — no one-size-fits-all solutions",
-    "20+ years of industry experience with 150+ experts on staff",
-    "200+ Salesforce Certifications and 5000+ TrailHead Badges",
-    "400+ projects delivered across multiple countries",
-    "ISO 27001 certified — enterprise-grade security focus",
-    "Dual Salesforce + Snowflake expertise for unified data intelligence",
-    "Proven measurable impact: up to 70% manual workload reduction, 20% cost decrease, 83% efficiency increase"
+    "20+ years of industry experience with 150+ experts",
+    "200+ Salesforce Certifications, 5,000+ TrailHead Badges, 200+ Super Badges",
+    "400+ projects delivered across USA, Canada, Australia, UK, Middle East",
+    "ISO 27001 certified — enterprise-grade security for regulated industries",
+    "Dual Salesforce + Snowflake expertise — unified CRM + data warehouse intelligence",
+    "AI-first approach embedding Custom GPT + Einstein workflows inside Salesforce",
+    "Leadership team with 30+ years enterprise IT experience (ex-Infosys)",
+    "Proven measurable impact: up to 70% workload reduction, 83% efficiency increase, 30% time-to-market reduction"
   ],
-  "tone_and_positioning": "Professional yet conversational and approachable. Positions itself as a consultative partner that 'powers intelligent enterprises' through AI, data, and Salesforce. Uses confident, impact-oriented language with emphasis on transformation, innovation, and measurable ROI. Slightly more playful than traditional consulting firms — uses phrases like 'Unf(AI)r advantage' and 'Turn Your Challenges Into Success Stories'. Emphasizes partnership over vendor relationship.",
-  "target_audience": "Financial services institutions (lenders, banks, fintechs, insurers), nonprofit organizations focused on mission scaling, and mid-to-large enterprises requiring regulated, secure, industry-specific solutions. Organizations undergoing digital transformation, legacy system modernization, or data platform migration.",
-  "tagline": "Powering Intelligent Enterprises — We give an Unf(AI)r advantage to your Business and Maximize the ROI",
-  "case_study_highlights": [
-    "Brickworks (manufacturing) — Digitized new product development and plant onboarding",
-    "Capify (fintech) — Enabled business loan extension across Australia and UK",
-    "Regents Capital (equipment financing) — Redefined leasing business operations",
-    "Raise Foundation (nonprofit) — Digitized mentorship and youth empowerment programs",
-    "Smartgroup (fintech) — Streamlined salary packaging and payroll services",
-    "Caritas Australia (nonprofit) — Built 'Compassion at Scale' donor management system"
-  ]
+  "tone_and_positioning": "Professional yet conversational and approachable. Positions itself as a consultative partner that 'powers intelligent enterprises' through AI, data, and Salesforce. Uses confident, impact-oriented language with emphasis on transformation, innovation, and measurable ROI. Slightly more playful than traditional consulting firms — uses phrases like 'Unf(AI)r advantage', 'Turn Your Challenges Into Success Stories', and 'Compassion at Scale'. Emphasizes partnership over vendor relationship. Speaks to both technical stakeholders (data architecture, Snowpark, Cortex) and business leaders (ROI, efficiency, revenue growth). Strong nonprofit empathy — understands mission-driven organizations. Every message should feel consultative, outcome-focused, and warmly professional.",
+  "target_audience": "Financial services institutions (lenders, banks, fintechs, insurers, salary packaging companies), nonprofit organizations focused on mission scaling and donor management, and mid-to-large enterprises in healthcare, manufacturing, real estate, education, and tech. Organizations undergoing digital transformation, legacy system modernization, data platform migration, or AI adoption. Decision-makers include CTOs, CIOs, VP Data, VP Operations, Heads of IT, and Executive Directors at nonprofits.",
+  "case_studies": {
+    "Brickworks": {
+      "industry": "Manufacturing (Australia's largest brick manufacturer)",
+      "solution": "Salesforce + JD Edwards integration",
+      "focus": "Digitized new product development and plant onboarding processes"
+    },
+    "Capify": {
+      "industry": "Business Lending (Australia/UK)",
+      "solution": "Salesforce partner onboarding platform",
+      "focus": "Enabled business loan extension across multiple markets"
+    },
+    "Regents Capital": {
+      "industry": "Equipment Financing & Leasing",
+      "solution": "Salesforce Lightning implementation",
+      "focus": "Redefined leasing and equipment financing operations"
+    },
+    "Raise Foundation": {
+      "industry": "Nonprofit (Youth Mentorship)",
+      "solution": "Salesforce Nonprofit Cloud",
+      "focus": "Digitized mentorship programs and youth empowerment initiatives"
+    },
+    "Smartgroup": {
+      "industry": "Fintech / Salary Packaging (ASX:SIQ)",
+      "solution": "Salesforce + Azure integration",
+      "focus": "Digitized salary packaging, novated leasing, fleet management, and payroll services"
+    },
+    "Caritas Australia": {
+      "industry": "Nonprofit (serving 1.5M people across 36 countries)",
+      "solution": "Salesforce Nonprofit Cloud",
+      "focus": "Built 'Compassion at Scale' donor management and community fundraising system"
+    },
+    "Alsco": {
+      "industry": "Uniform & Linen Rental (multi-continent)",
+      "solution": "Self-service customer portal via Salesforce",
+      "focus": "Recurring, one-time, and direct sales orders"
+    },
+    "Australian Business Credit": {
+      "industry": "Business Lending",
+      "solution": "Salesforce automation",
+      "focus": "Rent roll and trail book loans with process automation in data collection, onboarding, and lead management"
+    },
+    "THN Capital": {
+      "industry": "Invoice Factoring",
+      "solution": "Salesforce implementation",
+      "focus": "Extended lending to small businesses based on outstanding invoices"
+    },
+    "Homevestors of America": {
+      "industry": "Real Estate Franchise",
+      "solution": "Salesforce",
+      "focus": "Franchise management"
+    },
+    "Our Big Kitchen": {
+      "industry": "Nonprofit (Food Distribution)",
+      "solution": "Salesforce",
+      "focus": "Volunteer management for 250,000+ meals daily"
+    },
+    "MND of NSW": {
+      "industry": "Nonprofit (Health Services)",
+      "solution": "Salesforce",
+      "focus": "Motor neurone disease support services management"
+    }
+  }
 }
