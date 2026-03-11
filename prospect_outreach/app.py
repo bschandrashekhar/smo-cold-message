@@ -208,20 +208,6 @@ def main():
             else:
                 col1.warning(f"**{name}** — Not generated yet")
 
-            if exists:
-                with col2:
-                    if st.button(f"View", key=f"view_{name}"):
-                        pass  # Handled by expander below
-
-        # Show brand profiles in expanders
-        for name, exists in status.items():
-            if exists:
-                with st.expander(f"View {name} Profile"):
-                    try:
-                        profile = brand_knowledge.load_brand_profile(name)
-                        st.json(profile)
-                    except Exception as e:
-                        st.error(f"Failed to load: {e}")
 
         st.divider()
 
