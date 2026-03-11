@@ -218,8 +218,7 @@
         "anonymization": "Strip Personally Identifiable Information (PII). No unique identifiers in datasets used for training.",
         "federated_learning": "Machine learning technique that enables organizations to train models on decentralized data. Models trained in your environment on your data without the data ever leaving the company's premises. ML models sent to client servers for local training on anonymized data. Models then hosted in client's own environment."
       },
-      "fair_lending": "Flynx's AI models are trained on data that doesn't contain any features/variables that can potentially create bias in its predictions, thus making your business be automatically fairness-aware. Each product emphasizes Fair Lending Practices or Fair Lending principles integrated throughout.",
-      "flynx_reference": "Flynx is the AI/ML engine referenced across LendingLogik's products. Flynx's AI models are trained to be fairness-aware with bias-free predictions.",
+      "fair_lending": "AI models are trained on data that doesn't contain any features/variables that can potentially create bias in its predictions, thus making your business be automatically fairness-aware. Each product emphasizes Fair Lending Practices or Fair Lending principles integrated throughout.",
       "technology": "ML models trained on historical lending data, deployed via API on AWS/Azure/Google Cloud/Heroku. Supports federated learning and data anonymization. Integration with Salesforce/CRM via HTTP API requests."
     },
     "salesforce_services": [
@@ -675,7 +674,7 @@
       "AI/ML models trained on historical lending data",
       "Federated learning",
       "Data anonymization/de-identification",
-      "Flynx AI engine"
+      "Custom AI/ML engine for lending"
     ],
     "cloud_platforms": [
       "AWS",
@@ -699,7 +698,7 @@
     "50+ pre-built integrations with lending ecosystem partners (lead aggregators, credit bureaus, payment processors, bank data, document management)",
     "Multi-country presence: USA, India, Australia, Canada, UK",
     "End-to-end coverage from loan origination through servicing, collections, and compliance",
-    "ML models that support fair lending by mitigating decision-making biases (Flynx AI engine)",
+    "ML models that support fair lending by mitigating decision-making biases",
     "Cost-effective delivery model with flexible engagement options (remote certified team in India)",
     "Commitment to diversity, equity, inclusion, and environmental sustainability",
     "Focused on Lending — not a generalist",
