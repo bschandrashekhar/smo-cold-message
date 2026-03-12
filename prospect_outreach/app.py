@@ -50,6 +50,10 @@ def main():
                 st.dataframe(df, use_container_width=True)
 
                 if st.button("Run Research", type="primary"):
+                    # Clear stale results from previous run
+                    st.session_state.pop("research_output", None)
+                    st.session_state.pop("research_count", None)
+
                     # Save uploaded file to temp
                     tmp_in = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     tmp_in.write(uploaded.getbuffer())
@@ -75,25 +79,30 @@ def main():
                         )
                         progress_bar.progress(1.0)
                         status_text.text("Research complete!")
-                        st.success(f"Research completed for {len(df)} prospects.")
-
-                        # Show results preview
-                        result_df = pd.read_excel(tmp_out.name, sheet_name="prospects")
-                        st.subheader("Results Preview")
-                        st.dataframe(result_df, use_container_width=True)
 
                         with open(tmp_out.name, "rb") as f:
-                            st.download_button(
-                                "Download data_output.xlsx",
-                                f.read(),
-                                file_name="data_output.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                type="primary",
-                            )
+                            st.session_state["research_output"] = f.read()
+                        st.session_state["research_count"] = len(df)
                     except Exception as e:
                         st.error(f"Research failed: {e}")
                     finally:
                         os.unlink(tmp_in.name)
+
+                # Show results and download button outside the Run button block
+                if "research_output" in st.session_state:
+                    st.success(f"Research complete for {st.session_state.get('research_count', '?')} prospects. Download the file below.")
+
+                    result_df = pd.read_excel(st.session_state["research_output"], sheet_name="prospects")
+                    st.subheader("Results Preview")
+                    st.dataframe(result_df, use_container_width=True)
+
+                    st.download_button(
+                        "Download data_output.xlsx",
+                        st.session_state["research_output"],
+                        file_name="data_output.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary",
+                    )
 
             except Exception as e:
                 st.error(f"Failed to read workbook: {e}")
@@ -147,6 +156,10 @@ def main():
                 if ready == 0:
                     st.warning("No prospects ready for message generation.")
                 elif st.button("Generate Messages", type="primary"):
+                    # Clear stale results from previous run
+                    st.session_state.pop("messages_output", None)
+                    st.session_state.pop("messages_count", None)
+
                     # Save to temp
                     tmp_in2 = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     tmp_in2.write(uploaded2.getbuffer())
@@ -171,25 +184,30 @@ def main():
                         )
                         progress_bar2.progress(1.0)
                         status_text2.text("Generation complete!")
-                        st.success(f"Messages generated for {ready} prospects.")
-
-                        # Show results
-                        result_df2 = pd.read_excel(tmp_out2.name, sheet_name="prospects")
-                        st.subheader("Results Preview")
-                        st.dataframe(result_df2, use_container_width=True)
 
                         with open(tmp_out2.name, "rb") as f:
-                            st.download_button(
-                                "Download data_final.xlsx",
-                                f.read(),
-                                file_name="data_final.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                type="primary",
-                            )
+                            st.session_state["messages_output"] = f.read()
+                        st.session_state["messages_count"] = ready
                     except Exception as e:
                         st.error(f"Message generation failed: {e}")
                     finally:
                         os.unlink(tmp_in2.name)
+
+                # Show results and download button outside the Generate button block
+                if "messages_output" in st.session_state:
+                    st.success(f"Messages generated for {st.session_state.get('messages_count', '?')} prospects. Download the file below.")
+
+                    result_df2 = pd.read_excel(st.session_state["messages_output"], sheet_name="prospects")
+                    st.subheader("Results Preview")
+                    st.dataframe(result_df2, use_container_width=True)
+
+                    st.download_button(
+                        "Download data_final.xlsx",
+                        st.session_state["messages_output"],
+                        file_name="data_final.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary",
+                    )
 
     # ── Tab 3: Settings ──────────────────────────────────────────────────
     with tabs[2]:
