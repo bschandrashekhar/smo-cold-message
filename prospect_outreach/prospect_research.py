@@ -61,16 +61,18 @@ Return a structured summary with clear bullet points."""
     response = _call_claude_with_retry(
         client,
         model="claude-sonnet-4-20250514",
-        max_tokens=2048,
+        max_tokens=4096,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
     )
 
-    text_parts = []
+    # Only keep the final text block — earlier ones are intermediate narration
+    # ("Let me search for...", "Now let me look at...") between web search calls
+    last_text = ""
     for block in response.content:
         if block.type == "text":
-            text_parts.append(block.text)
-    return "\n".join(text_parts).strip()
+            last_text = block.text
+    return last_text.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -105,11 +107,11 @@ Return 3-4 concise bullet points tailored to this person's role."""
         messages=[{"role": "user", "content": prompt}],
     )
 
-    text_parts = []
+    last_text = ""
     for block in response.content:
         if block.type == "text":
-            text_parts.append(block.text)
-    return "\n".join(text_parts).strip()
+            last_text = block.text
+    return last_text.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -288,8 +290,8 @@ def run_research(
 
             # Build research summary (company + prospect findings)
             summary_parts = []
-            summary_parts.append(f"Company: {company_research[:500]}")
-            summary_parts.append(f"Prospect: {prospect_research[:500]}")
+            summary_parts.append(f"Company: {company_research}")
+            summary_parts.append(f"Prospect: {prospect_research}")
             if case_studies:
                 cs_brief = "; ".join(
                     f"{cs['use_case']} ({cs['industry']})" for cs in case_studies[:3]
