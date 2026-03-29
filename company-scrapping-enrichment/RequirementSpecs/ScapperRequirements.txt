@@ -9,12 +9,14 @@ Event Prospecting Strategy:
 Input: data.xlsx (this will be uploaded to the application front end)
 | Column | Description |
 |--------|-------------|
-| Exhibhition | Full name of the exhibhition 
+| Exhibition | Full name of the exhibhition 
 | Exhibitor Link | Link to the list of exhibitors 
+
+Input sheet will have multiple rows in the input excel sheet, each row will have a different exhibition and its corresponding exhibitor link. The tool will iterate through each row and extract the list of exhibitors for each exhibition.
 
 Output: 
 Step 1:
-For each 'Exhibitor Link' from the input excel sheet, I need you to take out the list of companies that are exhibiting and prepare an excel sheet With the following information :
+For each 'Exhibitor Link' from the input excel sheet, I need you to take out the list of companies that are exhibiting and prepare a worksheet within the input sheet itself (Call it <ExhibitionName>-Exhibitors). <ExhibitionName> is the name of the corresponding exhibition in the input  The following information needs to be captured for each company in the list:
 
 | Company Name | Name of the Exhibiting company.
 | Website | Exhibiting Company website URL.
@@ -23,6 +25,12 @@ For each 'Exhibitor Link' from the input excel sheet, I need you to take out the
 | Industry Vertical | Deduce and fill the industry vertical that the company belongs to like Financial Services, Automotive, Banking, Healthcare etc.
 | Sub-industry | Sub-vertical or sub-industry within the major vertical if applicable.
 | Revenue Range | The latest revenue of the company.
+
+Points to consider:
+- The exhibitor page can be scraped and HTML parsed to read the exhibitor's list name. Simple HTML parsing can be used to read the exhibitor's list name, website, and location (whatever is available of the three). For rest of the information industry vertical, sub-industry, and revenue range, you can use a combination of web scraping and API calls to business information services like LinkedIn, Crunchbase, or similar platforms that provide company data in combination with Apollo.io. Give preference to Apollo.io for data enrichment as it is the primary tool for lead enrichment in this project.
+- The only scenario where this might not work is if the exhibitor page is heavily JavaScript-rendered (SPA) — then requests.get() would get an empty shell. But most exhibition sites render their exhibitor lists server-side, so this should work well. If we hit a JS-heavy page, let us know on the UI itself and if that is the case, in that scenario we can explore:
+- Using Claude Web Search for scraping the exhibitor list if the page is JavaScript-heavy and not easily scrappable with traditional methods. 
+- If Apollo.io does not have the required data points for a company, we can use LinkedIn and Crunchbase as secondary sources to fill in the gaps. The data collection process should be automated as much as possible to ensure efficiency and accuracy.
 
 Use #INPUT-STEP1 to as the shortlist criteria.
 
@@ -41,7 +49,10 @@ Within each company, I need to collect the prospects that we can reach out to. T
 - Exclude CFOs from targeting
 - Collect contact details and email addresses for identified prospects from lead enrichment services.
 
-Use #INPUT-STEP2 to enhance the Excel template structure with additional data points, the listing has to be ordered based on company:
+Points to consider:
+	- Apollo.io will be the primary tool for lead enrichment to gather contact details and email addresses for the identified prospects. If Apollo.io does not have the required data points for a prospect, we can use LinkedIn and Crunchbase as secondary sources to fill in the gaps. Against each prospect in a column indicate all the source that was referred to formulate the information. Let it be a comma separated list of sources like Apollo, LinkedIn, Crunchbase etc. This will help us understand the reliability of the data and the sources that are most effective for our lead enrichment process. Always start and give priority to Apollo.io for data enrichment as it is the primary tool for lead enrichment in this project.
+
+Use #INPUT-STEP2 to enhance the Excel template structure with additional data points, the listing has to be ordered based on company. The same worksheet as created in Step 1 (<ExhibitionName>-Exhibitors) will be used to add the prospects data for each company. The following columns will be added to the right of the existing columns for each company:
 
 	#INPUT-STEP2:
 	Data Collection Requirements from lead enrichment services.
@@ -50,5 +61,4 @@ Use #INPUT-STEP2 to enhance the Excel template structure with additional data po
 	- Location: City, state, country
 	- Company: Name, industry, , 
 	- Technology: Tools/platforms they use
-	- Lead source tracking
-
+	- Dont repeat the company rows while listing the prospects per company. It will be more readable.
