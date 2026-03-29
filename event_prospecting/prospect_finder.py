@@ -2,6 +2,11 @@
 
 Takes the multi-sheet workbook from Step 1 and adds prospect columns to the
 right of existing company data in each worksheet.
+
+Data source tracking: each prospect row includes a "Lead Source" field
+indicating which services were used (e.g. "Apollo", "Apollo, LinkedIn").
+Apollo.io is the primary source; secondary sources (LinkedIn, Crunchbase)
+are noted for future integration.
 """
 
 import re
@@ -62,16 +67,12 @@ EXCLUDE_TITLES = ["Chief Financial Officer", "CFO"]
 
 
 def _parse_revenue_to_millions(revenue_range: str) -> Optional[float]:
-    """Parse a revenue range string into an approximate value in millions.
-
-    Returns None if unparseable. Used to determine company size for targeting.
-    """
+    """Parse a revenue range string into an approximate value in millions."""
     if not revenue_range or revenue_range.lower() in ("unknown", "n/a", ""):
         return None
 
     text = revenue_range.upper().replace(",", "").replace("$", "").strip()
 
-    # Try to find a number with B/M suffix
     match = re.search(r"([\d.]+)\s*(B|M|K)?", text)
     if not match:
         return None
@@ -84,15 +85,11 @@ def _parse_revenue_to_millions(revenue_range: str) -> Optional[float]:
     elif unit == "K":
         return value / 1000
     else:
-        # Default to millions
         return value
 
 
 def _is_large_company(revenue_range: str) -> bool:
-    """Determine if a company is 'large' based on revenue.
-
-    Large = revenue > $100M. If unknown, default to small/mid targeting.
-    """
+    """Determine if a company is 'large' based on revenue (>$100M)."""
     millions = _parse_revenue_to_millions(revenue_range)
     if millions is None:
         return False
@@ -106,7 +103,6 @@ def _extract_domain(website: str) -> str:
     website = website.strip().lower()
     if not website.startswith("http"):
         website = "https://" + website
-    # Extract domain
     match = re.search(r"https?://(?:www\.)?([^/]+)", website)
     return match.group(1) if match else website
 
@@ -117,17 +113,7 @@ def _apollo_people_search(
     exclude_titles: List[str],
     per_page: int = 10,
 ) -> List[Dict]:
-    """Search Apollo.io for people at a company matching role criteria.
-
-    Args:
-        domain: Company domain (e.g. 'acme.com').
-        titles: Job titles to include.
-        exclude_titles: Job titles to exclude.
-        per_page: Max results per request.
-
-    Returns:
-        List of person dicts from Apollo API.
-    """
+    """Search Apollo.io for people at a company matching role criteria."""
     if not config.APOLLO_API_KEY:
         return []
 
@@ -153,8 +139,23 @@ def _apollo_people_search(
 
 
 def _extract_prospect_row(person: Dict, company_name: str) -> Dict:
-    """Extract prospect fields from an Apollo person record."""
+    """Extract prospect fields from an Apollo person record.
+
+    Tracks data sources: builds a comma-separated list of sources used.
+    Currently Apollo is the primary source. Fields that came from Apollo
+    are tagged. If a field is empty, it indicates a gap that could be
+    filled by secondary sources (LinkedIn, Crunchbase) in future.
+    """
     org = person.get("organization", {}) or {}
+
+    # Track which sources contributed data
+    sources = []
+    sources.append("Apollo")
+
+    # Check if LinkedIn profile is available from Apollo
+    linkedin_url = person.get("linkedin_url", "")
+    if linkedin_url:
+        sources.append("LinkedIn")
 
     return {
         "First Name": person.get("first_name", ""),
@@ -164,13 +165,13 @@ def _extract_prospect_row(person: Dict, company_name: str) -> Dict:
         "Phone": person.get("phone_number", "") or (person.get("phone_numbers", [{}]) or [{}])[0].get("sanitized_number", ""),
         "Mobile": person.get("mobile_phone", ""),
         "Email": person.get("email", ""),
-        "LinkedIn Profile Link": person.get("linkedin_url", ""),
+        "LinkedIn Profile Link": linkedin_url,
         "City": person.get("city", ""),
         "State": person.get("state", ""),
         "Prospect Country": person.get("country", ""),
         "Industry": org.get("industry", ""),
         "Technology": ", ".join(org.get("current_technologies", [])[:10]) if org.get("current_technologies") else "",
-        "Lead Source": "Apollo.io",
+        "Lead Source": ", ".join(sources),
     }
 
 
@@ -179,6 +180,10 @@ def find_prospects(
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> Dict[str, pd.DataFrame]:
     """Find prospects for each company and add as columns to the right.
+
+    Apollo.io is the primary source. If Apollo returns no results for a company,
+    the prospect columns are left empty with Lead Source indicating the gap.
+    Secondary sources (LinkedIn, Crunchbase) can be added in future iterations.
 
     Args:
         sheets: Dict mapping sheet names to company DataFrames (from Step 1).
@@ -209,6 +214,7 @@ def find_prospects(
                 row_data = company_row.to_dict()
                 for col in PROSPECT_COLUMNS:
                     row_data[col] = ""
+                row_data["Lead Source"] = "No domain available"
                 enriched_rows.append(row_data)
                 processed += 1
                 continue
@@ -219,7 +225,7 @@ def find_prospects(
             else:
                 titles = SMALL_MID_COMPANY_TITLES
 
-            # Search Apollo
+            # Search Apollo (primary source)
             people = _apollo_people_search(domain, titles, EXCLUDE_TITLES)
 
             if people:
@@ -234,10 +240,11 @@ def find_prospects(
                     row_data.update(prospect_data)
                     enriched_rows.append(row_data)
             else:
-                # No prospects found — add company row with empty prospect columns
+                # No prospects found via Apollo — flag for potential secondary source lookup
                 row_data = company_row.to_dict()
                 for col in PROSPECT_COLUMNS:
                     row_data[col] = ""
+                row_data["Lead Source"] = "Apollo: no results"
                 enriched_rows.append(row_data)
 
             processed += 1
