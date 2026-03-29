@@ -1,0 +1,54 @@
+Application type: Streamlit App
+Repo: Github
+Lead Enrichment to be done using: Apollo.io
+
+Event Prospecting Strategy:
+
+- This tool is a web based application that targets a conference website to extract the list of exhibitors. The input excel sheet will comprise of:
+
+Input: data.xlsx (this will be uploaded to the application front end)
+| Column | Description |
+|--------|-------------|
+| Exhibhition | Full name of the exhibhition 
+| Exhibitor Link | Link to the list of exhibitors 
+
+Output: 
+Step 1:
+For each 'Exhibitor Link' from the input excel sheet, I need you to take out the list of companies that are exhibiting and prepare an excel sheet With the following information :
+
+| Company Name | Name of the Exhibiting company.
+| Website | Exhibiting Company website URL.
+| Location of Company | Geographic location of the Company (city).
+| Country | Country of the Company.
+| Industry Vertical | Deduce and fill the industry vertical that the company belongs to like Financial Services, Automotive, Banking, Healthcare etc.
+| Sub-industry | Sub-vertical or sub-industry within the major vertical if applicable.
+| Revenue Range | The latest revenue of the company.
+
+Use #INPUT-STEP1 to as the shortlist criteria.
+
+	#INPUT-STEP1:
+	Conditions for the companies to be considered in the above list:
+	- Not IT service providers
+	- Revenue under $2 billion
+	- Preferably financial services (not mandatory)
+	- Using technologies in our expertise area which comprises of these: Salesforce, Dell Boomi, Snowflake, .NET, Tableau, MS Fabric.
+	- Avoid casting too wide a net on data engineering tools while sticking to the tools within our capabilities.
+
+Step 2:
+Within each company, I need to collect the prospects that we can reach out to. The rules for targeting would be role based. Target Contact Shortlisting Strategy (ICP varies by company size):
+- Large companies: Director of Engineering, Director of Data Engineering, Head of Applications
+- Small/mid-size companies: C-level executives (CEO, CTO, etc.)
+- Exclude CFOs from targeting
+- Collect contact details and email addresses for identified prospects from lead enrichment services.
+
+Use #INPUT-STEP2 to enhance the Excel template structure with additional data points, the listing has to be ordered based on company:
+
+	#INPUT-STEP2:
+	Data Collection Requirements from lead enrichment services.
+	- Personal: First name, last name, job title, department
+	- Contact: Phone, mobile, email, LinkedIn profile link
+	- Location: City, state, country
+	- Company: Name, industry, , 
+	- Technology: Tools/platforms they use
+	- Lead source tracking
+

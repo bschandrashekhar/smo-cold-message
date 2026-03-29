@@ -103,3 +103,101 @@ def match_case_studies(query: str, match_count: int = 5) -> List[Dict]:
         # Graceful degradation — pipeline continues without case studies
         print(f"Case study search failed: {e}")
         return []
+
+
+
+# Industry keyword groups for broadening search when exact matches are insufficient
+RELATED_INDUSTRIES = {
+    "banking": ["lending", "financial"],
+    "lending": ["banking", "financial"],
+    "financial services": ["banking", "lending"],
+    "insurance": ["financial"],
+    "payments": ["financial", "banking"],
+    "healthcare": [],
+    "nonprofit": [],
+    "real estate": [],
+    "retail": [],
+    "technology": [],
+    "education": [],
+    "manufacturing": [],
+}
+
+
+def find_industry_references(
+    industry: str,
+    prospect_geography: str = "",
+    company_name: str = "",
+    top_k: int = 5,
+) -> List[str]:
+    """Find reference client names in the same industry/vertical.
+
+    Uses the client_references table in Supabase (curated client list with
+    industry and geography). Two-tier matching:
+      Tier 1: Exact industry match, local geography first
+      Tier 2: Related industries, local geography first (only if Tier 1 < top_k)
+
+    Args:
+        industry: Detected industry vertical (e.g. "banking").
+        prospect_geography: Prospect's geography for local-first sorting.
+        company_name: Prospect's company name to exclude from results.
+        top_k: Number of unique reference clients to return.
+
+    Returns:
+        List of client company names.
+    """
+    try:
+        supabase = _get_supabase()
+        result = supabase.table("client_references").select(
+            "client_name, industry, geography"
+        ).execute()
+        all_clients = result.data or []
+    except Exception as e:
+        print(f"Client references lookup failed: {e}")
+        return []
+
+    industry_lower = industry.lower()
+    geo_lower = prospect_geography.lower()
+    company_lower = company_name.lower()
+
+    def _is_local(client_geo: str) -> bool:
+        return geo_lower in client_geo.lower() if geo_lower else False
+
+    # Tier 1: Exact industry match
+    tier1 = []
+    for c in all_clients:
+        if industry_lower in c["industry"].lower() and c["client_name"].lower() != company_lower:
+            tier1.append((c["client_name"], _is_local(c["geography"])))
+    tier1.sort(key=lambda x: (not x[1], x[0]))
+
+    picked = []
+    seen = set()
+    for name, _ in tier1:
+        if name.lower() not in seen:
+            picked.append(name)
+            seen.add(name.lower())
+        if len(picked) >= top_k:
+            return picked
+
+    # Tier 2: Related industries, local geography first
+    related_keywords = RELATED_INDUSTRIES.get(industry_lower, [])
+    if related_keywords and len(picked) < top_k:
+        tier2 = []
+        for c in all_clients:
+            ind_lower = c["industry"].lower()
+            if (
+                any(k in ind_lower for k in related_keywords)
+                and industry_lower not in ind_lower
+                and c["client_name"].lower() not in seen
+                and c["client_name"].lower() != company_lower
+            ):
+                tier2.append((c["client_name"], _is_local(c["geography"])))
+        tier2.sort(key=lambda x: (not x[1], x[0]))
+
+        for name, _ in tier2:
+            if name.lower() not in seen:
+                picked.append(name)
+                seen.add(name.lower())
+            if len(picked) >= top_k:
+                break
+
+    return picked

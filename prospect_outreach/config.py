@@ -22,6 +22,7 @@ ANTHROPIC_API_KEY = _get_secret("ANTHROPIC_API_KEY")
 VOYAGE_API_KEY = _get_secret("VOYAGE_API_KEY")
 SUPABASE_URL = _get_secret("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = _get_secret("SUPABASE_SERVICE_KEY")
+SERPER_API_KEY = _get_secret("SERPER_API_KEY")
 
 # Data directory where brand profiles are stored
 BASE_DIR = Path(__file__).parent.parent

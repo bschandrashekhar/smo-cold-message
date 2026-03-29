@@ -1,59 +1,17 @@
-import sys
+"""Prospect Outreach pipeline UI — Research + Generate Messages tabs."""
+
 import os
-
-# Allow absolute imports when run directly by Streamlit
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import streamlit as st
-import pandas as pd
 import tempfile
-from datetime import datetime
 
-from prospect_outreach import brand_knowledge, prospect_research, message_generator, config, skill_orchestrator
+import pandas as pd
+import streamlit as st
 
-st.set_page_config(page_title="Prospect Outreach Generator", layout="wide")
-
-
-def parse_research_prompt(prompt: str) -> dict:
-    """Parse natural language research prompts into skill parameters."""
-    import re
-
-    prompt = prompt.lower().strip()
-
-    # Extract URL
-    url_pattern = r'https?://[^\s]+|www\.[^\s]+|\b[a-z0-9-]+\.[a-z]{2,}\b'
-    url_match = re.search(url_pattern, prompt)
-    url = None
-    if url_match:
-        url = url_match.group()
-        if not url.startswith('http'):
-            url = 'https://' + url
-
-    # Extract company name - try to get it from text before URL
-    company_name = None
-    if url_match:
-        before_url = prompt[:url_match.start()].strip()
-        # Remove common words
-        before_url = re.sub(r'\b(research|this|company|the)\b', '', before_url).strip()
-        if before_url:
-            company_name = before_url.title()
-        else:
-            # Fallback: use domain name
-            domain = re.search(r'([a-z0-9-]+\.[a-z]{2,})', url_match.group())
-            if domain:
-                company_name = domain.group(1).split('.')[0].title()
-
-    return {
-        'company_name': company_name,
-        'url': url,
-        'intent': 'company-research' if company_name and url else None
-    }
+from prospect_outreach import prospect_research, message_generator, skill_orchestrator
 
 
-def main():
-    st.title("Prospect Outreach Generator")
-
-    tabs = st.tabs(["Research", "Generate Messages", "Settings"])
+def render():
+    """Render the Prospect Outreach pipeline tabs."""
+    tabs = st.tabs(["Research", "Generate Messages"])
 
     # ── Tab 1: Research ──────────────────────────────────────────────────
     with tabs[0]:
@@ -68,7 +26,6 @@ def main():
                 key="nl_research"
             )
             if nl_prompt:
-                # Use the skill orchestrator to process the request
                 orchestrator = skill_orchestrator.get_orchestrator()
                 intent = orchestrator.parse_intent(nl_prompt)
 
@@ -135,7 +92,7 @@ def main():
                             except Exception as e:
                                 st.error(f"Skill run failed: {e}")
 
-        uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="research_upload")
+        uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="po_research_upload")
 
         if uploaded is not None:
             try:
@@ -150,7 +107,6 @@ def main():
                     st.error("Missing required columns: Prospect Name, Designation, Company Name, Website, Location of Prospect")
                     return
 
-                # Show summary stats
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total Prospects", len(df))
                 col2.metric("Unique Companies", df["Company Name"].nunique())
@@ -161,11 +117,9 @@ def main():
                 st.dataframe(df, use_container_width=True)
 
                 if st.button("Run Research", type="primary"):
-                    # Clear stale results from previous run
-                    st.session_state.pop("research_output", None)
-                    st.session_state.pop("research_count", None)
+                    st.session_state.pop("po_research_output", None)
+                    st.session_state.pop("po_research_count", None)
 
-                    # Save uploaded file to temp
                     tmp_in = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     tmp_in.write(uploaded.getbuffer())
                     tmp_in.flush()
@@ -174,7 +128,6 @@ def main():
                     tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     tmp_out.close()
 
-                    # Progress tracking
                     progress_bar = st.progress(0)
                     status_text = st.empty()
 
@@ -192,24 +145,23 @@ def main():
                         status_text.text("Research complete!")
 
                         with open(tmp_out.name, "rb") as f:
-                            st.session_state["research_output"] = f.read()
-                        st.session_state["research_count"] = len(df)
+                            st.session_state["po_research_output"] = f.read()
+                        st.session_state["po_research_count"] = len(df)
                     except Exception as e:
                         st.error(f"Research failed: {e}")
                     finally:
                         os.unlink(tmp_in.name)
 
-                # Show results and download button outside the Run button block
-                if "research_output" in st.session_state:
-                    st.success(f"Research complete for {st.session_state.get('research_count', '?')} prospects. Download the file below.")
+                if "po_research_output" in st.session_state:
+                    st.success(f"Research complete for {st.session_state.get('po_research_count', '?')} prospects. Download the file below.")
 
-                    result_df = pd.read_excel(st.session_state["research_output"], sheet_name="prospects")
+                    result_df = pd.read_excel(st.session_state["po_research_output"], sheet_name="prospects")
                     st.subheader("Results Preview")
                     st.dataframe(result_df, use_container_width=True)
 
                     st.download_button(
                         "Download data_output.xlsx",
-                        st.session_state["research_output"],
+                        st.session_state["po_research_output"],
                         file_name="data_output.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary",
@@ -223,7 +175,7 @@ def main():
         st.header("Pass 2: Generate Messages")
         st.caption("Upload the reviewed data_output.xlsx to generate personalized outreach messages.")
 
-        uploaded2 = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="gen_upload")
+        uploaded2 = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="po_gen_upload")
 
         if uploaded2 is not None:
             try:
@@ -233,7 +185,6 @@ def main():
                 df2 = None
 
             if df2 is not None:
-                # Calculate skip logic summary
                 ready = 0
                 skip_has_message = 0
                 skip_no_research = 0
@@ -254,7 +205,6 @@ def main():
                         continue
                     ready += 1
 
-                # Show summary
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Ready to Generate", ready)
                 col2.metric("Already Has Message", skip_has_message)
@@ -267,11 +217,9 @@ def main():
                 if ready == 0:
                     st.warning("No prospects ready for message generation.")
                 elif st.button("Generate Messages", type="primary"):
-                    # Clear stale results from previous run
-                    st.session_state.pop("messages_output", None)
-                    st.session_state.pop("messages_count", None)
+                    st.session_state.pop("po_messages_output", None)
+                    st.session_state.pop("po_messages_count", None)
 
-                    # Save to temp
                     tmp_in2 = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     tmp_in2.write(uploaded2.getbuffer())
                     tmp_in2.flush()
@@ -297,67 +245,24 @@ def main():
                         status_text2.text("Generation complete!")
 
                         with open(tmp_out2.name, "rb") as f:
-                            st.session_state["messages_output"] = f.read()
-                        st.session_state["messages_count"] = ready
+                            st.session_state["po_messages_output"] = f.read()
+                        st.session_state["po_messages_count"] = ready
                     except Exception as e:
                         st.error(f"Message generation failed: {e}")
                     finally:
                         os.unlink(tmp_in2.name)
 
-                # Show results and download button outside the Generate button block
-                if "messages_output" in st.session_state:
-                    st.success(f"Messages generated for {st.session_state.get('messages_count', '?')} prospects. Download the file below.")
+                if "po_messages_output" in st.session_state:
+                    st.success(f"Messages generated for {st.session_state.get('po_messages_count', '?')} prospects. Download the file below.")
 
-                    result_df2 = pd.read_excel(st.session_state["messages_output"], sheet_name="prospects")
+                    result_df2 = pd.read_excel(st.session_state["po_messages_output"], sheet_name="prospects")
                     st.subheader("Results Preview")
                     st.dataframe(result_df2, use_container_width=True)
 
                     st.download_button(
                         "Download data_final.xlsx",
-                        st.session_state["messages_output"],
+                        st.session_state["po_messages_output"],
                         file_name="data_final.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary",
                     )
-
-    # ── Tab 3: Settings ──────────────────────────────────────────────────
-    with tabs[2]:
-        st.header("Settings")
-
-        st.subheader("Brand Knowledge Status")
-        status = brand_knowledge.are_brand_files_present()
-
-        for name, exists in status.items():
-            path = config.BRAND_JSONS[name]
-            col1, col2 = st.columns([3, 1])
-
-            if exists:
-                mod_time = datetime.fromtimestamp(path.stat().st_mtime)
-                col1.success(f"**{name}** — Last updated: {mod_time.strftime('%Y-%m-%d %H:%M')}")
-            else:
-                col1.warning(f"**{name}** — Not generated yet")
-
-        for name, exists in status.items():
-            if exists:
-                with st.expander(f"View {name} Profile"):
-                    try:
-                        profile = brand_knowledge.load_brand_profile(name)
-                        st.json(profile)
-                    except Exception as e:
-                        st.error(f"Failed to load: {e}")
-
-        st.divider()
-
-        if st.button("Refresh Brand Knowledge", type="primary"):
-            with st.spinner("Scraping brand websites with Claude web search..."):
-                try:
-                    brand_knowledge.refresh_brand_profiles()
-                    st.success("Brand profiles refreshed successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to refresh brand profiles: {e}")
-
-
-
-if __name__ == "__main__":
-    main()
