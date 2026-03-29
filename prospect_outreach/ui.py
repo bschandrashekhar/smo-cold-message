@@ -6,7 +6,7 @@ import tempfile
 import pandas as pd
 import streamlit as st
 
-from prospect_outreach import prospect_research, message_generator, skill_orchestrator
+from prospect_outreach import prospect_research, message_generator
 
 
 def render():
@@ -17,80 +17,6 @@ def render():
     with tabs[0]:
         st.header("Pass 1: Research Prospects")
         st.caption("Upload your data.xlsx, run AI research, then download and review before generating messages.")
-
-        # Natural language research prompt using skill orchestrator
-        with st.expander("Natural Language Research (Auto Skills)"):
-            nl_prompt = st.text_input(
-                "Enter research request",
-                placeholder="research mobilepundits.com",
-                key="nl_research"
-            )
-            if nl_prompt:
-                orchestrator = skill_orchestrator.get_orchestrator()
-                intent = orchestrator.parse_intent(nl_prompt)
-
-                if intent:
-                    skill_name = intent['skill']
-                    params = intent['params']
-                    st.success(f"Detected skill: **{skill_name}**")
-                    st.json(params)
-
-                    if st.button("Run Research", key="run_nl_research"):
-                        with st.spinner(f"Running {skill_name} skill..."):
-                            try:
-                                result = orchestrator.execute_skill(skill_name, params)
-                                st.code(result, language="json")
-                            except Exception as e:
-                                st.error(f"Skill execution failed: {e}")
-                else:
-                    st.warning("Could not determine skill intent from prompt.")
-                    st.info("Available skills: " + ", ".join(orchestrator.skill_definitions.keys()))
-                    st.info("Examples: 'research MobilePundits www.mobilepundits.com', 'research John Smith at Acme Corp'")
-
-        with st.expander("Quick skill run (company-research / prospect-research)"):
-            skill_name = st.selectbox("Skill", ["company-research", "prospect-research"], key="quick_skill")
-            if skill_name == "company-research":
-                quick_company = st.text_input("Company Name", key="quick_company_name")
-                quick_url = st.text_input("Company Website", key="quick_company_url")
-                provider = st.selectbox("Search provider", ["serper", "claude"], key="quick_company_provider")
-                if st.button("Run company-research", key="run_company_research"):
-                    if not quick_company or not quick_url:
-                        st.warning("Please enter company name and website.")
-                    else:
-                        with st.spinner("Running company-research skill..."):
-                            try:
-                                result = prospect_research.run_skill(
-                                    "company-research",
-                                    company_name=quick_company,
-                                    url=quick_url,
-                                    provider=provider,
-                                )
-                                st.code(result, language="json")
-                            except Exception as e:
-                                st.error(f"Skill run failed: {e}")
-            else:
-                quick_prospect_name = st.text_input("Prospect Name", key="quick_prospect_name")
-                quick_designation = st.text_input("Designation", key="quick_designation")
-                quick_company = st.text_input("Company Name", key="quick_prospect_company_name")
-                quick_company_research = st.text_area("Company Research JSON", key="quick_company_research")
-                provider = st.selectbox("Search provider", ["serper", "claude"], key="quick_prospect_provider")
-                if st.button("Run prospect-research", key="run_prospect_research"):
-                    if not quick_prospect_name or not quick_designation or not quick_company:
-                        st.warning("Please enter prospect name, designation, and company name.")
-                    else:
-                        with st.spinner("Running prospect-research skill..."):
-                            try:
-                                result = prospect_research.run_skill(
-                                    "prospect-research",
-                                    prospect_name=quick_prospect_name,
-                                    designation=quick_designation,
-                                    company_name=quick_company,
-                                    company_research=quick_company_research,
-                                    provider=provider,
-                                )
-                                st.code(result, language="json")
-                            except Exception as e:
-                                st.error(f"Skill run failed: {e}")
 
         uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="po_research_upload")
 
