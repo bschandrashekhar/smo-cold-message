@@ -80,13 +80,10 @@ def render():
                         progress_bar.progress(1.0)
                         status_text.text("Scraping complete!")
 
-                        # Show diagnostic logs
-                        with st.expander("Scraping Log", expanded=not sheets):
-                            st.code("\n".join(logs), language=None)
+                        # Persist logs and results in session state
+                        st.session_state["ep_scrape_logs"] = logs
 
-                        if not sheets:
-                            st.warning("No companies passed the shortlist criteria. Try different exhibitions or adjust criteria.")
-                        else:
+                        if sheets:
                             tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                             tmp_out.close()
                             _write_sheets_to_excel(sheets, tmp_out.name)
@@ -95,14 +92,34 @@ def render():
                                 st.session_state["ep_scrape_output"] = f.read()
                             st.session_state["ep_scrape_sheets"] = list(sheets.keys())
                             os.unlink(tmp_out.name)
+                        else:
+                            st.session_state.pop("ep_scrape_output", None)
+                            st.session_state["ep_scrape_sheets"] = []
+
                     except Exception as e:
                         st.error(f"Scraping failed: {e}")
                         import traceback
                         st.code(traceback.format_exc())
 
+                # Show scraping log if available
+                if "ep_scrape_logs" in st.session_state:
+                    scrape_logs = st.session_state["ep_scrape_logs"]
+                    has_output = "ep_scrape_output" in st.session_state
+                    with st.expander("Scraping Log", expanded=not has_output):
+                        st.code("\n".join(scrape_logs), language=None)
+
                 if "ep_scrape_output" in st.session_state:
                     sheet_names = st.session_state.get("ep_scrape_sheets", [])
-                    st.success(f"Scraped {len(sheet_names)} exhibition(s). Download the file below.")
+                    shortlist_count = sum(1 for s in sheet_names if "Shortlist" in s)
+                    all_count = sum(1 for s in sheet_names if "-All" in s)
+
+                    if shortlist_count > 0:
+                        st.success(f"Scraped {all_count} exhibition(s), {shortlist_count} with shortlisted companies. Download below.")
+                    else:
+                        st.warning(
+                            f"Scraped {all_count} exhibition(s) but no companies passed the shortlist. "
+                            "Download the All sheets below to review what was found."
+                        )
 
                     # Preview each exhibition sheet in its own expander
                     all_sheets = _read_sheets_from_excel(st.session_state["ep_scrape_output"])
@@ -117,6 +134,8 @@ def render():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary",
                     )
+                elif "ep_scrape_sheets" in st.session_state and not st.session_state["ep_scrape_sheets"]:
+                    st.warning("No exhibitors could be extracted from any of the provided links. Check the Scraping Log above for details.")
 
             except Exception as e:
                 st.error(f"Failed to read workbook: {e}")
