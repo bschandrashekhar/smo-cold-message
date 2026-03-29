@@ -147,11 +147,14 @@ def _enrich_companies(
     progress_callback: Optional[Callable] = None,
     progress_offset: int = 0,
     progress_total: int = 0,
-) -> List[Dict]:
-    """Enrich a list of company names with details and apply shortlist criteria.
+) -> tuple:
+    """Enrich a list of company names with details, then apply shortlist criteria.
 
     Uses Serper to search for each company, then Claude to synthesize results
-    into structured data and apply filtering.
+    into structured data. Returns both the full list and the shortlisted subset.
+
+    Returns:
+        Tuple of (all_companies, shortlisted_companies) — both are List[Dict].
     """
     # Batch companies for enrichment — search for all, then synthesize in one Claude call
     all_search_results = []
@@ -172,7 +175,8 @@ def _enrich_companies(
 
     search_context = "\n\n---\n\n".join(all_search_results)
 
-    prompt = f"""Based on the search results below, produce a JSON array of enriched company profiles for the exhibition "{exhibition_name}".
+    # Step 1: Enrich ALL companies (no filtering)
+    enrich_prompt = f"""Based on the search results below, produce a JSON array of enriched company profiles for the exhibition "{exhibition_name}".
 
 SEARCH RESULTS:
 {search_context}
@@ -186,11 +190,7 @@ For each company, extract:
 - "sub_industry": Sub-vertical if applicable (e.g. Banking, Insurance, Lending)
 - "revenue_range": Estimated revenue range (e.g. "$50M-$100M", "$500M-$1B", "Unknown")
 
-{SHORTLIST_CRITERIA}
-
-Return ONLY a JSON array of objects for companies that pass the shortlist criteria.
-Companies that are clearly IT service providers or have revenue over $2B should be excluded.
-If unsure about a company, include it with revenue_range "Unknown".
+Include ALL companies — do NOT filter any out. If information is unknown, use "Unknown".
 
 Return ONLY the JSON array, no other text."""
 
@@ -198,20 +198,53 @@ Return ONLY the JSON array, no other text."""
         client,
         model="claude-sonnet-4-20250514",
         max_tokens=8192,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": enrich_prompt}],
     )
 
     text = response.content[0].text.strip()
     text = _extract_json(text)
 
     try:
-        companies = json.loads(text)
-        if isinstance(companies, list):
-            return companies
+        all_companies = json.loads(text)
+        if not isinstance(all_companies, list):
+            all_companies = []
     except json.JSONDecodeError:
-        pass
+        all_companies = []
 
-    return []
+    if not all_companies:
+        return [], []
+
+    # Step 2: Apply shortlist criteria
+    filter_prompt = f"""Given this list of companies, apply the shortlist criteria and return ONLY the companies that pass.
+
+COMPANIES:
+{json.dumps(all_companies, indent=2)}
+
+{SHORTLIST_CRITERIA}
+
+Return ONLY a JSON array of the companies that pass ALL criteria. Keep the exact same fields.
+If no companies pass, return an empty array: []
+
+Return ONLY the JSON array, no other text."""
+
+    response2 = _call_claude_with_retry(
+        client,
+        model="claude-sonnet-4-20250514",
+        max_tokens=8192,
+        messages=[{"role": "user", "content": filter_prompt}],
+    )
+
+    text2 = response2.content[0].text.strip()
+    text2 = _extract_json(text2)
+
+    try:
+        shortlisted = json.loads(text2)
+        if not isinstance(shortlisted, list):
+            shortlisted = []
+    except json.JSONDecodeError:
+        shortlisted = []
+
+    return all_companies, shortlisted
 
 
 def scrape_exhibitors(
@@ -264,7 +297,7 @@ def scrape_exhibitors(
             )
 
         # Step 1b: Enrich companies with details + apply shortlist
-        enriched = _enrich_companies(
+        all_enriched, shortlisted = _enrich_companies(
             client,
             company_names,
             exhibition_name,
@@ -272,35 +305,43 @@ def scrape_exhibitors(
             progress_offset=idx,
             progress_total=total_exhibitions,
         )
-        logs.append(f"Companies after shortlist: {len(enriched)}")
+        logs.append(f"Companies enriched: {len(all_enriched)}")
+        logs.append(f"Companies after shortlist: {len(shortlisted)}")
 
-        if not enriched:
-            logs.append("⚠ All companies filtered out by shortlist criteria — skipping")
+        if not all_enriched:
+            logs.append("⚠ Enrichment returned no results — skipping")
             if progress_callback:
-                progress_callback(idx, total_exhibitions, f"No companies passed shortlist for {exhibition_name}")
+                progress_callback(idx, total_exhibitions, f"No enrichment results for {exhibition_name}")
             continue
 
-        # Build DataFrame from enriched data
-        rows = []
-        for company in enriched:
-            rows.append({
-                "Company Name": company.get("company_name", ""),
-                "Website": company.get("website", ""),
-                "Location of Company": company.get("location", ""),
-                "Country": company.get("country", ""),
-                "Industry Vertical": company.get("industry_vertical", ""),
-                "Sub-industry": company.get("sub_industry", ""),
-                "Revenue Range": company.get("revenue_range", "Unknown"),
-            })
+        def _build_rows(companies):
+            return [{
+                "Company Name": c.get("company_name", ""),
+                "Website": c.get("website", ""),
+                "Location of Company": c.get("location", ""),
+                "Country": c.get("country", ""),
+                "Industry Vertical": c.get("industry_vertical", ""),
+                "Sub-industry": c.get("sub_industry", ""),
+                "Revenue Range": c.get("revenue_range", "Unknown"),
+            } for c in companies]
 
-        sheet_name = f"{exhibition_name}-Exhibitors"[:31]  # Excel 31-char limit
-        sheets[sheet_name] = pd.DataFrame(rows, columns=COMPANY_COLUMNS)
-        logs.append(f"✓ Sheet '{sheet_name}': {len(rows)} companies")
+        # Sheet with ALL enriched companies (before filtering)
+        all_sheet_name = f"{exhibition_name}-All"[:31]
+        sheets[all_sheet_name] = pd.DataFrame(_build_rows(all_enriched), columns=COMPANY_COLUMNS)
+        logs.append(f"✓ Sheet '{all_sheet_name}': {len(all_enriched)} companies")
+
+        # Sheet with shortlisted companies only
+        if shortlisted:
+            short_sheet_name = f"{exhibition_name}-Shortlist"[:31]
+            sheets[short_sheet_name] = pd.DataFrame(_build_rows(shortlisted), columns=COMPANY_COLUMNS)
+            logs.append(f"✓ Sheet '{short_sheet_name}': {len(shortlisted)} companies")
+        else:
+            logs.append("⚠ No companies passed shortlist — only All sheet created")
 
         if progress_callback:
             progress_callback(
                 idx + 1, total_exhibitions,
-                f"Completed {exhibition_name}: {len(rows)} companies"
+                f"Completed {exhibition_name}: {len(all_enriched)} total, {len(shortlisted)} shortlisted"
             )
 
     return sheets, logs
