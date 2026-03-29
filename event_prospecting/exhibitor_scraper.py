@@ -217,7 +217,7 @@ Return ONLY the JSON array, no other text."""
 def scrape_exhibitors(
     df: pd.DataFrame,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> Dict[str, pd.DataFrame]:
+) -> tuple:
     """Scrape exhibitor links and return enriched company lists per exhibition.
 
     Args:
@@ -225,23 +225,34 @@ def scrape_exhibitors(
         progress_callback: Optional callback(current, total, status_text).
 
     Returns:
-        Dict mapping sheet names ('<ExhibitionName>-Exhibitors') to DataFrames.
+        Tuple of (sheets_dict, logs_list).
+        sheets_dict: Dict mapping sheet names ('<ExhibitionName>-Exhibitors') to DataFrames.
+        logs_list: List of diagnostic log strings for UI display.
     """
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     total_exhibitions = len(df)
     sheets = {}
+    logs = []
 
     for idx, row in df.iterrows():
         exhibition_name = str(row["Exhibition"]).strip()
         exhibitor_link = str(row["Exhibitor Link"]).strip()
+        logs.append(f"--- {exhibition_name} ---")
+        logs.append(f"Link: {exhibitor_link}")
 
         if progress_callback:
             progress_callback(idx, total_exhibitions, f"Extracting exhibitors: {exhibition_name}")
 
         # Step 1a: Extract company names from exhibitor page
         company_names = _extract_exhibitor_names(client, exhibitor_link)
+        logs.append(f"Exhibitors extracted: {len(company_names)}")
+        if company_names:
+            logs.append(f"Names: {', '.join(company_names[:20])}")
+            if len(company_names) > 20:
+                logs.append(f"  ... and {len(company_names) - 20} more")
 
         if not company_names:
+            logs.append("⚠ No exhibitors found — skipping")
             if progress_callback:
                 progress_callback(idx, total_exhibitions, f"No exhibitors found for {exhibition_name}")
             continue
@@ -261,8 +272,10 @@ def scrape_exhibitors(
             progress_offset=idx,
             progress_total=total_exhibitions,
         )
+        logs.append(f"Companies after shortlist: {len(enriched)}")
 
         if not enriched:
+            logs.append("⚠ All companies filtered out by shortlist criteria — skipping")
             if progress_callback:
                 progress_callback(idx, total_exhibitions, f"No companies passed shortlist for {exhibition_name}")
             continue
@@ -282,6 +295,7 @@ def scrape_exhibitors(
 
         sheet_name = f"{exhibition_name}-Exhibitors"[:31]  # Excel 31-char limit
         sheets[sheet_name] = pd.DataFrame(rows, columns=COMPANY_COLUMNS)
+        logs.append(f"✓ Sheet '{sheet_name}': {len(rows)} companies")
 
         if progress_callback:
             progress_callback(
@@ -289,4 +303,4 @@ def scrape_exhibitors(
                 f"Completed {exhibition_name}: {len(rows)} companies"
             )
 
-    return sheets
+    return sheets, logs

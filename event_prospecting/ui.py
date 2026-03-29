@@ -73,10 +73,14 @@ def render():
                     try:
                         from event_prospecting import exhibitor_scraper
 
-                        sheets = exhibitor_scraper.scrape_exhibitors(df, progress_callback=on_progress)
+                        sheets, logs = exhibitor_scraper.scrape_exhibitors(df, progress_callback=on_progress)
 
                         progress_bar.progress(1.0)
                         status_text.text("Scraping complete!")
+
+                        # Show diagnostic logs
+                        with st.expander("Scraping Log", expanded=not sheets):
+                            st.code("\n".join(logs), language=None)
 
                         if not sheets:
                             st.warning("No companies passed the shortlist criteria. Try different exhibitions or adjust criteria.")
