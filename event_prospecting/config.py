@@ -11,8 +11,14 @@ load_dotenv()
 
 
 def _get_secret(key: str) -> str:
-    """Read from environment variables."""
-    return os.environ.get(key, "")
+    """Read from Streamlit secrets (cloud) or env vars (local)."""
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return os.getenv(key, "")
 
 
 APOLLO_API_KEY = _get_secret("APOLLO_API_KEY")
