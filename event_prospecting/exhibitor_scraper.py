@@ -1,7 +1,7 @@
 """Step 1: Scrape exhibition websites for exhibitor companies and enrich with company details.
 
 For each exhibition row, uses Claude web search to extract exhibitor names from the
-exhibitor link, then enriches each company via Serper + Claude synthesis, applying
+exhibitor link, then enriches each company via Claude web search, applying
 shortlist criteria to filter results.
 """
 
@@ -9,7 +9,6 @@ import json
 import time
 from typing import Dict, List, Optional, Callable
 
-import requests
 import pandas as pd
 import anthropic
 
@@ -17,8 +16,6 @@ from event_prospecting import config
 
 MAX_RETRIES = 3
 RETRY_DELAY = 65
-BATCH_SIZE = 5
-BATCH_DELAY = 3
 
 # Company columns produced by Step 1
 COMPANY_COLUMNS = [
@@ -55,33 +52,6 @@ def _call_claude_with_retry(client, **kwargs):
                 time.sleep(wait)
             else:
                 raise
-
-
-def _serper_search(query: str, num_results: int = 10) -> List[Dict]:
-    """Call Serper.dev Google Search API and return organic results."""
-    response = requests.post(
-        "https://google.serper.dev/search",
-        headers={
-            "X-API-KEY": config.SERPER_API_KEY,
-            "Content-Type": "application/json",
-        },
-        json={"q": query, "num": num_results},
-        timeout=30,
-    )
-    response.raise_for_status()
-    data = response.json()
-    return data.get("organic", [])
-
-
-def _serper_search_results_to_text(results: List[Dict]) -> str:
-    """Format Serper search results into text for Claude synthesis."""
-    lines = []
-    for i, r in enumerate(results, 1):
-        title = r.get("title", "")
-        snippet = r.get("snippet", "")
-        link = r.get("link", "")
-        lines.append(f"{i}. {title}\n   {snippet}\n   URL: {link}")
-    return "\n\n".join(lines)
 
 
 def _extract_json(text: str) -> str:
@@ -150,38 +120,27 @@ def _enrich_companies(
 ) -> tuple:
     """Enrich a list of company names with details, then apply shortlist criteria.
 
-    Uses Serper to search for each company, then Claude to synthesize results
+    Uses Claude web search to research each company, then synthesizes results
     into structured data. Returns both the full list and the shortlisted subset.
 
     Returns:
         Tuple of (all_companies, shortlisted_companies) — both are List[Dict].
     """
-    # Batch companies for enrichment — search for all, then synthesize in one Claude call
-    all_search_results = []
-    for i, name in enumerate(company_names):
-        if progress_callback:
-            progress_callback(
-                progress_offset + i, progress_total,
-                f"Searching: {name}"
-            )
+    # Use Claude with web search to enrich all companies in one call
+    company_list_text = "\n".join(f"- {name}" for name in company_names)
 
-        query = f'"{name}" company website industry revenue'
-        results = _serper_search(query, num_results=5)
-        result_text = _serper_search_results_to_text(results) if results else "No results found."
-        all_search_results.append(f"Company: {name}\n{result_text}")
+    if progress_callback:
+        progress_callback(
+            progress_offset, progress_total,
+            f"Researching {len(company_names)} companies for {exhibition_name}..."
+        )
 
-        if (i + 1) % BATCH_SIZE == 0:
-            time.sleep(BATCH_DELAY)
+    enrich_prompt = f"""Search the web and research each of the following companies from the exhibition "{exhibition_name}".
 
-    search_context = "\n\n---\n\n".join(all_search_results)
+COMPANIES TO RESEARCH:
+{company_list_text}
 
-    # Step 1: Enrich ALL companies (no filtering)
-    enrich_prompt = f"""Based on the search results below, produce a JSON array of enriched company profiles for the exhibition "{exhibition_name}".
-
-SEARCH RESULTS:
-{search_context}
-
-For each company, extract:
+For each company, find and extract:
 - "company_name": Company name
 - "website": Company website URL (homepage only)
 - "location": City where the company is based
@@ -192,16 +151,28 @@ For each company, extract:
 
 Include ALL companies — do NOT filter any out. If information is unknown, use "Unknown".
 
-Return ONLY the JSON array, no other text."""
+Return ONLY a JSON array of objects, no other text."""
 
     response = _call_claude_with_retry(
         client,
         model="claude-sonnet-4-20250514",
-        max_tokens=8192,
+        max_tokens=16000,
+        tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": enrich_prompt}],
     )
 
-    text = response.content[0].text.strip()
+    # Extract text from response (after last web search result)
+    last_search_idx = -1
+    for i, block in enumerate(response.content):
+        if block.type == "web_search_tool_result":
+            last_search_idx = i
+
+    text_parts = []
+    for i, block in enumerate(response.content):
+        if block.type == "text" and i > last_search_idx:
+            text_parts.append(block.text)
+
+    text = "".join(text_parts).strip()
     text = _extract_json(text)
 
     try:
