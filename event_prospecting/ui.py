@@ -78,14 +78,17 @@ def render():
                         progress_bar.progress(1.0)
                         status_text.text("Scraping complete!")
 
-                        tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                        tmp_out.close()
-                        _write_sheets_to_excel(sheets, tmp_out.name)
+                        if not sheets:
+                            st.warning("No companies passed the shortlist criteria. Try different exhibitions or adjust criteria.")
+                        else:
+                            tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                            tmp_out.close()
+                            _write_sheets_to_excel(sheets, tmp_out.name)
 
-                        with open(tmp_out.name, "rb") as f:
-                            st.session_state["ep_scrape_output"] = f.read()
-                        st.session_state["ep_scrape_sheets"] = list(sheets.keys())
-                        os.unlink(tmp_out.name)
+                            with open(tmp_out.name, "rb") as f:
+                                st.session_state["ep_scrape_output"] = f.read()
+                            st.session_state["ep_scrape_sheets"] = list(sheets.keys())
+                            os.unlink(tmp_out.name)
                     except Exception as e:
                         st.error(f"Scraping failed: {e}")
                         import traceback
