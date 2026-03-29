@@ -9,6 +9,8 @@ import streamlit as st
 
 def _write_sheets_to_excel(sheets: dict, path: str) -> None:
     """Write a dict of {sheet_name: DataFrame} to an Excel file."""
+    if not sheets:
+        raise ValueError("No sheets to write — result was empty")
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             # Excel sheet names max 31 chars
