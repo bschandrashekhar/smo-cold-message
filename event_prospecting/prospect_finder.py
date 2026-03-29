@@ -223,9 +223,14 @@ def find_prospects(
             people = _apollo_people_search(domain, titles, EXCLUDE_TITLES)
 
             if people:
-                for person in people:
-                    row_data = company_row.to_dict()
+                for p_idx, person in enumerate(people):
                     prospect_data = _extract_prospect_row(person, company_name)
+                    if p_idx == 0:
+                        # First prospect row: include company data
+                        row_data = company_row.to_dict()
+                    else:
+                        # Subsequent prospects: blank company columns for readability
+                        row_data = {col: "" for col in company_df.columns}
                     row_data.update(prospect_data)
                     enriched_rows.append(row_data)
             else:
