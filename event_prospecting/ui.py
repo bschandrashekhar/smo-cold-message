@@ -86,10 +86,10 @@ def render():
                             st.session_state["ep_scrape_output"] = f.read()
                         st.session_state["ep_scrape_sheets"] = list(sheets.keys())
                         os.unlink(tmp_out.name)
-                    except NotImplementedError:
-                        st.warning("Exhibitor scraping is not yet implemented.")
                     except Exception as e:
                         st.error(f"Scraping failed: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
 
                 if "ep_scrape_output" in st.session_state:
                     sheet_names = st.session_state.get("ep_scrape_sheets", [])
@@ -169,10 +169,10 @@ def render():
                             st.session_state["ep_enrich_output"] = f.read()
                         st.session_state["ep_enrich_sheets"] = list(enriched_sheets.keys())
                         os.unlink(tmp_out2.name)
-                    except NotImplementedError:
-                        st.warning("Prospect enrichment is not yet implemented.")
                     except Exception as e:
                         st.error(f"Enrichment failed: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
 
                 if "ep_enrich_output" in st.session_state:
                     sheet_names = st.session_state.get("ep_enrich_sheets", [])
