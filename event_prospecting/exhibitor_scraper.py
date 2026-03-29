@@ -1,14 +1,18 @@
 """Step 1: Scrape exhibition websites for exhibitor companies and enrich with company details.
 
-For each exhibition row, uses Claude web search to extract exhibitor names from the
-exhibitor link, then enriches each company via Claude web search, applying
-shortlist criteria to filter results.
+For each exhibition row:
+1. Fetches the exhibitor page HTML via requests
+2. Uses Claude to parse the HTML and extract company names + website URLs
+3. Uses Apollo.io Organization Enrichment to get company details (industry, revenue, location)
+4. Applies shortlist criteria to produce a filtered subset
 """
 
 import json
+import re
 import time
 from typing import Dict, List, Optional, Callable
 
+import requests
 import pandas as pd
 import anthropic
 
@@ -16,6 +20,7 @@ from event_prospecting import config
 
 MAX_RETRIES = 3
 RETRY_DELAY = 65
+APOLLO_BATCH_DELAY = 1  # seconds between Apollo API calls
 
 # Company columns produced by Step 1
 COMPANY_COLUMNS = [
@@ -63,129 +68,184 @@ def _extract_json(text: str) -> str:
     return text
 
 
-def _extract_exhibitor_names(client, exhibitor_link: str) -> List[str]:
-    """Use Claude with web search to extract company names from an exhibitor page.
+def _fetch_page_html(url: str) -> str:
+    """Fetch a web page and return cleaned text content for parsing.
 
-    Returns a list of company names found on the page.
+    Returns the raw HTML. If the page can't be fetched, returns empty string.
     """
-    prompt = f"""Visit this exhibition exhibitor page and extract ALL company names listed:
-{exhibitor_link}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"Failed to fetch {url}: {e}")
+        return ""
 
-Search for this page and extract the complete list of exhibiting companies.
-Return ONLY a JSON array of company name strings, no other text.
 
-Example: ["Company A", "Company B", "Company C"]
+def _clean_html_for_parsing(html: str, max_chars: int = 80000) -> str:
+    """Strip scripts, styles, and excess whitespace from HTML to reduce token usage.
 
-If you cannot access the page or find no exhibitors, return an empty array: []"""
+    Keeps the structure and text content that Claude needs for parsing.
+    """
+    # Remove script and style blocks
+    html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    # Remove HTML comments
+    html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+    # Collapse whitespace
+    html = re.sub(r'\s+', ' ', html)
+    # Truncate if too long
+    if len(html) > max_chars:
+        html = html[:max_chars] + "\n... [truncated]"
+    return html.strip()
+
+
+def _extract_exhibitors_from_html(client, html: str, exhibitor_link: str) -> List[Dict]:
+    """Use Claude to parse HTML and extract exhibitor company names + website URLs.
+
+    Returns a list of dicts with 'company_name' and 'website' keys.
+    """
+    cleaned = _clean_html_for_parsing(html)
+
+    prompt = f"""Parse this HTML from an exhibition exhibitor listing page ({exhibitor_link}) and extract ALL exhibiting company names and their website URLs.
+
+HTML CONTENT:
+{cleaned}
+
+For each exhibitor, extract:
+- "company_name": The company/organization name
+- "website": Their website URL if available in the HTML (href links), otherwise empty string ""
+
+Return ONLY a JSON array of objects. Example:
+[
+  {{"company_name": "Acme Corp", "website": "https://acme.com"}},
+  {{"company_name": "Beta Inc", "website": ""}}
+]
+
+If you find no exhibitors, return an empty array: []
+Return ONLY the JSON array, no other text."""
 
     response = _call_claude_with_retry(
         client,
         model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        max_tokens=8192,
         messages=[{"role": "user", "content": prompt}],
     )
 
-    # Extract text from response (after last web search result)
-    last_search_idx = -1
-    for i, block in enumerate(response.content):
-        if block.type == "web_search_tool_result":
-            last_search_idx = i
-
-    text_parts = []
-    for i, block in enumerate(response.content):
-        if block.type == "text" and i > last_search_idx:
-            text_parts.append(block.text)
-
-    text = "".join(text_parts).strip()
+    text = response.content[0].text.strip()
     text = _extract_json(text)
 
     try:
-        names = json.loads(text)
-        if isinstance(names, list):
-            return [str(n).strip() for n in names if str(n).strip()]
+        exhibitors = json.loads(text)
+        if isinstance(exhibitors, list):
+            return [
+                {
+                    "company_name": str(e.get("company_name", "")).strip(),
+                    "website": str(e.get("website", "")).strip(),
+                }
+                for e in exhibitors
+                if str(e.get("company_name", "")).strip()
+            ]
     except json.JSONDecodeError:
         pass
 
     return []
 
 
-def _enrich_companies(
-    client,
-    company_names: List[str],
-    exhibition_name: str,
-    progress_callback: Optional[Callable] = None,
-    progress_offset: int = 0,
-    progress_total: int = 0,
-) -> tuple:
-    """Enrich a list of company names with details, then apply shortlist criteria.
+def _apollo_org_enrichment(domain: str) -> Optional[Dict]:
+    """Enrich a company via Apollo.io Organization Enrichment API.
 
-    Uses Claude web search to research each company, then synthesizes results
-    into structured data. Returns both the full list and the shortlisted subset.
+    Args:
+        domain: Company domain (e.g. 'acme.com').
 
     Returns:
-        Tuple of (all_companies, shortlisted_companies) — both are List[Dict].
+        Organization dict from Apollo, or None if not found.
     """
-    # Use Claude with web search to enrich all companies in one call
-    company_list_text = "\n".join(f"- {name}" for name in company_names)
-
-    if progress_callback:
-        progress_callback(
-            progress_offset, progress_total,
-            f"Researching {len(company_names)} companies for {exhibition_name}..."
-        )
-
-    enrich_prompt = f"""Search the web and research each of the following companies from the exhibition "{exhibition_name}".
-
-COMPANIES TO RESEARCH:
-{company_list_text}
-
-For each company, find and extract:
-- "company_name": Company name
-- "website": Company website URL (homepage only)
-- "location": City where the company is based
-- "country": Country
-- "industry_vertical": Main industry (e.g. Financial Services, Healthcare, Automotive, Retail)
-- "sub_industry": Sub-vertical if applicable (e.g. Banking, Insurance, Lending)
-- "revenue_range": Estimated revenue range (e.g. "$50M-$100M", "$500M-$1B", "Unknown")
-
-Include ALL companies — do NOT filter any out. If information is unknown, use "Unknown".
-
-Return ONLY a JSON array of objects, no other text."""
-
-    response = _call_claude_with_retry(
-        client,
-        model="claude-sonnet-4-20250514",
-        max_tokens=16000,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
-        messages=[{"role": "user", "content": enrich_prompt}],
-    )
-
-    # Extract text from response (after last web search result)
-    last_search_idx = -1
-    for i, block in enumerate(response.content):
-        if block.type == "web_search_tool_result":
-            last_search_idx = i
-
-    text_parts = []
-    for i, block in enumerate(response.content):
-        if block.type == "text" and i > last_search_idx:
-            text_parts.append(block.text)
-
-    text = "".join(text_parts).strip()
-    text = _extract_json(text)
+    if not config.APOLLO_API_KEY or not domain:
+        return None
 
     try:
-        all_companies = json.loads(text)
-        if not isinstance(all_companies, list):
-            all_companies = []
-    except json.JSONDecodeError:
-        all_companies = []
+        response = requests.get(
+            "https://api.apollo.io/api/v1/organizations/enrich",
+            params={
+                "api_key": config.APOLLO_API_KEY,
+                "domain": domain,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        org = data.get("organization")
+        return org if org else None
+    except requests.RequestException as e:
+        print(f"Apollo org enrichment error for {domain}: {e}")
+        return None
 
-    if not all_companies:
-        return [], []
 
-    # Step 2: Apply shortlist criteria
+def _extract_domain(url: str) -> str:
+    """Extract domain from a URL."""
+    if not url:
+        return ""
+    url = url.strip().lower()
+    if not url.startswith("http"):
+        url = "https://" + url
+    match = re.search(r"https?://(?:www\.)?([^/]+)", url)
+    return match.group(1) if match else ""
+
+
+def _format_revenue(estimated_revenue: Optional[float]) -> str:
+    """Format Apollo's annual_revenue_printed or estimated_num_employees into a revenue range."""
+    if not estimated_revenue:
+        return "Unknown"
+    if estimated_revenue >= 1_000_000_000:
+        return f"${estimated_revenue / 1_000_000_000:.1f}B"
+    if estimated_revenue >= 1_000_000:
+        return f"${estimated_revenue / 1_000_000:.0f}M"
+    if estimated_revenue >= 1_000:
+        return f"${estimated_revenue / 1_000:.0f}K"
+    return f"${estimated_revenue:.0f}"
+
+
+def _build_company_row(exhibitor: Dict, apollo_org: Optional[Dict]) -> Dict:
+    """Build a company row dict from exhibitor info + Apollo enrichment data."""
+    if apollo_org:
+        # Apollo provides rich data
+        revenue_printed = apollo_org.get("annual_revenue_printed") or ""
+        if not revenue_printed:
+            raw_revenue = apollo_org.get("annual_revenue")
+            revenue_printed = _format_revenue(raw_revenue) if raw_revenue else "Unknown"
+
+        return {
+            "company_name": apollo_org.get("name") or exhibitor["company_name"],
+            "website": apollo_org.get("website_url") or exhibitor["website"],
+            "location": apollo_org.get("city") or "",
+            "country": apollo_org.get("country") or "",
+            "industry_vertical": apollo_org.get("industry") or "Unknown",
+            "sub_industry": apollo_org.get("subindustry") or "",
+            "revenue_range": revenue_printed,
+        }
+    else:
+        # Fallback — only basic info from exhibitor listing
+        return {
+            "company_name": exhibitor["company_name"],
+            "website": exhibitor["website"],
+            "location": "",
+            "country": "",
+            "industry_vertical": "Unknown",
+            "sub_industry": "",
+            "revenue_range": "Unknown",
+        }
+
+
+def _apply_shortlist(client, all_companies: List[Dict]) -> List[Dict]:
+    """Use Claude to apply shortlist criteria to the enriched company list.
+
+    Returns only companies that pass the criteria.
+    """
     filter_prompt = f"""Given this list of companies, apply the shortlist criteria and return ONLY the companies that pass.
 
 COMPANIES:
@@ -198,24 +258,24 @@ If no companies pass, return an empty array: []
 
 Return ONLY the JSON array, no other text."""
 
-    response2 = _call_claude_with_retry(
+    response = _call_claude_with_retry(
         client,
         model="claude-sonnet-4-20250514",
         max_tokens=8192,
         messages=[{"role": "user", "content": filter_prompt}],
     )
 
-    text2 = response2.content[0].text.strip()
-    text2 = _extract_json(text2)
+    text = response.content[0].text.strip()
+    text = _extract_json(text)
 
     try:
-        shortlisted = json.loads(text2)
-        if not isinstance(shortlisted, list):
-            shortlisted = []
+        shortlisted = json.loads(text)
+        if isinstance(shortlisted, list):
+            return shortlisted
     except json.JSONDecodeError:
-        shortlisted = []
+        pass
 
-    return all_companies, shortlisted
+    return []
 
 
 def scrape_exhibitors(
@@ -224,13 +284,19 @@ def scrape_exhibitors(
 ) -> tuple:
     """Scrape exhibitor links and return enriched company lists per exhibition.
 
+    Pipeline per exhibition:
+    1. Fetch exhibitor page HTML
+    2. Parse HTML with Claude to extract company names + URLs
+    3. Enrich each company via Apollo.io Organization API
+    4. Apply shortlist criteria via Claude
+
     Args:
         df: Input DataFrame with 'Exhibition' and 'Exhibitor Link' columns.
         progress_callback: Optional callback(current, total, status_text).
 
     Returns:
         Tuple of (sheets_dict, logs_list).
-        sheets_dict: Dict mapping sheet names ('<ExhibitionName>-Exhibitors') to DataFrames.
+        sheets_dict: Dict mapping sheet names to DataFrames.
         logs_list: List of diagnostic log strings for UI display.
     """
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
@@ -245,18 +311,32 @@ def scrape_exhibitors(
         logs.append(f"Link: {exhibitor_link}")
 
         if progress_callback:
-            progress_callback(idx, total_exhibitions, f"Extracting exhibitors: {exhibition_name}")
+            progress_callback(idx, total_exhibitions, f"Fetching page: {exhibition_name}")
 
-        # Step 1a: Extract company names from exhibitor page
-        company_names = _extract_exhibitor_names(client, exhibitor_link)
-        logs.append(f"Exhibitors extracted: {len(company_names)}")
-        if company_names:
-            logs.append(f"Names: {', '.join(company_names[:20])}")
-            if len(company_names) > 20:
-                logs.append(f"  ... and {len(company_names) - 20} more")
+        # Step 1: Fetch exhibitor page HTML
+        html = _fetch_page_html(exhibitor_link)
+        if not html:
+            logs.append("⚠ Could not fetch page HTML — skipping")
+            if progress_callback:
+                progress_callback(idx, total_exhibitions, f"Could not fetch page for {exhibition_name}")
+            continue
 
-        if not company_names:
-            logs.append("⚠ No exhibitors found — skipping")
+        logs.append(f"HTML fetched: {len(html)} chars")
+
+        if progress_callback:
+            progress_callback(idx, total_exhibitions, f"Parsing exhibitors: {exhibition_name}")
+
+        # Step 2: Parse HTML with Claude to extract company names + URLs
+        exhibitors = _extract_exhibitors_from_html(client, html, exhibitor_link)
+        logs.append(f"Exhibitors parsed: {len(exhibitors)}")
+        if exhibitors:
+            names_preview = [e["company_name"] for e in exhibitors[:20]]
+            logs.append(f"Names: {', '.join(names_preview)}")
+            if len(exhibitors) > 20:
+                logs.append(f"  ... and {len(exhibitors) - 20} more")
+
+        if not exhibitors:
+            logs.append("⚠ No exhibitors found in HTML — skipping")
             if progress_callback:
                 progress_callback(idx, total_exhibitions, f"No exhibitors found for {exhibition_name}")
             continue
@@ -264,28 +344,40 @@ def scrape_exhibitors(
         if progress_callback:
             progress_callback(
                 idx, total_exhibitions,
-                f"Found {len(company_names)} companies for {exhibition_name}. Enriching..."
+                f"Enriching {len(exhibitors)} companies via Apollo: {exhibition_name}"
             )
 
-        # Step 1b: Enrich companies with details + apply shortlist
-        all_enriched, shortlisted = _enrich_companies(
-            client,
-            company_names,
-            exhibition_name,
-            progress_callback=progress_callback,
-            progress_offset=idx,
-            progress_total=total_exhibitions,
-        )
-        logs.append(f"Companies enriched: {len(all_enriched)}")
+        # Step 3: Enrich each company via Apollo.io
+        all_enriched = []
+        for i, exhibitor in enumerate(exhibitors):
+            domain = _extract_domain(exhibitor["website"])
+            apollo_org = None
+
+            if domain:
+                apollo_org = _apollo_org_enrichment(domain)
+                time.sleep(APOLLO_BATCH_DELAY)
+
+            row_data = _build_company_row(exhibitor, apollo_org)
+            all_enriched.append(row_data)
+
+            if progress_callback and (i + 1) % 5 == 0:
+                progress_callback(
+                    idx, total_exhibitions,
+                    f"Enriched {i + 1}/{len(exhibitors)} companies for {exhibition_name}"
+                )
+
+        logs.append(f"Companies enriched via Apollo: {len(all_enriched)}")
+        apollo_hits = sum(1 for c in all_enriched if c["industry_vertical"] != "Unknown")
+        logs.append(f"Apollo matches: {apollo_hits}/{len(all_enriched)}")
+
+        # Step 4: Apply shortlist criteria
+        if progress_callback:
+            progress_callback(idx, total_exhibitions, f"Applying shortlist: {exhibition_name}")
+
+        shortlisted = _apply_shortlist(client, all_enriched)
         logs.append(f"Companies after shortlist: {len(shortlisted)}")
 
-        if not all_enriched:
-            logs.append("⚠ Enrichment returned no results — skipping")
-            if progress_callback:
-                progress_callback(idx, total_exhibitions, f"No enrichment results for {exhibition_name}")
-            continue
-
-        def _build_rows(companies):
+        def _build_df_rows(companies):
             return [{
                 "Company Name": c.get("company_name", ""),
                 "Website": c.get("website", ""),
@@ -298,13 +390,13 @@ def scrape_exhibitors(
 
         # Sheet with ALL enriched companies (before filtering)
         all_sheet_name = f"{exhibition_name}-All"[:31]
-        sheets[all_sheet_name] = pd.DataFrame(_build_rows(all_enriched), columns=COMPANY_COLUMNS)
+        sheets[all_sheet_name] = pd.DataFrame(_build_df_rows(all_enriched), columns=COMPANY_COLUMNS)
         logs.append(f"✓ Sheet '{all_sheet_name}': {len(all_enriched)} companies")
 
         # Sheet with shortlisted companies only
         if shortlisted:
             short_sheet_name = f"{exhibition_name}-Shortlist"[:31]
-            sheets[short_sheet_name] = pd.DataFrame(_build_rows(shortlisted), columns=COMPANY_COLUMNS)
+            sheets[short_sheet_name] = pd.DataFrame(_build_df_rows(shortlisted), columns=COMPANY_COLUMNS)
             logs.append(f"✓ Sheet '{short_sheet_name}': {len(shortlisted)} companies")
         else:
             logs.append("⚠ No companies passed shortlist — only All sheet created")
