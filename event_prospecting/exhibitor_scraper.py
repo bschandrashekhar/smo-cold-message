@@ -2,10 +2,11 @@
 
 For each exhibition row:
 1. Fetches the exhibitor page HTML via requests
-2. Uses Claude to parse the HTML and extract company names + website URLs
-3. If HTML parsing fails (JS-heavy page), falls back to Claude Web Search
-4. Uses Apollo.io Organization Enrichment to get company details (industry, revenue, location)
-5. Applies shortlist criteria to produce a filtered subset
+2. Uses BeautifulSoup to find the exhibitor section and extract company names + URLs
+3. If BS4 parsing finds nothing, falls back to Claude HTML parsing (smaller section)
+4. If that also fails, falls back to Claude Web Search
+5. Uses Apollo.io Organization Enrichment to get company details
+6. Applies shortlist criteria to produce a filtered subset
 
 Data source tracking: each company row includes a "Data Source" field
 indicating where the enrichment data came from (e.g. "Apollo", "HTML only").
@@ -15,19 +16,18 @@ import json
 import re
 import time
 from typing import Dict, List, Optional, Callable
+from urllib.parse import urljoin
 
 import requests
 import pandas as pd
 import anthropic
+from bs4 import BeautifulSoup, Tag
 
 from event_prospecting import config
 
 MAX_RETRIES = 3
 RETRY_DELAY = 65
 APOLLO_BATCH_DELAY = 1  # seconds between Apollo API calls
-
-# Minimum meaningful HTML length — below this, the page is likely JS-rendered
-MIN_HTML_CONTENT_LENGTH = 500
 
 # Company columns produced by Step 1
 COMPANY_COLUMNS = [
@@ -51,6 +51,16 @@ Shortlist criteria — only include companies that meet ALL of these:
 
 If you cannot determine whether a company meets a criterion, include it with a note.
 """
+
+# Words that indicate navigation/boilerplate rather than company names
+NOISE_WORDS = {
+    "home", "about", "contact", "register", "login", "sign up", "menu",
+    "search", "privacy", "terms", "cookie", "back to top", "read more",
+    "learn more", "view all", "see all", "click here", "download",
+    "agenda", "schedule", "speakers", "venue", "hotel", "travel",
+    "faq", "help", "support", "share", "tweet", "facebook", "linkedin",
+    "instagram", "twitter", "youtube", "subscribe", "newsletter",
+}
 
 
 def _call_claude_with_retry(client, **kwargs):
@@ -77,10 +87,7 @@ def _extract_json(text: str) -> str:
 
 
 def _fetch_page_html(url: str) -> str:
-    """Fetch a web page and return raw HTML.
-
-    Returns empty string if the page can't be fetched.
-    """
+    """Fetch a web page and return raw HTML."""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -94,72 +101,210 @@ def _fetch_page_html(url: str) -> str:
         return ""
 
 
-def _clean_html_for_parsing(html: str, max_chars: int = 80000) -> str:
-    """Strip scripts, styles, and excess whitespace from HTML to reduce token usage."""
-    html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
-    html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
-    html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
-    html = re.sub(r'\s+', ' ', html)
-    if len(html) > max_chars:
-        html = html[:max_chars] + "\n... [truncated]"
-    return html.strip()
+# ── BeautifulSoup HTML Parsing ────────────────────────────────────────────────
 
 
-def _is_js_heavy_page(html: str) -> bool:
-    """Detect if a page is likely JavaScript-rendered with minimal server-side content.
+def _find_exhibitor_section(soup: BeautifulSoup) -> Optional[Tag]:
+    """Find the exhibitor/sponsor section in the page.
 
-    Checks if the cleaned HTML (minus scripts/styles) has very little text content,
-    which suggests the real content is loaded via JS.
+    Searches generically by:
+    1. Element with id containing 'exhibitor' or 'sponsor'
+    2. Element with class containing 'exhibitor' or 'sponsor'
+    3. Heading (h1-h4) containing the word 'exhibitor' or 'sponsor', then takes parent section
     """
-    cleaned = _clean_html_for_parsing(html)
-    # Strip all remaining HTML tags to get just text
-    text_only = re.sub(r'<[^>]+>', ' ', cleaned)
-    text_only = re.sub(r'\s+', ' ', text_only).strip()
-    return len(text_only) < MIN_HTML_CONTENT_LENGTH
+    # Strategy 1: Find by id
+    for keyword in ["exhibitor", "sponsor", "partner"]:
+        el = soup.find(id=re.compile(keyword, re.IGNORECASE))
+        if el:
+            return el
+
+    # Strategy 2: Find by class
+    for keyword in ["exhibitor", "sponsor", "partner"]:
+        el = soup.find(class_=re.compile(keyword, re.IGNORECASE))
+        if el:
+            # Walk up to a section/div parent for broader context
+            parent = el
+            for _ in range(3):
+                if parent.parent and parent.parent.name in ("section", "div", "main", "article"):
+                    parent = parent.parent
+                else:
+                    break
+            return parent
+
+    # Strategy 3: Find by heading text
+    for heading_tag in ["h1", "h2", "h3", "h4"]:
+        for heading in soup.find_all(heading_tag):
+            text = heading.get_text(strip=True).lower()
+            if any(kw in text for kw in ["exhibitor", "sponsor", "partner"]):
+                # Return the parent section/div
+                parent = heading.parent
+                for _ in range(3):
+                    if parent.parent and parent.parent.name in ("section", "div", "main", "article"):
+                        parent = parent.parent
+                    else:
+                        break
+                return parent
+
+    return None
 
 
-def _extract_exhibitors_section(html: str) -> str:
-    """Try to extract just the exhibitor-related section from the HTML.
+def _is_likely_company_name(text: str) -> bool:
+    """Check if a text string looks like a company name rather than navigation/boilerplate."""
+    text = text.strip()
+    if not text or len(text) < 2 or len(text) > 100:
+        return False
+    if text.lower() in NOISE_WORDS:
+        return False
+    # Skip if it's just a number or very short generic word
+    if text.isdigit():
+        return False
+    # Skip if it looks like a sentence (too many words = probably a description)
+    if len(text.split()) > 8:
+        return False
+    return True
 
-    Looks for common patterns like id="exhibitors", class="exhibitor",
-    or anchor names. Returns the section if found, otherwise empty string.
+
+def _extract_companies_from_section(section: Tag, base_url: str) -> List[Dict]:
+    """Extract company names and URLs from an exhibitor section using structural patterns.
+
+    Handles common patterns:
+    - Logo images with alt text
+    - Links to company websites
+    - Cards/grid items with company info
+    - List items with company names
     """
-    # Look for exhibitor section by id or anchor
-    patterns = [
-        r'(?:id|name)=["\'](?:[^"\']*exhibitor[^"\']*)["\']',
-        r'(?:id|name)=["\'](?:[^"\']*sponsor[^"\']*)["\']',
-        r'(?:class)=["\'](?:[^"\']*exhibitor[^"\']*)["\']',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, html, re.IGNORECASE)
-        if match:
-            # Extract a generous chunk around the match (50K chars after)
-            start = max(0, match.start() - 1000)
-            end = min(len(html), match.start() + 50000)
-            return html[start:end]
-    return ""
+    companies = {}  # name_lower -> {company_name, website}
+
+    def _add(name: str, website: str = ""):
+        name = name.strip()
+        if not _is_likely_company_name(name):
+            return
+        key = name.lower()
+        if key not in companies:
+            companies[key] = {"company_name": name, "website": website}
+        elif website and not companies[key]["website"]:
+            companies[key]["website"] = website
+
+    # Pattern 1: Images with alt text (logo grids)
+    for img in section.find_all("img"):
+        alt = (img.get("alt") or "").strip()
+        if alt and _is_likely_company_name(alt):
+            # Check if the image is wrapped in a link
+            parent_link = img.find_parent("a")
+            href = ""
+            if parent_link:
+                href = parent_link.get("href", "")
+                if href and not href.startswith(("http", "//")):
+                    href = urljoin(base_url, href)
+            _add(alt, href)
+
+    # Pattern 2: Links with text that look like company names
+    for a in section.find_all("a"):
+        href = a.get("href", "")
+        text = a.get_text(strip=True)
+
+        # Skip internal/anchor links
+        if href.startswith("#") or href.startswith("mailto:") or href.startswith("tel:"):
+            continue
+
+        if href and not href.startswith(("http", "//")):
+            href = urljoin(base_url, href)
+
+        # Skip links to the same domain (internal navigation)
+        if href and base_url:
+            from urllib.parse import urlparse
+            link_domain = urlparse(href).netloc.lower().replace("www.", "")
+            base_domain = urlparse(base_url).netloc.lower().replace("www.", "")
+            is_external = link_domain and link_domain != base_domain
+
+            if text and _is_likely_company_name(text):
+                _add(text, href if is_external else "")
+
+    # Pattern 3: Heading tags within repeating containers (cards)
+    # Find repeating child divs/articles that might be exhibitor cards
+    card_containers = section.find_all(["div", "article", "li"], recursive=False)
+    if len(card_containers) < 3:
+        # Try one level deeper
+        for child in section.find_all(["div", "section"], recursive=False):
+            deeper = child.find_all(["div", "article", "li"], recursive=False)
+            if len(deeper) >= 3:
+                card_containers = deeper
+                break
+
+    if len(card_containers) >= 3:
+        for card in card_containers:
+            # Look for a heading or strong tag as the company name
+            name_el = card.find(["h2", "h3", "h4", "h5", "strong", "b"])
+            if name_el:
+                name = name_el.get_text(strip=True)
+                # Find an external link in the card
+                link = card.find("a", href=True)
+                href = ""
+                if link:
+                    href = link.get("href", "")
+                    if href and not href.startswith(("http", "//")):
+                        href = urljoin(base_url, href)
+                _add(name, href)
+
+    return list(companies.values())
 
 
-def _extract_exhibitors_from_html(client, html: str, exhibitor_link: str) -> List[Dict]:
-    """Use Claude to parse HTML and extract exhibitor company names + website URLs.
+def _bs4_extract_exhibitors(html: str, url: str, logs: List[str]) -> List[Dict]:
+    """Main BeautifulSoup extraction pipeline.
 
-    Returns a list of dicts with 'company_name' and 'website' keys.
+    1. Parse HTML
+    2. Find exhibitor section
+    3. Extract companies from that section
     """
-    # Try to find the exhibitor section first (avoids truncating it away)
-    section = _extract_exhibitors_section(html)
-    if section:
-        cleaned = _clean_html_for_parsing(section)
-    else:
-        cleaned = _clean_html_for_parsing(html)
+    soup = BeautifulSoup(html, "html.parser")
 
-    prompt = f"""Parse this HTML from an exhibition exhibitor listing page ({exhibitor_link}) and extract ALL exhibiting company names and their website URLs.
+    section = _find_exhibitor_section(soup)
+    if not section:
+        logs.append("BS4: No exhibitor section found in HTML")
+        return []
 
-HTML CONTENT:
-{cleaned}
+    section_id = section.get("id", "")
+    section_class = " ".join(section.get("class", []))[:50]
+    logs.append(f"BS4: Found exhibitor section (id='{section_id}', class='{section_class}')")
+    logs.append(f"BS4: Section size: {len(str(section))} chars")
+
+    companies = _extract_companies_from_section(section, url)
+    logs.append(f"BS4: Extracted {len(companies)} companies from section")
+
+    return companies
+
+
+# ── Claude Fallbacks ──────────────────────────────────────────────────────────
+
+
+def _claude_parse_section_html(client, section_html: str, exhibitor_link: str) -> List[Dict]:
+    """Use Claude to parse a smaller HTML section when BS4 structural extraction fails.
+
+    This sends only the exhibitor section (not the whole page) to Claude.
+    """
+    # Clean the section HTML
+    section_html = re.sub(r'<script[^>]*>.*?</script>', '', section_html, flags=re.DOTALL | re.IGNORECASE)
+    section_html = re.sub(r'<style[^>]*>.*?</style>', '', section_html, flags=re.DOTALL | re.IGNORECASE)
+    section_html = re.sub(r'\s+', ' ', section_html)
+
+    # Truncate if still too large
+    if len(section_html) > 60000:
+        section_html = section_html[:60000] + "\n... [truncated]"
+
+    prompt = f"""Parse this HTML section from an exhibition exhibitor listing page ({exhibitor_link}).
+This is the exhibitor/sponsor section of the page. Extract ALL company names and their website URLs.
+
+HTML SECTION:
+{section_html}
+
+Look for:
+- Company names in headings, strong tags, alt text of images
+- Website URLs in href attributes of links
+- Any text that represents a company or organization name
 
 For each exhibitor, extract:
 - "company_name": The company/organization name
-- "website": Their website URL if available in the HTML (href links), otherwise empty string ""
+- "website": Their website URL if available, otherwise empty string ""
 
 Return ONLY a JSON array of objects. Example:
 [
@@ -198,12 +343,7 @@ Return ONLY the JSON array, no other text."""
 
 
 def _extract_exhibitors_via_web_search(client, exhibitor_link: str, exhibition_name: str = "") -> List[Dict]:
-    """Fallback: Use Claude Web Search to extract exhibitors when HTML parsing fails.
-
-    Used for JS-heavy pages that can't be scraped with requests.get().
-    Uses multiple search strategies to find the exhibitor list.
-    Returns a list of dicts with 'company_name' and 'website' keys.
-    """
+    """Last resort: Use Claude Web Search to find exhibitors when all HTML parsing fails."""
     search_hint = f'"{exhibition_name}" ' if exhibition_name else ""
     prompt = f"""I need to find the complete list of exhibiting companies for this conference/exhibition.
 
@@ -267,6 +407,9 @@ Return ONLY the JSON array, no other text."""
     return []
 
 
+# ── Apollo Enrichment ─────────────────────────────────────────────────────────
+
+
 def _apollo_org_enrichment(domain: str) -> Optional[Dict]:
     """Enrich a company via Apollo.io Organization Enrichment API."""
     if not config.APOLLO_API_KEY or not domain:
@@ -315,10 +458,7 @@ def _format_revenue(estimated_revenue: Optional[float]) -> str:
 
 
 def _build_company_row(exhibitor: Dict, apollo_org: Optional[Dict]) -> Dict:
-    """Build a company row dict from exhibitor info + Apollo enrichment data.
-
-    Tracks the data source for transparency.
-    """
+    """Build a company row dict from exhibitor info + Apollo enrichment data."""
     if apollo_org:
         revenue_printed = apollo_org.get("annual_revenue_printed") or ""
         if not revenue_printed:
@@ -346,6 +486,9 @@ def _build_company_row(exhibitor: Dict, apollo_org: Optional[Dict]) -> Dict:
             "revenue_range": "Unknown",
             "data_source": "HTML only",
         }
+
+
+# ── Shortlist Filtering ──────────────────────────────────────────────────────
 
 
 def _apply_shortlist(client, all_companies: List[Dict]) -> List[Dict]:
@@ -382,17 +525,22 @@ Return ONLY the JSON array, no other text."""
     return []
 
 
+# ── Main Orchestrator ─────────────────────────────────────────────────────────
+
+
 def scrape_exhibitors(
     df: pd.DataFrame,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> tuple:
     """Scrape exhibitor links and return enriched company lists per exhibition.
 
-    Pipeline per exhibition:
-    1. Fetch exhibitor page HTML
-    2. Parse HTML with Claude to extract company names + URLs
-    3. If HTML parsing fails (JS-heavy), fall back to Claude Web Search
-    4. Enrich each company via Apollo.io Organization API
+    Extraction cascade per exhibition:
+    1. Fetch HTML → BS4 structural parse (fastest, cheapest)
+    2. If BS4 finds section but no companies → Claude parses the section HTML
+    3. If no section found or all parsing fails → Claude Web Search
+
+    Then:
+    4. Enrich each company via Apollo.io
     5. Apply shortlist criteria via Claude
 
     Returns:
@@ -412,27 +560,54 @@ def scrape_exhibitors(
         if progress_callback:
             progress_callback(idx, total_exhibitions, f"Fetching page: {exhibition_name}")
 
-        # Step 1: Fetch exhibitor page HTML
+        # Step 1: Fetch HTML
         html = _fetch_page_html(exhibitor_link)
-        scrape_method = "HTML"
+        scrape_method = ""
         exhibitors = []
+        section_html = ""
 
-        if html and not _is_js_heavy_page(html):
+        if not html:
+            logs.append("⚠ Could not fetch page HTML")
+        else:
             logs.append(f"HTML fetched: {len(html)} chars")
 
             if progress_callback:
-                progress_callback(idx, total_exhibitions, f"Parsing exhibitors from HTML: {exhibition_name}")
+                progress_callback(idx, total_exhibitions, f"Parsing exhibitors: {exhibition_name}")
 
-            # Step 2: Parse HTML with Claude
-            exhibitors = _extract_exhibitors_from_html(client, html, exhibitor_link)
-            logs.append(f"Exhibitors parsed from HTML: {len(exhibitors)}")
-        else:
-            if html:
-                logs.append(f"⚠ Page appears JS-heavy ({len(html)} chars HTML but minimal text content)")
+            # Step 2: BeautifulSoup structural extraction
+            exhibitors = _bs4_extract_exhibitors(html, exhibitor_link, logs)
+
+            if exhibitors:
+                scrape_method = "HTML (BS4)"
             else:
-                logs.append("⚠ Could not fetch page HTML")
+                # Step 2b: Claude parses the exhibitor section if BS4 found one
+                soup = BeautifulSoup(html, "html.parser")
+                section = None
+                # Re-find the section for Claude parsing
+                for keyword in ["exhibitor", "sponsor", "partner"]:
+                    section = soup.find(id=re.compile(keyword, re.IGNORECASE))
+                    if section:
+                        break
+                if not section:
+                    for keyword in ["exhibitor", "sponsor", "partner"]:
+                        section = soup.find(class_=re.compile(keyword, re.IGNORECASE))
+                        if section:
+                            break
 
-        # Step 2b: Fallback to Claude Web Search if HTML parsing yielded nothing
+                if section:
+                    section_html = str(section)
+                    logs.append(f"BS4 found section ({len(section_html)} chars) — sending to Claude for parsing")
+
+                    if progress_callback:
+                        progress_callback(idx, total_exhibitions, f"Claude parsing section: {exhibition_name}")
+
+                    exhibitors = _claude_parse_section_html(client, section_html, exhibitor_link)
+                    logs.append(f"Claude parsed from section: {len(exhibitors)} companies")
+
+                    if exhibitors:
+                        scrape_method = "HTML (Claude section parse)"
+
+        # Step 3: Claude Web Search fallback
         if not exhibitors:
             logs.append("Falling back to Claude Web Search...")
             scrape_method = "Claude Web Search"
@@ -463,7 +638,7 @@ def scrape_exhibitors(
                 f"Enriching {len(exhibitors)} companies via Apollo: {exhibition_name}"
             )
 
-        # Step 3: Enrich each company via Apollo.io
+        # Step 4: Enrich each company via Apollo.io
         all_enriched = []
         for i, exhibitor in enumerate(exhibitors):
             domain = _extract_domain(exhibitor["website"])
@@ -485,7 +660,7 @@ def scrape_exhibitors(
         apollo_hits = sum(1 for c in all_enriched if c["data_source"] == "Apollo")
         logs.append(f"Companies enriched: {len(all_enriched)} (Apollo: {apollo_hits}, HTML only: {len(all_enriched) - apollo_hits})")
 
-        # Step 4: Apply shortlist criteria
+        # Step 5: Apply shortlist criteria
         if progress_callback:
             progress_callback(idx, total_exhibitions, f"Applying shortlist: {exhibition_name}")
 

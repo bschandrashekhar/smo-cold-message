@@ -5,3 +5,4 @@ voyageai>=0.3.0
 supabase>=2.0.0
 python-dotenv>=1.0.0
 pandas>=2.0.0
+beautifulsoup4>=4.12.0
