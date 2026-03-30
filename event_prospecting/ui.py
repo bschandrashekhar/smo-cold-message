@@ -24,7 +24,7 @@ def _read_sheets_from_excel(data: bytes) -> dict:
     return {name: pd.read_excel(xls, sheet_name=name) for name in xls.sheet_names}
 
 
-_BUILD = "v2.1"  # bump to verify deployments
+_BUILD = "v2.2"  # bump to verify deployments
 
 
 def render():

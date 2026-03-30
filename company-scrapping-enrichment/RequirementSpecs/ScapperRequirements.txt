@@ -27,18 +27,19 @@ For each 'Exhibitor Link' from the input excel sheet, I need you to take out the
 | Revenue Range | The latest revenue of the company.
 
 Points to consider:
-- The exhibitor page can be scraped and HTML parsed to read the exhibitor's list name. Simple HTML parsing can be used to read the exhibitor's list name, website, and location (whatever is available of the three). For rest of the information industry vertical, sub-industry, and revenue range, you can use a combination of web scraping and API calls to business information services like LinkedIn, Crunchbase, or similar platforms that provide company data in combination with Apollo.io. Give preference to Apollo.io for data enrichment as it is the primary tool for lead enrichment in this project.
-- The only scenario where this might not work is if the exhibitor page is heavily JavaScript-rendered (SPA) — then requests.get() would get an empty shell. But most exhibition sites render their exhibitor lists server-side, so this should work well. If we hit a JS-heavy page, let us know on the UI itself and if that is the case, in that scenario we can explore:
-- Using Claude Web Search for scraping the exhibitor list if the page is JavaScript-heavy and not easily scrappable with traditional methods. 
+- The exhibitor page can be scraped and HTML parsed to read the exhibitor's list name. Simple HTML parsing can be used to read the exhibitor's list to get the company name, its website. No LLM need to be used for this step, just plain HTML parser. We can improve the parsing as we add more websites to handle additional conditions of HTML parsing. 
+- Make the Scraping Log visible in UI throughout.
+- For rest of the information on the company industry vertical, sub-industry, and revenue range, you can use a combination of web scraping and API calls to business information services like LinkedIn, Crunchbase, or similar platforms that provide company data in combination with Apollo.io. Give preference to Apollo.io for data enrichment as it is the primary tool for lead enrichment in this project.
+- The only scenario where this might not work is if the exhibitor page is heavily JavaScript-rendered (SPA) — then requests.get() would get an empty shell. But most exhibition sites render their exhibitor lists server-side, so this should work well. If we hit a JS-heavy page, let us know on the UI itself and dont proceed.
 - If Apollo.io does not have the required data points for a company, we can use LinkedIn and Crunchbase as secondary sources to fill in the gaps. The data collection process should be automated as much as possible to ensure efficiency and accuracy.
 
 Use #INPUT-STEP1 to as the shortlist criteria.
 
 	#INPUT-STEP1:
 	Conditions for the companies to be considered in the above list:
-	- Not IT service providers
-	- Revenue under $2 billion
-	- Preferably financial services (not mandatory)
+	- Company shouldnt be IT service providers.
+	- Revenue under $2 billion.
+	- Preferably financial services (not mandatory).
 	- Using technologies in our expertise area which comprises of these: Salesforce, Dell Boomi, Snowflake, .NET, Tableau, MS Fabric.
 	- Avoid casting too wide a net on data engineering tools while sticking to the tools within our capabilities.
 

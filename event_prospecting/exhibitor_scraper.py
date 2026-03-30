@@ -2,11 +2,10 @@
 
 For each exhibition row:
 1. Fetches the exhibitor page HTML via requests
-2. Uses BeautifulSoup to find the exhibitor section and extract company names + URLs
-3. If BS4 parsing finds nothing, falls back to Claude HTML parsing (smaller section)
-4. If that also fails, falls back to Claude Web Search
-5. Uses Apollo.io Organization Enrichment to get company details
-6. Applies shortlist criteria to produce a filtered subset
+2. Detects JS-heavy/SPA pages and skips with a clear warning
+3. Uses BeautifulSoup to find the exhibitor section and extract company names + URLs
+4. Uses Apollo.io Organization Enrichment to get company details
+5. Applies shortlist criteria via Claude to produce a filtered subset
 
 Data source tracking: each company row includes a "Data Source" field
 indicating where the enrichment data came from (e.g. "Apollo", "HTML only").
@@ -249,6 +248,49 @@ def _extract_companies_from_section(section: Tag, base_url: str) -> List[Dict]:
     return list(companies.values())
 
 
+def _is_js_heavy_page(html: str, url: str) -> bool:
+    """Detect if a page is likely JavaScript-rendered (SPA) with no server-side content.
+
+    Indicators:
+    - URL contains a hash fragment (e.g. /#exhibitors)
+    - HTML body has very little visible text relative to script content
+    - Presence of SPA framework markers (React root, Angular app, Vue app)
+    """
+    # Hash-based routing is a strong SPA signal
+    if "#" in url:
+        return True
+
+    soup = BeautifulSoup(html, "html.parser")
+    body = soup.find("body")
+    if not body:
+        return True
+
+    # Compare script content vs visible text
+    scripts = body.find_all("script")
+    script_chars = sum(len(s.get_text()) for s in scripts)
+
+    # Remove scripts to measure visible text
+    for s in scripts:
+        s.decompose()
+    visible_text = body.get_text(strip=True)
+
+    # If visible text is tiny compared to script content, likely JS-rendered
+    if len(visible_text) < 500 and script_chars > 5000:
+        return True
+
+    # SPA framework markers
+    spa_markers = [
+        body.find(id="root"),        # React
+        body.find(id="app"),         # Vue
+        body.find(id="__next"),      # Next.js
+        body.find(attrs={"ng-app": True}),  # Angular
+    ]
+    if any(spa_markers) and len(visible_text) < 1000:
+        return True
+
+    return False
+
+
 def _bs4_extract_exhibitors(html: str, url: str, logs: List[str]) -> List[Dict]:
     """Main BeautifulSoup extraction pipeline.
 
@@ -434,6 +476,13 @@ def scrape_exhibitors(
             continue
 
         logs.append(f"HTML fetched: {len(html)} chars")
+
+        # Check for JS-heavy pages that won't have server-rendered content
+        if _is_js_heavy_page(html, exhibitor_link):
+            logs.append("⚠ Page appears to be JavaScript-rendered (SPA) — exhibitor data is loaded dynamically and cannot be extracted via HTTP fetch. Skipping.")
+            if progress_callback:
+                progress_callback(idx, total_exhibitions, f"JS-rendered page, skipping: {exhibition_name}")
+            continue
 
         if progress_callback:
             progress_callback(idx, total_exhibitions, f"Parsing exhibitors: {exhibition_name}")
