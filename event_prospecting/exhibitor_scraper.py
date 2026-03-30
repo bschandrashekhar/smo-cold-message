@@ -274,139 +274,6 @@ def _bs4_extract_exhibitors(html: str, url: str, logs: List[str]) -> List[Dict]:
     return companies
 
 
-# ── Claude Fallbacks ──────────────────────────────────────────────────────────
-
-
-def _claude_parse_section_html(client, section_html: str, exhibitor_link: str) -> List[Dict]:
-    """Use Claude to parse a smaller HTML section when BS4 structural extraction fails.
-
-    This sends only the exhibitor section (not the whole page) to Claude.
-    """
-    # Clean the section HTML
-    section_html = re.sub(r'<script[^>]*>.*?</script>', '', section_html, flags=re.DOTALL | re.IGNORECASE)
-    section_html = re.sub(r'<style[^>]*>.*?</style>', '', section_html, flags=re.DOTALL | re.IGNORECASE)
-    section_html = re.sub(r'\s+', ' ', section_html)
-
-    # Truncate if still too large
-    if len(section_html) > 60000:
-        section_html = section_html[:60000] + "\n... [truncated]"
-
-    prompt = f"""Parse this HTML section from an exhibition exhibitor listing page ({exhibitor_link}).
-This is the exhibitor/sponsor section of the page. Extract ALL company names and their website URLs.
-
-HTML SECTION:
-{section_html}
-
-Look for:
-- Company names in headings, strong tags, alt text of images
-- Website URLs in href attributes of links
-- Any text that represents a company or organization name
-
-For each exhibitor, extract:
-- "company_name": The company/organization name
-- "website": Their website URL if available, otherwise empty string ""
-
-Return ONLY a JSON array of objects. Example:
-[
-  {{"company_name": "Acme Corp", "website": "https://acme.com"}},
-  {{"company_name": "Beta Inc", "website": ""}}
-]
-
-If you find no exhibitors, return an empty array: []
-Return ONLY the JSON array, no other text."""
-
-    response = _call_claude_with_retry(
-        client,
-        model="claude-sonnet-4-20250514",
-        max_tokens=8192,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    text = response.content[0].text.strip()
-    text = _extract_json(text)
-
-    try:
-        exhibitors = json.loads(text)
-        if isinstance(exhibitors, list):
-            return [
-                {
-                    "company_name": str(e.get("company_name", "")).strip(),
-                    "website": str(e.get("website", "")).strip(),
-                }
-                for e in exhibitors
-                if str(e.get("company_name", "")).strip()
-            ]
-    except json.JSONDecodeError:
-        pass
-
-    return []
-
-
-def _extract_exhibitors_via_web_search(client, exhibitor_link: str, exhibition_name: str = "") -> List[Dict]:
-    """Last resort: Use Claude Web Search to find exhibitors when all HTML parsing fails."""
-    search_hint = f'"{exhibition_name}" ' if exhibition_name else ""
-    prompt = f"""I need to find the complete list of exhibiting companies for this conference/exhibition.
-
-Exhibition page: {exhibitor_link}
-{f'Exhibition name: {exhibition_name}' if exhibition_name else ''}
-
-The exhibitor list on that page is loaded dynamically via JavaScript, so I need you to search the web to find this information.
-
-Please search for:
-1. {search_hint}exhibitors list
-2. {search_hint}sponsors list
-3. The conference name + "exhibitors" or "exhibitor directory"
-
-Find as many exhibiting company names as possible. For each company, also find their website URL if available.
-
-Return ONLY a JSON array of objects. Example:
-[
-  {{"company_name": "Acme Corp", "website": "https://acme.com"}},
-  {{"company_name": "Beta Inc", "website": ""}}
-]
-
-If you truly cannot find any exhibitor information after searching, return an empty array: []
-Return ONLY the JSON array, no other text."""
-
-    response = _call_claude_with_retry(
-        client,
-        model="claude-sonnet-4-20250514",
-        max_tokens=8192,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    # Extract text from response (after last web search result)
-    last_search_idx = -1
-    for i, block in enumerate(response.content):
-        if block.type == "web_search_tool_result":
-            last_search_idx = i
-
-    text_parts = []
-    for i, block in enumerate(response.content):
-        if block.type == "text" and i > last_search_idx:
-            text_parts.append(block.text)
-
-    text = "".join(text_parts).strip()
-    text = _extract_json(text)
-
-    try:
-        exhibitors = json.loads(text)
-        if isinstance(exhibitors, list):
-            return [
-                {
-                    "company_name": str(e.get("company_name", "")).strip(),
-                    "website": str(e.get("website", "")).strip(),
-                }
-                for e in exhibitors
-                if str(e.get("company_name", "")).strip()
-            ]
-    except json.JSONDecodeError:
-        pass
-
-    return []
-
-
 # ── Apollo Enrichment ─────────────────────────────────────────────────────────
 
 
@@ -534,14 +401,10 @@ def scrape_exhibitors(
 ) -> tuple:
     """Scrape exhibitor links and return enriched company lists per exhibition.
 
-    Extraction cascade per exhibition:
-    1. Fetch HTML → BS4 structural parse (fastest, cheapest)
-    2. If BS4 finds section but no companies → Claude parses the section HTML
-    3. If no section found or all parsing fails → Claude Web Search
-
-    Then:
-    4. Enrich each company via Apollo.io
-    5. Apply shortlist criteria via Claude
+    Pipeline per exhibition:
+    1. Fetch HTML → BS4 structural parse (Python only, no LLM)
+    2. Enrich each company via Apollo.io
+    3. Apply shortlist criteria via Claude
 
     Returns:
         Tuple of (sheets_dict, logs_list).
@@ -562,61 +425,21 @@ def scrape_exhibitors(
 
         # Step 1: Fetch HTML
         html = _fetch_page_html(exhibitor_link)
-        scrape_method = ""
         exhibitors = []
-        section_html = ""
 
         if not html:
-            logs.append("⚠ Could not fetch page HTML")
-        else:
-            logs.append(f"HTML fetched: {len(html)} chars")
-
+            logs.append("⚠ Could not fetch page HTML — skipping")
             if progress_callback:
-                progress_callback(idx, total_exhibitions, f"Parsing exhibitors: {exhibition_name}")
+                progress_callback(idx, total_exhibitions, f"Could not fetch page for {exhibition_name}")
+            continue
 
-            # Step 2: BeautifulSoup structural extraction
-            exhibitors = _bs4_extract_exhibitors(html, exhibitor_link, logs)
+        logs.append(f"HTML fetched: {len(html)} chars")
 
-            if exhibitors:
-                scrape_method = "HTML (BS4)"
-            else:
-                # Step 2b: Claude parses the exhibitor section if BS4 found one
-                soup = BeautifulSoup(html, "html.parser")
-                section = None
-                # Re-find the section for Claude parsing
-                for keyword in ["exhibitor", "sponsor", "partner"]:
-                    section = soup.find(id=re.compile(keyword, re.IGNORECASE))
-                    if section:
-                        break
-                if not section:
-                    for keyword in ["exhibitor", "sponsor", "partner"]:
-                        section = soup.find(class_=re.compile(keyword, re.IGNORECASE))
-                        if section:
-                            break
+        if progress_callback:
+            progress_callback(idx, total_exhibitions, f"Parsing exhibitors: {exhibition_name}")
 
-                if section:
-                    section_html = str(section)
-                    logs.append(f"BS4 found section ({len(section_html)} chars) — sending to Claude for parsing")
-
-                    if progress_callback:
-                        progress_callback(idx, total_exhibitions, f"Claude parsing section: {exhibition_name}")
-
-                    exhibitors = _claude_parse_section_html(client, section_html, exhibitor_link)
-                    logs.append(f"Claude parsed from section: {len(exhibitors)} companies")
-
-                    if exhibitors:
-                        scrape_method = "HTML (Claude section parse)"
-
-        # Step 3: Claude Web Search fallback
-        if not exhibitors:
-            logs.append("Falling back to Claude Web Search...")
-            scrape_method = "Claude Web Search"
-
-            if progress_callback:
-                progress_callback(idx, total_exhibitions, f"Using Claude Web Search: {exhibition_name}")
-
-            exhibitors = _extract_exhibitors_via_web_search(client, exhibitor_link, exhibition_name)
-            logs.append(f"Exhibitors found via Web Search: {len(exhibitors)}")
+        # Step 2: BeautifulSoup structural extraction (Python only, no LLM)
+        exhibitors = _bs4_extract_exhibitors(html, exhibitor_link, logs)
 
         if exhibitors:
             names_preview = [e["company_name"] for e in exhibitors[:20]]
@@ -625,12 +448,10 @@ def scrape_exhibitors(
                 logs.append(f"  ... and {len(exhibitors) - 20} more")
 
         if not exhibitors:
-            logs.append("⚠ No exhibitors found via any method — skipping")
+            logs.append("⚠ No exhibitors found in HTML — skipping")
             if progress_callback:
                 progress_callback(idx, total_exhibitions, f"No exhibitors found for {exhibition_name}")
             continue
-
-        logs.append(f"Scrape method: {scrape_method}")
 
         if progress_callback:
             progress_callback(
