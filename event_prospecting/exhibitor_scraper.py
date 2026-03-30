@@ -118,12 +118,39 @@ def _is_js_heavy_page(html: str) -> bool:
     return len(text_only) < MIN_HTML_CONTENT_LENGTH
 
 
+def _extract_exhibitors_section(html: str) -> str:
+    """Try to extract just the exhibitor-related section from the HTML.
+
+    Looks for common patterns like id="exhibitors", class="exhibitor",
+    or anchor names. Returns the section if found, otherwise empty string.
+    """
+    # Look for exhibitor section by id or anchor
+    patterns = [
+        r'(?:id|name)=["\'](?:[^"\']*exhibitor[^"\']*)["\']',
+        r'(?:id|name)=["\'](?:[^"\']*sponsor[^"\']*)["\']',
+        r'(?:class)=["\'](?:[^"\']*exhibitor[^"\']*)["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html, re.IGNORECASE)
+        if match:
+            # Extract a generous chunk around the match (50K chars after)
+            start = max(0, match.start() - 1000)
+            end = min(len(html), match.start() + 50000)
+            return html[start:end]
+    return ""
+
+
 def _extract_exhibitors_from_html(client, html: str, exhibitor_link: str) -> List[Dict]:
     """Use Claude to parse HTML and extract exhibitor company names + website URLs.
 
     Returns a list of dicts with 'company_name' and 'website' keys.
     """
-    cleaned = _clean_html_for_parsing(html)
+    # Try to find the exhibitor section first (avoids truncating it away)
+    section = _extract_exhibitors_section(html)
+    if section:
+        cleaned = _clean_html_for_parsing(section)
+    else:
+        cleaned = _clean_html_for_parsing(html)
 
     prompt = f"""Parse this HTML from an exhibition exhibitor listing page ({exhibitor_link}) and extract ALL exhibiting company names and their website URLs.
 
@@ -170,19 +197,27 @@ Return ONLY the JSON array, no other text."""
     return []
 
 
-def _extract_exhibitors_via_web_search(client, exhibitor_link: str) -> List[Dict]:
+def _extract_exhibitors_via_web_search(client, exhibitor_link: str, exhibition_name: str = "") -> List[Dict]:
     """Fallback: Use Claude Web Search to extract exhibitors when HTML parsing fails.
 
     Used for JS-heavy pages that can't be scraped with requests.get().
+    Uses multiple search strategies to find the exhibitor list.
     Returns a list of dicts with 'company_name' and 'website' keys.
     """
-    prompt = f"""Visit this exhibition exhibitor page and extract ALL company names listed:
-{exhibitor_link}
+    search_hint = f'"{exhibition_name}" ' if exhibition_name else ""
+    prompt = f"""I need to find the complete list of exhibiting companies for this conference/exhibition.
 
-Search for this page and extract the complete list of exhibiting companies.
-For each exhibitor, extract:
-- "company_name": The company/organization name
-- "website": Their website URL if you can find it, otherwise empty string ""
+Exhibition page: {exhibitor_link}
+{f'Exhibition name: {exhibition_name}' if exhibition_name else ''}
+
+The exhibitor list on that page is loaded dynamically via JavaScript, so I need you to search the web to find this information.
+
+Please search for:
+1. {search_hint}exhibitors list
+2. {search_hint}sponsors list
+3. The conference name + "exhibitors" or "exhibitor directory"
+
+Find as many exhibiting company names as possible. For each company, also find their website URL if available.
 
 Return ONLY a JSON array of objects. Example:
 [
@@ -190,7 +225,7 @@ Return ONLY a JSON array of objects. Example:
   {{"company_name": "Beta Inc", "website": ""}}
 ]
 
-If you cannot access the page or find no exhibitors, return an empty array: []
+If you truly cannot find any exhibitor information after searching, return an empty array: []
 Return ONLY the JSON array, no other text."""
 
     response = _call_claude_with_retry(
@@ -405,7 +440,7 @@ def scrape_exhibitors(
             if progress_callback:
                 progress_callback(idx, total_exhibitions, f"Using Claude Web Search: {exhibition_name}")
 
-            exhibitors = _extract_exhibitors_via_web_search(client, exhibitor_link)
+            exhibitors = _extract_exhibitors_via_web_search(client, exhibitor_link, exhibition_name)
             logs.append(f"Exhibitors found via Web Search: {len(exhibitors)}")
 
         if exhibitors:
