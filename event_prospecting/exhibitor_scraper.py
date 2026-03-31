@@ -78,26 +78,49 @@ def _extract_json(text: str) -> str:
 # ── Apollo Enrichment ─────────────────────────────────────────────────────────
 
 
-def _apollo_org_enrichment(domain: str) -> Optional[Dict]:
-    """Enrich a company via Apollo.io Organization Enrichment API."""
-    if not config.APOLLO_API_KEY or not domain:
+def _apollo_org_search(company_name: str, domain: str = "") -> Optional[Dict]:
+    """Search for a company via Apollo.io Organization Search API.
+
+    Primary lookup is by company name. If a domain is provided, it's used to
+    confirm the best match from search results.
+    """
+    if not config.APOLLO_API_KEY or not company_name:
         return None
 
     try:
-        response = requests.get(
-            "https://api.apollo.io/api/v1/organizations/enrich",
-            params={
-                "api_key": config.APOLLO_API_KEY,
-                "domain": domain,
+        response = requests.post(
+            "https://api.apollo.io/api/v1/organizations/search",
+            headers={
+                "X-Api-Key": config.APOLLO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={
+                "q_organization_name": company_name,
+                "page": 1,
+                "per_page": 5,
             },
             timeout=30,
         )
         response.raise_for_status()
         data = response.json()
-        org = data.get("organization")
-        return org if org else None
+        orgs = data.get("organizations", [])
+
+        if not orgs:
+            return None
+
+        # If we have a domain, try to match it against results
+        if domain:
+            domain_clean = domain.lower().replace("www.", "")
+            for org in orgs:
+                org_url = (org.get("website_url") or "").lower().replace("www.", "")
+                if domain_clean in org_url or org_url.endswith(domain_clean):
+                    return org
+
+        # Otherwise return the first (best) match
+        return orgs[0]
+
     except requests.RequestException as e:
-        print(f"Apollo org enrichment error for {domain}: {e}")
+        print(f"Apollo org search error for '{company_name}': {e}")
         return None
 
 
@@ -252,15 +275,12 @@ def enrich_exhibitors(
                 f"Enriching {len(exhibitors)} companies via Apollo: {exhibition_name}"
             )
 
-        # Step 1: Enrich each company via Apollo.io
+        # Step 1: Enrich each company via Apollo.io (name-based search)
         all_enriched = []
         for i, exhibitor in enumerate(exhibitors):
-            domain = _extract_domain(exhibitor["website"])
-            apollo_org = None
-
-            if domain:
-                apollo_org = _apollo_org_enrichment(domain)
-                time.sleep(APOLLO_BATCH_DELAY)
+            domain = _extract_domain(exhibitor.get("website", ""))
+            apollo_org = _apollo_org_search(exhibitor["company_name"], domain)
+            time.sleep(APOLLO_BATCH_DELAY)
 
             row_data = _build_company_row(exhibitor, apollo_org)
             all_enriched.append(row_data)
