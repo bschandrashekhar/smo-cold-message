@@ -151,9 +151,14 @@ def _format_revenue(estimated_revenue: Optional[float]) -> str:
 def _build_company_row(exhibitor: Dict, apollo_org: Optional[Dict]) -> Dict:
     """Build a company row dict from exhibitor info + Apollo enrichment data."""
     if apollo_org:
-        revenue_printed = apollo_org.get("annual_revenue_printed") or ""
+        # Search endpoint uses organization_revenue*, enrich uses annual_revenue*
+        revenue_printed = (
+            apollo_org.get("organization_revenue_printed")
+            or apollo_org.get("annual_revenue_printed")
+            or ""
+        )
         if not revenue_printed:
-            raw_revenue = apollo_org.get("annual_revenue")
+            raw_revenue = apollo_org.get("organization_revenue") or apollo_org.get("annual_revenue")
             revenue_printed = _format_revenue(raw_revenue) if raw_revenue else "Unknown"
 
         return {
@@ -162,7 +167,11 @@ def _build_company_row(exhibitor: Dict, apollo_org: Optional[Dict]) -> Dict:
             "location": apollo_org.get("city") or "",
             "country": apollo_org.get("country") or "",
             "industry_vertical": apollo_org.get("industry") or "Unknown",
-            "sub_industry": apollo_org.get("subindustry") or "",
+            "sub_industry": (
+                apollo_org.get("subindustry")
+                or ", ".join(apollo_org.get("secondary_industries") or [])
+                or ""
+            ),
             "revenue_range": revenue_printed,
             "data_source": "Apollo",
         }
