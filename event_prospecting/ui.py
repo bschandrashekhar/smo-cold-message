@@ -24,47 +24,58 @@ def _read_sheets_from_excel(data: bytes) -> dict:
     return {name: pd.read_excel(xls, sheet_name=name) for name in xls.sheet_names}
 
 
-_BUILD = "v2.2"  # bump to verify deployments
+_BUILD = "v3.0"  # bump to verify deployments
 
 
 def render():
     """Render the Event Prospecting pipeline tabs."""
     st.caption(f"Build: {_BUILD}")
-    tabs = st.tabs(["Scrape Exhibitors", "Enrich Prospects"])
+    tabs = st.tabs(["Enrich Exhibitors", "Find Prospects"])
 
-    # ── Tab 1: Scrape Exhibitors (Step 1) ────────────────────────────────
+    # ── Tab 1: Enrich Exhibitors (Step 1) ────────────────────────────────
     with tabs[0]:
-        st.header("Step 1: Scrape Exhibitors")
+        st.header("Step 1: Enrich Exhibitors")
         st.caption(
-            "Upload an Excel file with exhibition names and exhibitor page links. "
-            "The tool scrapes company lists into per-exhibition worksheets."
+            "Upload an Excel file with sheets named `<ExhibitionName>-Exhibitors`. "
+            "Each sheet needs at minimum a **Company Name** column (and optionally **Website**). "
+            "The tool enriches each company via Apollo.io and applies shortlist filtering."
         )
 
-        uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="ep_scrape_upload")
+        uploaded = st.file_uploader("Upload exhibitors.xlsx", type=["xlsx"], key="ep_scrape_upload")
 
         if uploaded is not None:
             try:
-                df = pd.read_excel(uploaded)
+                xls = pd.ExcelFile(uploaded)
+                exhibitor_sheets = {
+                    name: pd.read_excel(xls, sheet_name=name)
+                    for name in xls.sheet_names
+                }
 
-                required = ["Exhibition", "Exhibitor Link"]
-                missing = [c for c in required if c not in df.columns]
-                if missing:
-                    st.error(f"Missing required columns: {', '.join(missing)}")
+                # Validate at least one sheet has Company Name
+                valid_sheets = {
+                    name: df for name, df in exhibitor_sheets.items()
+                    if "Company Name" in df.columns
+                }
+
+                if not valid_sheets:
+                    st.error("No sheets found with a 'Company Name' column. Each sheet needs at least a 'Company Name' column.")
                     return
 
+                total_companies = sum(len(df) for df in valid_sheets.values())
                 col1, col2 = st.columns(2)
-                col1.metric("Exhibitions", df["Exhibition"].nunique())
-                col2.metric("Exhibitor Links", len(df))
+                col1.metric("Exhibition Sheets", len(valid_sheets))
+                col2.metric("Total Companies", total_companies)
 
-                st.subheader("Preview")
-                st.dataframe(df, use_container_width=True)
+                for sheet_name, sheet_df in valid_sheets.items():
+                    with st.expander(f"{sheet_name} ({len(sheet_df)} companies)"):
+                        st.dataframe(sheet_df, use_container_width=True)
 
                 st.info(
                     "Shortlist criteria: Not IT service providers, revenue under $2B, "
                     "preferably financial services, using Salesforce/Dell Boomi/Snowflake/.NET/Tableau/MS Fabric."
                 )
 
-                if st.button("Scrape Exhibitors", type="primary"):
+                if st.button("Enrich & Shortlist", type="primary"):
                     st.session_state.pop("ep_scrape_output", None)
                     st.session_state.pop("ep_scrape_sheets", None)
 
@@ -79,10 +90,12 @@ def render():
                     try:
                         from event_prospecting import exhibitor_scraper
 
-                        sheets, logs = exhibitor_scraper.scrape_exhibitors(df, progress_callback=on_progress)
+                        sheets, logs = exhibitor_scraper.enrich_exhibitors(
+                            valid_sheets, progress_callback=on_progress
+                        )
 
                         progress_bar.progress(1.0)
-                        status_text.text("Scraping complete!")
+                        status_text.text("Enrichment complete!")
 
                         # Persist logs and results in session state
                         st.session_state["ep_scrape_logs"] = logs
@@ -101,15 +114,15 @@ def render():
                             st.session_state["ep_scrape_sheets"] = []
 
                     except Exception as e:
-                        st.error(f"Scraping failed: {e}")
+                        st.error(f"Enrichment failed: {e}")
                         import traceback
                         st.code(traceback.format_exc())
 
-                # Show scraping log if available
+                # Show enrichment log if available
                 if "ep_scrape_logs" in st.session_state:
                     scrape_logs = st.session_state["ep_scrape_logs"]
                     has_output = "ep_scrape_output" in st.session_state
-                    with st.expander("Scraping Log", expanded=not has_output):
+                    with st.expander("Enrichment Log", expanded=not has_output):
                         st.code("\n".join(scrape_logs), language=None)
 
                 if "ep_scrape_output" in st.session_state:
@@ -118,10 +131,10 @@ def render():
                     all_count = sum(1 for s in sheet_names if "-All" in s)
 
                     if shortlist_count > 0:
-                        st.success(f"Scraped {all_count} exhibition(s), {shortlist_count} with shortlisted companies. Download below.")
+                        st.success(f"Enriched {all_count} exhibition(s), {shortlist_count} with shortlisted companies. Download below.")
                     else:
                         st.warning(
-                            f"Scraped {all_count} exhibition(s) but no companies passed the shortlist. "
+                            f"Enriched {all_count} exhibition(s) but no companies passed the shortlist. "
                             "Download the All sheets below to review what was found."
                         )
 
@@ -132,21 +145,21 @@ def render():
                             st.dataframe(sheet_df, use_container_width=True)
 
                     st.download_button(
-                        "Download exhibitors.xlsx",
+                        "Download enriched_exhibitors.xlsx",
                         st.session_state["ep_scrape_output"],
-                        file_name="exhibitors.xlsx",
+                        file_name="enriched_exhibitors.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary",
                     )
                 elif "ep_scrape_sheets" in st.session_state and not st.session_state["ep_scrape_sheets"]:
-                    st.warning("No exhibitors could be extracted from any of the provided links. Check the Scraping Log above for details.")
+                    st.warning("No companies could be enriched. Check the Enrichment Log above for details.")
 
             except Exception as e:
                 st.error(f"Failed to read workbook: {e}")
 
-    # ── Tab 2: Enrich Prospects (Step 2) ─────────────────────────────────
+    # ── Tab 2: Find Prospects (Step 2) ───────────────────────────────────
     with tabs[1]:
-        st.header("Step 2: Enrich Prospects")
+        st.header("Step 2: Find Prospects")
         st.caption(
             "Upload the exhibitors.xlsx from Step 1. The tool finds prospects by role "
             "and adds contact details (via Apollo.io) to the right of each company row."
