@@ -62,8 +62,7 @@ def render():
     # Detail expandable sections
     if n_create > 0:
         with st.expander(f"New rows to create ({n_create})"):
-            df = pd.DataFrame(diff["create"])
-            st.dataframe(df[["client_name", "exact_key", "client_industry", "client_geography", "embed_text"]], use_container_width=True)
+            st.dataframe(pd.DataFrame(diff["create"]), use_container_width=True)
 
     if n_update > 0:
         with st.expander(f"Rows to update ({n_update})"):
@@ -83,8 +82,7 @@ def render():
 
     if n_delete > 0:
         with st.expander(f"Rows to delete ({n_delete})"):
-            df = pd.DataFrame(diff["delete"])
-            st.dataframe(df[["client_name", "exact_key", "client_industry", "client_geography"]], use_container_width=True)
+            st.dataframe(pd.DataFrame(diff["delete"]), use_container_width=True)
 
     # Embed cost note
     texts_needing_embed = n_create + sum(1 for u in diff["update"] if u["embed_text_changed"])
@@ -131,7 +129,6 @@ def _show_current_data():
 
         st.metric("Total Rows", len(db_rows))
         df = pd.DataFrame(db_rows)
-        display_cols = [c for c in ["client_name", "exact_key", "client_industry", "client_geography", "client_url", "embed_text"] if c in df.columns]
-        st.dataframe(df[display_cols], use_container_width=True)
+        st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.warning(f"Could not load current data: {e}")
