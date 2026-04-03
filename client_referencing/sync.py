@@ -78,7 +78,7 @@ def fetch_existing() -> list[dict]:
     """Fetch all current rows from Supabase (without embedding vectors)."""
     sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     # Fetch all columns except the large embedding vector for diffing
-    cols = "id,client_name,client_industry,client_geography,client_url,industry_array,industry_primary,industry_group,embed_text,exact_key"
+    cols = "id,client_name,client_industry,client_geography,client_url,industry_array,industry_primary,industry_group,embed_text,exact_key,embedding"
     result = sb.table(TABLE_NAME).select(cols).execute()
     return result.data
 

@@ -129,6 +129,10 @@ def _show_current_data():
 
         st.metric("Total Rows", len(db_rows))
         df = pd.DataFrame(db_rows)
+        if "embedding" in df.columns:
+            df["embedding"] = df["embedding"].apply(
+                lambda v: str(v)[:50] + "..." if v else None
+            )
         st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.warning(f"Could not load current data: {e}")
