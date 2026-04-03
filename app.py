@@ -50,7 +50,7 @@ def main():
         st.title("SMO Workbench")
         pipeline = st.radio(
             "Pipeline",
-            ["Prospect Outreach", "Event Prospecting"],
+            ["Prospect Outreach", "Event Prospecting", "Client Referencing"],
             label_visibility="collapsed",
         )
         st.divider()
@@ -60,8 +60,11 @@ def main():
     if pipeline == "Prospect Outreach":
         from prospect_outreach.ui import render
         render()
-    else:
+    elif pipeline == "Event Prospecting":
         from event_prospecting.ui import render
+        render()
+    else:
+        from client_referencing.ui import render
         render()
 
 
