@@ -235,7 +235,7 @@ def find_matches(
         - total_candidates: int
     """
     prospect_ind = prospect_industry.strip().lower()
-    prospect_techs = [t.strip() for t in prospect_technologies.split(",") if t.strip()]
+    prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
     total_techs = len(prospect_techs)
 
     if total_techs == 0:
