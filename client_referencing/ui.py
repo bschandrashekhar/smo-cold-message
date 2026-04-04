@@ -1,11 +1,24 @@
-"""Client Referencing Data Sync UI — upload Excel, preview diff, apply sync."""
+"""Client Referencing pipeline UI — Data Sync + VectorMatch tabs."""
 
 import pandas as pd
 import streamlit as st
 
 
 def render():
-    """Render the Client Referencing Data sync tab."""
+    """Render the Client Referencing pipeline with tabs."""
+    tabs = st.tabs(["Data Sync", "VectorMatch"])
+
+    with tabs[0]:
+        _render_sync_tab()
+
+    with tabs[1]:
+        _render_vector_match_tab()
+
+
+# ── Data Sync Tab ────────────────────────────────────────────────────────
+
+def _render_sync_tab():
+    """Render the sync UI (upload Excel, preview diff, apply)."""
     st.header("Client Referencing Data Sync")
     st.caption(
         "Upload the client-referencing-data.xlsx file to sync with Supabase. "
@@ -18,13 +31,11 @@ def render():
     )
 
     if uploaded is None:
-        # Show current DB state
         _show_current_data()
         return
 
     from client_referencing.sync import read_excel, fetch_existing, compute_diff, apply_sync
 
-    # Parse Excel
     try:
         excel_rows = read_excel(uploaded.getvalue())
     except Exception as e:
@@ -33,7 +44,6 @@ def render():
 
     st.success(f"Parsed **{len(excel_rows)}** rows from Excel.")
 
-    # Fetch existing DB data
     with st.spinner("Fetching current data from Supabase..."):
         try:
             db_rows = fetch_existing()
@@ -43,13 +53,11 @@ def render():
 
     st.info(f"**{len(db_rows)}** rows currently in Supabase.")
 
-    # Compute diff
     diff = compute_diff(excel_rows, db_rows)
     n_create = len(diff["create"])
     n_update = len(diff["update"])
     n_delete = len(diff["delete"])
 
-    # Summary metrics
     col1, col2, col3 = st.columns(3)
     col1.metric("To Create", n_create, delta=f"+{n_create}" if n_create else None)
     col2.metric("To Update", n_update)
@@ -59,7 +67,6 @@ def render():
         st.success("Everything is in sync. No changes needed.")
         return
 
-    # Detail expandable sections
     if n_create > 0:
         with st.expander(f"New rows to create ({n_create})"):
             st.dataframe(pd.DataFrame(diff["create"]), use_container_width=True)
@@ -84,12 +91,10 @@ def render():
         with st.expander(f"Rows to delete ({n_delete})"):
             st.dataframe(pd.DataFrame(diff["delete"]), use_container_width=True)
 
-    # Embed cost note
     texts_needing_embed = n_create + sum(1 for u in diff["update"] if u["embed_text_changed"])
     if texts_needing_embed > 0:
         st.caption(f"Voyage AI embeddings will be generated for **{texts_needing_embed}** rows (deduplicated where possible).")
 
-    # Apply button
     if st.button("Apply Sync", type="primary"):
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -136,3 +141,102 @@ def _show_current_data():
         st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.warning(f"Could not load current data: {e}")
+
+
+# ── VectorMatch Tab ──────────────────────────────────────────────────────
+
+def _render_vector_match_tab():
+    """Render the VectorMatch prospect matching UI."""
+    st.header("VectorMatch — Prospect Client Matching")
+    st.caption(
+        "Enter a prospect's industry and technologies to find the best-matching "
+        "existing clients from the reference database."
+    )
+
+    with st.form("vectormatch_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            prospect_industry = st.text_input(
+                "Prospect Industry",
+                placeholder="e.g. Banking, Healthcare, Retail",
+            )
+        with col2:
+            prospect_technologies = st.text_input(
+                "Prospect Technologies (comma-separated)",
+                placeholder="e.g. Salesforce, Mulesoft, Snowflake",
+            )
+        submitted = st.form_submit_button("Find Matches", type="primary")
+
+    if not submitted:
+        return
+
+    if not prospect_technologies.strip():
+        st.warning("Please enter at least one technology.")
+        return
+
+    from client_referencing.matcher import find_matches
+
+    with st.spinner("Matching prospect against client database..."):
+        try:
+            results = find_matches(prospect_industry, prospect_technologies)
+        except Exception as e:
+            st.error(f"Matching failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            return
+
+    if not results["matches"]:
+        st.info("No matching clients found.")
+        return
+
+    # Industry filter status
+    st.subheader(f"Top {len(results['matches'])} Matching Clients")
+    if results["industry_filter_applied"]:
+        st.success(f"Industry filter applied: \"{prospect_industry}\"")
+    else:
+        st.info("Industry filter was not applied (too few matches or no industry provided).")
+
+    # Results
+    for i, match in enumerate(results["matches"], 1):
+        with st.expander(
+            f"#{i} — {match.client_name} (Score: {match.final_score:.3f})",
+            expanded=(i <= 3),
+        ):
+            c1, c2, c3 = st.columns(3)
+            c1.markdown(f"**Industry:** {match.client_industry}")
+            c2.markdown(f"**Geography:** {match.client_geography}")
+            c3.markdown(f"**URL:** {match.client_url}")
+
+            sc1, sc2, sc3 = st.columns(3)
+            sc1.metric("Final Score", f"{match.final_score:.3f}")
+            sc2.metric("Exact Match Ratio", f"{match.match_ratio:.3f}",
+                       help="Exact matches / total prospect technologies")
+            sc3.metric("Semantic Similarity", f"{match.similarity_score:.3f}",
+                       help="Average semantic similarity for unmatched techs")
+
+            if match.exact_techs:
+                st.markdown(f"**Exact Matches ({len(match.exact_techs)}):** "
+                           + ", ".join(f"`{t}`" for t in match.exact_techs))
+            else:
+                st.caption("No exact technology matches.")
+
+            if match.semantic_techs:
+                st.markdown("**Semantic Matches:**")
+                for (ptech, embed_text, sim) in match.semantic_techs:
+                    st.caption(f"  {ptech} → {embed_text} (similarity: {sim:.3f})")
+            else:
+                st.caption("No semantic technology matches.")
+
+            if match.industry_match:
+                st.caption("Passed industry filter")
+
+    # Industry-only clients
+    if results["industry_filter_applied"] and results["industry_filtered_only"]:
+        st.divider()
+        st.subheader("Other Clients Passing Industry Filter")
+        st.caption("These clients matched the industry filter but did not rank in the top 5.")
+        for name in results["industry_filtered_only"]:
+            st.text(f"  • {name}")
+    elif not results["industry_filter_applied"]:
+        st.divider()
+        st.caption("Industry filtering was not applied, so no separate industry-only list is shown.")
