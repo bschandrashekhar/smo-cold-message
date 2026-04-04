@@ -161,6 +161,8 @@ def semantic_match(
         tech_to_query[tech] = normalize_tech_for_embedding(tech)
 
     unique_queries = list(set(tech_to_query.values()))
+    print(f"[DEBUG] Semantic query mapping: {tech_to_query}")
+    print(f"[DEBUG] Unique queries sent to Voyage: {unique_queries}")
 
     # Generate embeddings for all unique query texts at once
     embed_result = voyage.embed(
