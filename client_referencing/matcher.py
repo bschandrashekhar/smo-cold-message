@@ -247,6 +247,7 @@ def find_matches(
 
     # Step 2: Industry filter
     candidate_rows, industry_applied = filter_by_industry(all_rows, prospect_ind)
+    print(f"[DEBUG] Total rows: {len(all_rows)}, Candidate rows after industry filter: {len(candidate_rows)}, Filter applied: {industry_applied}")
     # Always track which clients match industry (for tiebreaker sorting)
     industry_client_names = set()
     if prospect_ind:
@@ -259,12 +260,16 @@ def find_matches(
 
     # Step 3: Exact match
     exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
+    print(f"[DEBUG] Exact matches by client: {dict((k, v) for k, v in exact_by_client.items())}")
+    print(f"[DEBUG] Unmatched techs: {unmatched_techs}")
 
     # Step 4: Semantic match on unmatched technologies
     semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
+    print(f"[DEBUG] Semantic matches by client: {list(semantic_by_client.keys())}")
 
     # Step 5: Score and rank
     all_matched_clients = set(exact_by_client.keys()) | set(semantic_by_client.keys())
+    print(f"[DEBUG] All matched clients: {all_matched_clients}")
 
     # Build client metadata lookup
     client_meta = {}
