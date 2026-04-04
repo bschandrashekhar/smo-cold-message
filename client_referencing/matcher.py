@@ -247,7 +247,9 @@ def find_matches(
 
     # Step 2: Industry filter
     candidate_rows, industry_applied = filter_by_industry(all_rows, prospect_ind)
+    candidate_client_names = sorted(set(r["client_name"] for r in candidate_rows))
     print(f"[DEBUG] Total rows: {len(all_rows)}, Candidate rows after industry filter: {len(candidate_rows)}, Filter applied: {industry_applied}")
+    print(f"[DEBUG] Industry-filtered clients ({len(candidate_client_names)}): {candidate_client_names}")
     # Always track which clients match industry (for tiebreaker sorting)
     industry_client_names = set()
     if prospect_ind:
