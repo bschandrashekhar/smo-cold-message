@@ -175,12 +175,26 @@ def _render_vector_match_tab():
         return
 
     from client_referencing.matcher import find_matches
+    import io, sys
 
     with st.spinner("Matching prospect against client database..."):
+        # Capture debug prints
+        debug_buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = debug_buf
         try:
             results = find_matches(prospect_industry, prospect_technologies)
         except Exception as e:
+            sys.stdout = old_stdout
             st.error(f"Matching failed: {e}")
+        finally:
+            sys.stdout = old_stdout
+
+    # Show debug output
+    debug_output = debug_buf.getvalue()
+    if debug_output:
+        with st.expander("Debug Log", expanded=False):
+            st.code(debug_output)
             import traceback
             st.code(traceback.format_exc())
             return
