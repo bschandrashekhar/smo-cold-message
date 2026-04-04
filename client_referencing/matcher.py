@@ -247,7 +247,15 @@ def find_matches(
 
     # Step 2: Industry filter
     candidate_rows, industry_applied = filter_by_industry(all_rows, prospect_ind)
-    industry_client_names = set(r["client_name"] for r in candidate_rows) if industry_applied else set()
+    # Always track which clients match industry (for tiebreaker sorting)
+    industry_client_names = set()
+    if prospect_ind:
+        for r in all_rows:
+            industry_arr = r.get("industry_array") or []
+            arr_match = any(prospect_ind in item.lower() for item in industry_arr)
+            group_match = prospect_ind in (r.get("industry_group") or "").lower()
+            if arr_match or group_match:
+                industry_client_names.add(r["client_name"])
 
     # Step 3: Exact match
     exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
@@ -301,7 +309,7 @@ def find_matches(
             final_score=round(final_score, 3),
         ))
 
-    matches.sort(key=lambda m: m.final_score, reverse=True)
+    matches.sort(key=lambda m: (m.final_score, m.industry_match), reverse=True)
     top_matches = matches[:top_k]
 
     # Clients that passed industry filter but didn't make top_k
