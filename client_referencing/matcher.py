@@ -18,8 +18,8 @@ from client_referencing.config import (
 EXACT_WEIGHT = 0.7
 SEMANTIC_WEIGHT = 0.3
 
-# Exact-key aliases: map input keywords to the exact_key stored in the DB
-# e.g. "ios" → "mobile application development" so it matches Moneyspot's exact_key
+# Single source of truth: map input keywords to their canonical exact_key in the DB.
+# Used for both exact matching and semantic search (with "Technology: " prefix).
 EXACT_KEY_ALIASES = {
     "ios": "mobile application development",
     "android": "mobile application development",
@@ -38,27 +38,6 @@ EXACT_KEY_ALIASES = {
     "react": "open source",
     "vue": "open source",
     "vue.js": "open source",
-}
-
-# Technology normalization: map keywords to canonical embed_text (for semantic search)
-TECH_ALIASES = {
-    "ios": "Technology: Mobile Application Development",
-    "android": "Technology: Mobile Application Development",
-    "swift": "Technology: Mobile Application Development",
-    "kotlin": "Technology: Mobile Application Development",
-    "flutter": "Technology: Mobile Application Development",
-    "react native": "Technology: Mobile Application Development",
-    "xamarin": "Technology: Mobile Application Development",
-    "javascript": "Technology: Open Source",
-    "js": "Technology: Open Source",
-    "node": "Technology: Open Source",
-    "node.js": "Technology: Open Source",
-    "nodejs": "Technology: Open Source",
-    "angular": "Technology: Open Source",
-    "typescript": "Technology: Open Source",
-    "react": "Technology: Open Source",
-    "vue": "Technology: Open Source",
-    "vue.js": "Technology: Open Source",
 }
 
 
@@ -163,10 +142,10 @@ def exact_match(rows: List[dict], prospect_techs: List[str]) -> Tuple[Dict[str, 
 
 
 def normalize_tech_for_embedding(tech: str) -> str:
-    """Apply alias rules for semantic matching."""
+    """Apply alias rules for semantic matching. Derives from EXACT_KEY_ALIASES."""
     tech_lower = tech.lower().strip()
-    if tech_lower in TECH_ALIASES:
-        return TECH_ALIASES[tech_lower]
+    if tech_lower in EXACT_KEY_ALIASES:
+        return f"Technology: {EXACT_KEY_ALIASES[tech_lower].title()}"
     return f"Technology: {tech.strip()}"
 
 
