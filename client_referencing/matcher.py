@@ -1,7 +1,7 @@
 """VectorMatch: find best-matching existing clients for a prospect."""
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
 import voyageai
 from supabase import create_client
@@ -52,6 +52,7 @@ class ClientMatch:
     match_ratio: float
     similarity_score: float
     final_score: float
+    match_source: str  # "industry_exact", "industry_semantic", "backfill_exact", "backfill_semantic", "geography"
 
 
 # Lazy-initialized clients
@@ -161,8 +162,6 @@ def semantic_match(
         tech_to_query[tech] = normalize_tech_for_embedding(tech)
 
     unique_queries = list(set(tech_to_query.values()))
-    print(f"[DEBUG] Semantic query mapping: {tech_to_query}")
-    print(f"[DEBUG] Unique queries sent to Voyage: {unique_queries}")
 
     # Generate embeddings for all unique query texts at once
     embed_result = voyage.embed(
@@ -223,87 +222,195 @@ def semantic_match(
     return semantic_by_client
 
 
+def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str) -> set:
+    """Compute which clients match the prospect industry (for tiebreaking)."""
+    if not prospect_ind:
+        return set()
+    names = set()
+    for r in all_rows:
+        industry_arr = r.get("industry_array") or []
+        arr_match = any(prospect_ind in item.lower() for item in industry_arr)
+        group_match = prospect_ind in (r.get("industry_group") or "").lower()
+        if arr_match or group_match:
+            names.add(r["client_name"])
+    return names
+
+
+def _build_client_meta(rows: List[dict]) -> Dict[str, dict]:
+    """Build {client_name: {industry, geography, url}} lookup from rows."""
+    meta = {}
+    for r in rows:
+        if r["client_name"] not in meta:
+            meta[r["client_name"]] = {
+                "client_industry": r["client_industry"],
+                "client_geography": r["client_geography"],
+                "client_url": r["client_url"],
+            }
+    return meta
+
+
+def _score_client(
+    cname: str,
+    exact_by_client: Dict[str, List[str]],
+    semantic_by_client: Dict[str, List[Tuple[str, str, float]]],
+    total_techs: int,
+) -> Tuple[float, float, float]:
+    """Compute match_ratio, similarity_score, final_score for a client."""
+    exact_techs = exact_by_client.get(cname, [])
+    sem_techs = semantic_by_client.get(cname, [])
+
+    match_ratio = len(set(exact_techs)) / total_techs if total_techs > 0 else 0
+
+    if sem_techs:
+        best_per_tech = {}
+        for (ptech, embed_text, sim) in sem_techs:
+            if ptech not in best_per_tech or sim > best_per_tech[ptech][1]:
+                best_per_tech[ptech] = (embed_text, sim)
+        similarity_score = sum(s for _, s in best_per_tech.values()) / len(best_per_tech)
+    else:
+        similarity_score = 0.0
+
+    final_score = EXACT_WEIGHT * match_ratio + SEMANTIC_WEIGHT * similarity_score
+    return round(match_ratio, 3), round(similarity_score, 3), round(final_score, 3)
+
+
+def _build_shortlist(
+    exact_by_client: Dict[str, List[str]],
+    semantic_by_client: Dict[str, List[Tuple[str, str, float]]],
+    industry_client_names: set,
+    sort_by_industry: bool,
+    source_exact: str,
+    source_semantic: str,
+    exclude_clients: set = None,
+) -> List[Tuple[str, str]]:
+    """Build ordered list of (client_name, match_source), exact-match clients first.
+
+    Clients with exact matches come first, then semantic-only clients.
+    Within each group, optionally sorted by industry relevance.
+    """
+    exclude = exclude_clients or set()
+
+    exact_clients = [c for c in exact_by_client if c not in exclude]
+    semantic_only = [c for c in semantic_by_client if c not in exclude and c not in exact_by_client]
+
+    if sort_by_industry:
+        exact_clients.sort(key=lambda c: (c not in industry_client_names, c))
+        semantic_only.sort(key=lambda c: (c not in industry_client_names, c))
+
+    result = [(c, source_exact) for c in exact_clients]
+    result += [(c, source_semantic) for c in semantic_only]
+    return result
+
+
+def _geography_backfill(
+    all_rows: List[dict],
+    prospect_country: str,
+    exclude_clients: set,
+) -> List[str]:
+    """Find unique clients matching prospect_country, excluding already-shortlisted."""
+    if not prospect_country:
+        return []
+    seen = set()
+    result = []
+    for r in all_rows:
+        cname = r["client_name"]
+        geo = (r.get("client_geography") or "").lower()
+        if cname not in exclude_clients and cname not in seen and prospect_country in geo:
+            result.append(cname)
+            seen.add(cname)
+    return result
+
+
 def find_matches(
     prospect_industry: str,
     prospect_technologies: str,
-    top_k: int = 5,
+    prospect_country: str = "",
 ) -> Dict:
-    """Main orchestrator. Returns structured results for UI rendering.
+    """Main orchestrator with tiered matching and backfill.
 
     Returns dict with keys:
         - matches: List[ClientMatch] sorted by final_score desc
-        - industry_filtered_only: List[str] clients that passed industry but not top_k
+        - industry_filtered_only: List[str] clients that passed industry but not in results
         - industry_filter_applied: bool
         - total_candidates: int
     """
     prospect_ind = prospect_industry.strip().lower()
     prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
+    prospect_ctry = prospect_country.strip().lower()
     total_techs = len(prospect_techs)
 
     if total_techs == 0:
         return {"matches": [], "industry_filtered_only": [],
                 "industry_filter_applied": False, "total_candidates": 0}
 
-    # Step 1: Fetch all rows
+    # Step 1: Fetch all rows and compute industry metadata
     all_rows = fetch_all_rows()
+    industry_client_names = _compute_industry_client_names(all_rows, prospect_ind)
+    client_meta = _build_client_meta(all_rows)
 
     # Step 2: Industry filter
     candidate_rows, industry_applied = filter_by_industry(all_rows, prospect_ind)
-    candidate_client_names = sorted(set(r["client_name"] for r in candidate_rows))
-    print(f"[DEBUG] Total rows: {len(all_rows)}, Candidate rows after industry filter: {len(candidate_rows)}, Filter applied: {industry_applied}")
-    print(f"[DEBUG] Industry-filtered clients ({len(candidate_client_names)}): {candidate_client_names}")
-    # Always track which clients match industry (for tiebreaker sorting)
-    industry_client_names = set()
-    if prospect_ind:
-        for r in all_rows:
-            industry_arr = r.get("industry_array") or []
-            arr_match = any(prospect_ind in item.lower() for item in industry_arr)
-            group_match = prospect_ind in (r.get("industry_group") or "").lower()
-            if arr_match or group_match:
-                industry_client_names.add(r["client_name"])
 
-    # Step 3: Exact match
+    # Step 3: Core matching (exact + semantic on candidate rows)
     exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
-    print(f"[DEBUG] Exact matches by client: {dict((k, v) for k, v in exact_by_client.items())}")
-    print(f"[DEBUG] Unmatched techs: {unmatched_techs}")
-
-    # Step 4: Semantic match on unmatched technologies
     semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
-    print(f"[DEBUG] Semantic matches by client: {list(semantic_by_client.keys())}")
 
-    # Step 5: Score and rank
-    all_matched_clients = set(exact_by_client.keys()) | set(semantic_by_client.keys())
-    print(f"[DEBUG] All matched clients: {all_matched_clients}")
+    # Build shortlist: exact clients first, then semantic-only
+    sort_by_ind = not industry_applied  # sort by industry only when filter was skipped
+    shortlist = _build_shortlist(
+        exact_by_client, semantic_by_client, industry_client_names,
+        sort_by_industry=sort_by_ind,
+        source_exact="industry_exact" if industry_applied else "exact",
+        source_semantic="industry_semantic" if industry_applied else "semantic",
+    )
 
-    # Build client metadata lookup
-    client_meta = {}
-    for r in candidate_rows:
-        if r["client_name"] not in client_meta:
-            client_meta[r["client_name"]] = {
-                "client_industry": r["client_industry"],
-                "client_geography": r["client_geography"],
-                "client_url": r["client_url"],
-            }
+    # Merge exact + semantic data for scoring (clients can have both)
+    all_exact = dict(exact_by_client)
+    all_semantic = dict(semantic_by_client)
 
+    # Step 4: Tech backfill if shortlist has ≤5 unique clients
+    shortlist_names = set(c for c, _ in shortlist)
+    if len(shortlist_names) <= 5:
+        remaining_rows = [r for r in all_rows if r["client_name"] not in shortlist_names]
+        if remaining_rows:
+            bf_exact, _ = exact_match(remaining_rows, prospect_techs)
+            bf_semantic = semantic_match(remaining_rows, unmatched_techs)
+
+            # Merge backfill data into scoring dicts
+            for c, techs in bf_exact.items():
+                all_exact.setdefault(c, []).extend(techs)
+            for c, techs in bf_semantic.items():
+                all_semantic.setdefault(c, []).extend(techs)
+
+            bf_shortlist = _build_shortlist(
+                bf_exact, bf_semantic, industry_client_names,
+                sort_by_industry=True,
+                source_exact="backfill_exact",
+                source_semantic="backfill_semantic",
+                exclude_clients=shortlist_names,
+            )
+            shortlist.extend(bf_shortlist)
+
+    # Step 5: Geography backfill if still ≤5 unique clients
+    shortlist_names = set(c for c, _ in shortlist)
+    if len(shortlist_names) <= 5 and prospect_ctry:
+        deficit = 6 - len(shortlist_names)
+        if deficit > 0:
+            geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
+            for cname in geo_clients[:deficit]:
+                shortlist.append((cname, "geography"))
+
+    # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
-    for cname in all_matched_clients:
-        exact_techs = exact_by_client.get(cname, [])
-        sem_techs = semantic_by_client.get(cname, [])
+    seen = set()
+    for cname, source in shortlist:
+        if cname in seen:
+            continue
+        seen.add(cname)
 
-        match_ratio = len(set(exact_techs)) / total_techs if total_techs > 0 else 0
-
-        # Similarity: average of best similarity per unmatched tech
-        if sem_techs:
-            best_per_tech = {}
-            for (ptech, embed_text, sim) in sem_techs:
-                if ptech not in best_per_tech or sim > best_per_tech[ptech][1]:
-                    best_per_tech[ptech] = (embed_text, sim)
-            similarity_score = sum(s for _, s in best_per_tech.values()) / len(best_per_tech)
-        else:
-            similarity_score = 0.0
-
-        final_score = EXACT_WEIGHT * match_ratio + SEMANTIC_WEIGHT * similarity_score
-
+        match_ratio, similarity_score, final_score = _score_client(
+            cname, all_exact, all_semantic, total_techs
+        )
         meta = client_meta.get(cname, {})
         matches.append(ClientMatch(
             client_name=cname,
@@ -311,23 +418,27 @@ def find_matches(
             client_geography=meta.get("client_geography", ""),
             client_url=meta.get("client_url", ""),
             industry_match=cname in industry_client_names,
-            exact_techs=list(set(exact_techs)),
-            semantic_techs=sem_techs,
-            match_ratio=round(match_ratio, 3),
-            similarity_score=round(similarity_score, 3),
-            final_score=round(final_score, 3),
+            exact_techs=list(set(all_exact.get(cname, []))),
+            semantic_techs=all_semantic.get(cname, []),
+            match_ratio=match_ratio,
+            similarity_score=similarity_score,
+            final_score=final_score,
+            match_source=source,
         ))
 
-    matches.sort(key=lambda m: (m.final_score, m.industry_match), reverse=True)
-    top_matches = matches[:top_k]
+    # Final sort: score desc, then exact-match preference, then industry
+    matches.sort(
+        key=lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_match),
+        reverse=True,
+    )
 
-    # Clients that passed industry filter but didn't make top_k
-    top_names = set(m.client_name for m in top_matches)
-    industry_only = sorted(industry_client_names - top_names) if industry_applied else []
+    # Clients that passed industry filter but didn't make the results
+    result_names = set(m.client_name for m in matches)
+    industry_only = sorted(industry_client_names - result_names) if industry_applied else []
 
     return {
-        "matches": top_matches,
+        "matches": matches,
         "industry_filtered_only": industry_only,
         "industry_filter_applied": industry_applied,
-        "total_candidates": len(all_matched_clients),
+        "total_candidates": len(result_names),
     }

@@ -154,7 +154,7 @@ def _render_vector_match_tab():
     )
 
     with st.form("vectormatch_form"):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             prospect_industry = st.text_input(
                 "Prospect Industry",
@@ -164,6 +164,11 @@ def _render_vector_match_tab():
             prospect_technologies = st.text_input(
                 "Prospect Technologies (comma-separated)",
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
+            )
+        with col3:
+            prospect_country = st.text_input(
+                "Prospect Country",
+                placeholder="e.g. USA, Australia, India",
             )
         submitted = st.form_submit_button("Find Matches", type="primary")
 
@@ -175,26 +180,12 @@ def _render_vector_match_tab():
         return
 
     from client_referencing.matcher import find_matches
-    import io, sys
 
     with st.spinner("Matching prospect against client database..."):
-        # Capture debug prints
-        debug_buf = io.StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = debug_buf
         try:
-            results = find_matches(prospect_industry, prospect_technologies)
+            results = find_matches(prospect_industry, prospect_technologies, prospect_country)
         except Exception as e:
-            sys.stdout = old_stdout
             st.error(f"Matching failed: {e}")
-        finally:
-            sys.stdout = old_stdout
-
-    # Show debug output
-    debug_output = debug_buf.getvalue()
-    if debug_output:
-        with st.expander("Debug Log", expanded=False):
-            st.code(debug_output)
             import traceback
             st.code(traceback.format_exc())
             return
@@ -210,10 +201,22 @@ def _render_vector_match_tab():
     else:
         st.info("Industry filter was not applied (too few matches or no industry provided).")
 
+    # Match source labels
+    _SOURCE_LABELS = {
+        "industry_exact": "Industry + Exact Match",
+        "industry_semantic": "Industry + Semantic Match",
+        "exact": "Exact Match",
+        "semantic": "Semantic Match",
+        "backfill_exact": "Backfill — Exact Match",
+        "backfill_semantic": "Backfill — Semantic Match",
+        "geography": "Geography Backfill",
+    }
+
     # Results
     for i, match in enumerate(results["matches"], 1):
+        source_label = _SOURCE_LABELS.get(match.match_source, match.match_source)
         with st.expander(
-            f"#{i} — {match.client_name} (Score: {match.final_score:.3f})",
+            f"#{i} — {match.client_name} (Score: {match.final_score:.3f}) | {source_label}",
             expanded=(i <= 3),
         ):
             c1, c2, c3 = st.columns(3)
@@ -237,7 +240,7 @@ def _render_vector_match_tab():
             if match.semantic_techs:
                 st.markdown("**Semantic Matches:**")
                 for (ptech, embed_text, sim) in match.semantic_techs:
-                    st.caption(f"  {ptech} → {embed_text} (similarity: {sim:.3f})")
+                    st.caption(f"  {ptech} \u2192 {embed_text} (similarity: {sim:.3f})")
             else:
                 st.caption("No semantic technology matches.")
 
