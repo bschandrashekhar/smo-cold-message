@@ -18,7 +18,29 @@ from client_referencing.config import (
 EXACT_WEIGHT = 0.7
 SEMANTIC_WEIGHT = 0.3
 
-# Technology normalization: map keywords to canonical embed_text
+# Exact-key aliases: map input keywords to the exact_key stored in the DB
+# e.g. "ios" → "mobile application development" so it matches Moneyspot's exact_key
+EXACT_KEY_ALIASES = {
+    "ios": "mobile application development",
+    "android": "mobile application development",
+    "swift": "mobile application development",
+    "kotlin": "mobile application development",
+    "flutter": "mobile application development",
+    "react native": "mobile application development",
+    "xamarin": "mobile application development",
+    "javascript": "open source",
+    "js": "open source",
+    "node": "open source",
+    "node.js": "open source",
+    "nodejs": "open source",
+    "angular": "open source",
+    "typescript": "open source",
+    "react": "open source",
+    "vue": "open source",
+    "vue.js": "open source",
+}
+
+# Technology normalization: map keywords to canonical embed_text (for semantic search)
 TECH_ALIASES = {
     "ios": "Technology: Mobile Application Development",
     "android": "Technology: Mobile Application Development",
@@ -125,10 +147,16 @@ def exact_match(rows: List[dict], prospect_techs: List[str]) -> Tuple[Dict[str, 
 
     for tech in prospect_techs:
         tech_lower = tech.lower().strip()
-        if tech_lower in key_to_rows:
-            matched_techs.add(tech)
-            for r in key_to_rows[tech_lower]:
-                matched_by_client.setdefault(r["client_name"], []).append(tech)
+        # Check direct match and alias match (e.g. "ios" → "mobile application development")
+        keys_to_check = [tech_lower]
+        if tech_lower in EXACT_KEY_ALIASES:
+            keys_to_check.append(EXACT_KEY_ALIASES[tech_lower])
+
+        for key in keys_to_check:
+            if key in key_to_rows:
+                matched_techs.add(tech)
+                for r in key_to_rows[key]:
+                    matched_by_client.setdefault(r["client_name"], []).append(tech)
 
     unmatched = [t for t in prospect_techs if t not in matched_techs]
     return matched_by_client, unmatched
@@ -431,6 +459,9 @@ def find_matches(
         key=lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_match),
         reverse=True,
     )
+
+    # Cap at 6 results (5 tech + 1 geography max per spec)
+    matches = matches[:6]
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
