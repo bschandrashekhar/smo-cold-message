@@ -392,28 +392,21 @@ def find_matches(
     )
     industry_applied = filter_level != "none"
 
-    # Debug: Pre-filter logs
+    # Debug: Always log tier 1 (Industry + Geography)
     debug_log.append((
-        "shortlist before Exact Match:: Pre-filter Industry & Geography",
-        ", ".join(tier1_clients) if tier1_clients else "(empty — not enough matches or no country provided)",
+        "Prep shortlistExistingClients (I+G)",
+        ", ".join(tier1_clients) if tier1_clients else "(empty)",
     ))
-    debug_log.append((
-        "shortlist before Exact Match::Pre-filter Industry",
-        ", ".join(tier2_clients) if tier2_clients else "(empty — not enough matches or no industry provided)",
-    ))
+    # Debug: Log tier 2 only if tier 1 was insufficient (≤4)
+    if len(tier1_clients) <= 4:
+        debug_log.append((
+            "Prep shortlistExistingClients (I Only)",
+            ", ".join(tier2_clients) if tier2_clients else "(empty)",
+        ))
 
     # Step 3: Core matching (exact + semantic on candidate rows)
     exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
     semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
-
-    # Debug: Exact match log
-    exact_detail = "; ".join(
-        f"{c}: [{', '.join(set(techs))}]" for c, techs in exact_by_client.items()
-    )
-    debug_log.append((
-        "shortlistOnExactMatch",
-        exact_detail if exact_detail else "(no exact matches)",
-    ))
 
     # Build shortlist: exact clients first, then semantic-only
     sort_by_ind = not industry_applied  # sort by industry only when filter was skipped
@@ -424,21 +417,25 @@ def find_matches(
         source_semantic="industry_semantic" if industry_applied else "semantic",
     )
 
-    # Debug: Shortlist after exact match
-    shortlist_after_exact = [c for c in exact_by_client]
-    debug_log.append((
-        "shortlist after Exact Match",
-        ", ".join(shortlist_after_exact) if shortlist_after_exact else "(empty)",
-    ))
-
-    # Debug: Semantic match log
-    semantic_detail = "; ".join(
-        f"{c}: [{', '.join(set(t[0] for t in techs))}]" for c, techs in semantic_by_client.items()
-    )
-    debug_log.append((
-        "shortlistOnSemanticMatch",
-        semantic_detail if semantic_detail else "(no semantic matches)",
-    ))
+    # Debug: Case-specific logging after core matching
+    _shortlist_names = [c for c, _ in shortlist]
+    if not industry_applied:
+        # Case A (NO_I): log after exact, then after semantic separately
+        exact_clients_str = ", ".join(exact_by_client.keys()) if exact_by_client else "(none)"
+        debug_log.append((
+            "Case NO_I: shortlistExistingClients (After Exact Match)",
+            exact_clients_str,
+        ))
+        debug_log.append((
+            "Case NO_I: shortlistExistingClients (After Semantic Search)",
+            ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
+        ))
+    else:
+        # Case B (YES_I): log after both matches together
+        debug_log.append((
+            "Case YES_I: shortlistExistingClients (After Both Matches)",
+            ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
+        ))
 
     # Merge exact + semantic data for scoring (clients can have both)
     all_exact = dict(exact_by_client)
@@ -467,6 +464,13 @@ def find_matches(
             )
             shortlist.extend(bf_shortlist)
 
+            # Debug: Tech backfill log
+            bf_names = [c for c, _ in shortlist]
+            debug_log.append((
+                "Case BACKFILL from Client Universe: shortlistExistingClients (After Both Matches)",
+                ", ".join(dict.fromkeys(bf_names)) if bf_names else "(empty)",
+            ))
+
     # Step 5: Geography backfill if still ≤5 unique clients
     shortlist_names = set(c for c, _ in shortlist)
     if len(shortlist_names) <= 5 and prospect_ctry:
@@ -476,17 +480,13 @@ def find_matches(
             for cname in geo_clients[:deficit]:
                 shortlist.append((cname, "geography"))
 
-    # Debug: Overall shortlist
-    overall_names = []
-    seen_for_log = set()
-    for c, _ in shortlist:
-        if c not in seen_for_log:
-            overall_names.append(c)
-            seen_for_log.add(c)
-    debug_log.append((
-        "Overall shortlist",
-        ", ".join(overall_names) if overall_names else "(empty)",
-    ))
+            # Debug: Geography backfill log
+            if geo_clients[:deficit]:
+                geo_names = [c for c, _ in shortlist]
+                debug_log.append((
+                    "Case BACKFILL for Geo: shortlistExistingClients",
+                    ", ".join(dict.fromkeys(geo_names)) if geo_names else "(empty)",
+                ))
 
     # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
