@@ -467,6 +467,14 @@ def find_matches(
             )
             backfill_entries.extend(bf_shortlist)
 
+        # Debug: generic backfill log (spec line 87)
+        if backfill_entries:
+            generic_names = list(dict.fromkeys(c for c, _ in backfill_entries))
+            debug_log.append((
+                "Case BACKFILL for Generic: shortlistAllBackFillClients",
+                ", ".join(generic_names),
+            ))
+
         # Geo backfill if combined count still ≤5
         backfill_names = set(c for c, _ in backfill_entries)
         combined_count = len(shortlist_names | backfill_names)
@@ -475,8 +483,16 @@ def find_matches(
             if deficit > 0:
                 exclude_all = shortlist_names | backfill_names
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, exclude_all)
-                for cname in geo_clients[:deficit]:
+                geo_added = geo_clients[:deficit]
+                for cname in geo_added:
                     backfill_entries.append((cname, "geography"))
+
+                # Debug: geo backfill log — only geo clients (spec line 105)
+                if geo_added:
+                    debug_log.append((
+                        "Case BACKFILL for Geo: shortlistGeoBackFillClients",
+                        ", ".join(geo_added),
+                    ))
 
         # Re-order entire backfill set by industry relevance, then append once
         if backfill_entries:
