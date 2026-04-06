@@ -441,9 +441,12 @@ def find_matches(
     all_exact = dict(exact_by_client)
     all_semantic = dict(semantic_by_client)
 
-    # Step 4: Tech backfill if shortlist has ≤5 unique clients
+    # Step 4+5: Combined backfill (generic + geo) collected, sorted, appended once
     shortlist_names = set(c for c, _ in shortlist)
+    backfill_entries = []  # List[(client_name, match_source)]
+
     if len(shortlist_names) <= 5:
+        # Generic backfill: exact + semantic from all clients excluding shortlist
         remaining_rows = [r for r in all_rows if r["client_name"] not in shortlist_names]
         if remaining_rows:
             bf_exact, _ = exact_match(remaining_rows, prospect_techs)
@@ -462,31 +465,30 @@ def find_matches(
                 source_semantic="backfill_semantic",
                 exclude_clients=shortlist_names,
             )
-            shortlist.extend(bf_shortlist)
+            backfill_entries.extend(bf_shortlist)
 
-            # Debug: Tech backfill log
-            bf_names = [c for c, _ in shortlist]
+        # Geo backfill if combined count still ≤5
+        backfill_names = set(c for c, _ in backfill_entries)
+        combined_count = len(shortlist_names | backfill_names)
+        if combined_count <= 5 and prospect_ctry:
+            deficit = 6 - combined_count
+            if deficit > 0:
+                exclude_all = shortlist_names | backfill_names
+                geo_clients = _geography_backfill(all_rows, prospect_ctry, exclude_all)
+                for cname in geo_clients[:deficit]:
+                    backfill_entries.append((cname, "geography"))
+
+        # Re-order entire backfill set by industry relevance, then append once
+        if backfill_entries:
+            backfill_entries.sort(key=lambda x: (x[0] not in industry_client_names, x[0]))
+            shortlist.extend(backfill_entries)
+
+            # Debug: single combined backfill log
+            all_names = list(dict.fromkeys(c for c, _ in shortlist))
             debug_log.append((
-                "Case BACKFILL from Client Universe: shortlistExistingClients (After Both Matches)",
-                ", ".join(dict.fromkeys(bf_names)) if bf_names else "(empty)",
+                "Case BACKFILL for Generic + Geo: shortlistExistingClients",
+                ", ".join(all_names) if all_names else "(empty)",
             ))
-
-    # Step 5: Geography backfill if still ≤5 unique clients
-    shortlist_names = set(c for c, _ in shortlist)
-    if len(shortlist_names) <= 5 and prospect_ctry:
-        deficit = 6 - len(shortlist_names)
-        if deficit > 0:
-            geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
-            for cname in geo_clients[:deficit]:
-                shortlist.append((cname, "geography"))
-
-            # Debug: Geography backfill log
-            if geo_clients[:deficit]:
-                geo_names = [c for c, _ in shortlist]
-                debug_log.append((
-                    "Case BACKFILL for Geo: shortlistExistingClients",
-                    ", ".join(dict.fromkeys(geo_names)) if geo_names else "(empty)",
-                ))
 
     # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
