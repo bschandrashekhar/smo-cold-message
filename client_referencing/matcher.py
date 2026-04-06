@@ -84,29 +84,57 @@ def fetch_all_rows() -> List[dict]:
     return result.data or []
 
 
-def filter_by_industry(rows: List[dict], prospect_industry: str) -> Tuple[List[dict], bool]:
-    """Filter rows where prospect_industry appears in industry_array or industry_group.
+def _matches_industry(row: dict, prospect_ind: str) -> bool:
+    """Check if a row matches the prospect industry."""
+    industry_arr = row.get("industry_array") or []
+    arr_match = any(prospect_ind in item.lower() for item in industry_arr)
+    group_match = prospect_ind in (row.get("industry_group") or "").lower()
+    return arr_match or group_match
 
-    Returns (filtered_rows, was_filter_applied).
-    If filter yields < 3 unique clients, return all rows with was_filter_applied=False.
+
+def _matches_geography(row: dict, prospect_ctry: str) -> bool:
+    """Check if a row matches the prospect country."""
+    geo = (row.get("client_geography") or "").lower()
+    return prospect_ctry in geo
+
+
+def filter_candidates(
+    rows: List[dict],
+    prospect_industry: str,
+    prospect_country: str,
+) -> Tuple[List[dict], str, List[str], List[str]]:
+    """3-tier pre-filter: Industry+Country → Industry → All.
+
+    Returns (filtered_rows, filter_level, tier1_clients, tier2_clients).
+    filter_level is "industry_and_geography", "industry", or "none".
+    tier1_clients/tier2_clients are unique client name lists for debug logging.
     """
     prospect_ind = prospect_industry.lower().strip()
+    prospect_ctry = prospect_country.lower().strip()
+
+    tier1_clients = []
+    tier2_clients = []
+
     if not prospect_ind:
-        return rows, False
+        return rows, "none", tier1_clients, tier2_clients
 
-    filtered = []
-    for r in rows:
-        industry_arr = r.get("industry_array") or []
-        arr_match = any(prospect_ind in item.lower() for item in industry_arr)
-        group_match = prospect_ind in (r.get("industry_group") or "").lower()
-        if arr_match or group_match:
-            filtered.append(r)
+    # Tier 1: Industry + Country
+    if prospect_ctry:
+        tier1_rows = [r for r in rows if _matches_industry(r, prospect_ind) and _matches_geography(r, prospect_ctry)]
+        tier1_clients = sorted(set(r["client_name"] for r in tier1_rows))
 
-    unique_clients = set(r["client_name"] for r in filtered)
-    if len(unique_clients) < 3:
-        return rows, False
+        if len(tier1_clients) > 4:
+            return tier1_rows, "industry_and_geography", tier1_clients, tier2_clients
 
-    return filtered, True
+    # Tier 2: Industry only
+    tier2_rows = [r for r in rows if _matches_industry(r, prospect_ind)]
+    tier2_clients = sorted(set(r["client_name"] for r in tier2_rows))
+
+    if len(tier2_clients) > 2:
+        return tier2_rows, "industry", tier1_clients, tier2_clients
+
+    # Tier 3: No filter (Case A)
+    return rows, "none", tier1_clients, tier2_clients
 
 
 def exact_match(rows: List[dict], prospect_techs: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
@@ -340,27 +368,52 @@ def find_matches(
         - industry_filtered_only: List[str] clients that passed industry but not in results
         - industry_filter_applied: bool
         - total_candidates: int
+        - debug_log: List[Tuple[str, str]] named log entries for UI display
     """
     prospect_ind = prospect_industry.strip().lower()
     prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
     prospect_ctry = prospect_country.strip().lower()
     total_techs = len(prospect_techs)
+    debug_log = []
 
     if total_techs == 0:
         return {"matches": [], "industry_filtered_only": [],
-                "industry_filter_applied": False, "total_candidates": 0}
+                "industry_filter_applied": False, "total_candidates": 0,
+                "debug_log": []}
 
     # Step 1: Fetch all rows and compute industry metadata
     all_rows = fetch_all_rows()
     industry_client_names = _compute_industry_client_names(all_rows, prospect_ind)
     client_meta = _build_client_meta(all_rows)
 
-    # Step 2: Industry filter
-    candidate_rows, industry_applied = filter_by_industry(all_rows, prospect_ind)
+    # Step 2: 3-tier pre-filter (Industry+Country → Industry → All)
+    candidate_rows, filter_level, tier1_clients, tier2_clients = filter_candidates(
+        all_rows, prospect_ind, prospect_ctry
+    )
+    industry_applied = filter_level != "none"
+
+    # Debug: Pre-filter logs
+    debug_log.append((
+        "shortlist before Exact Match:: Pre-filter Industry & Geography",
+        ", ".join(tier1_clients) if tier1_clients else "(empty — not enough matches or no country provided)",
+    ))
+    debug_log.append((
+        "shortlist before Exact Match::Pre-filter Industry",
+        ", ".join(tier2_clients) if tier2_clients else "(empty — not enough matches or no industry provided)",
+    ))
 
     # Step 3: Core matching (exact + semantic on candidate rows)
     exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
     semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
+
+    # Debug: Exact match log
+    exact_detail = "; ".join(
+        f"{c}: [{', '.join(set(techs))}]" for c, techs in exact_by_client.items()
+    )
+    debug_log.append((
+        "shortlistOnExactMatch",
+        exact_detail if exact_detail else "(no exact matches)",
+    ))
 
     # Build shortlist: exact clients first, then semantic-only
     sort_by_ind = not industry_applied  # sort by industry only when filter was skipped
@@ -370,6 +423,22 @@ def find_matches(
         source_exact="industry_exact" if industry_applied else "exact",
         source_semantic="industry_semantic" if industry_applied else "semantic",
     )
+
+    # Debug: Shortlist after exact match
+    shortlist_after_exact = [c for c in exact_by_client]
+    debug_log.append((
+        "shortlist after Exact Match",
+        ", ".join(shortlist_after_exact) if shortlist_after_exact else "(empty)",
+    ))
+
+    # Debug: Semantic match log
+    semantic_detail = "; ".join(
+        f"{c}: [{', '.join(set(t[0] for t in techs))}]" for c, techs in semantic_by_client.items()
+    )
+    debug_log.append((
+        "shortlistOnSemanticMatch",
+        semantic_detail if semantic_detail else "(no semantic matches)",
+    ))
 
     # Merge exact + semantic data for scoring (clients can have both)
     all_exact = dict(exact_by_client)
@@ -406,6 +475,18 @@ def find_matches(
             geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
             for cname in geo_clients[:deficit]:
                 shortlist.append((cname, "geography"))
+
+    # Debug: Overall shortlist
+    overall_names = []
+    seen_for_log = set()
+    for c, _ in shortlist:
+        if c not in seen_for_log:
+            overall_names.append(c)
+            seen_for_log.add(c)
+    debug_log.append((
+        "Overall shortlist",
+        ", ".join(overall_names) if overall_names else "(empty)",
+    ))
 
     # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
@@ -451,4 +532,5 @@ def find_matches(
         "industry_filtered_only": industry_only,
         "industry_filter_applied": industry_applied,
         "total_candidates": len(result_names),
+        "debug_log": debug_log,
     }

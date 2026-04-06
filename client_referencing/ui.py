@@ -257,3 +257,11 @@ def _render_vector_match_tab():
     elif not results["industry_filter_applied"]:
         st.divider()
         st.caption("Industry filtering was not applied, so no separate industry-only list is shown.")
+
+    # Debug log
+    if results.get("debug_log"):
+        st.divider()
+        with st.expander("Debug Log", expanded=False):
+            for label, content in results["debug_log"]:
+                st.markdown(f"**{label}:**")
+                st.text(content)
