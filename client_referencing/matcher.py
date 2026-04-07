@@ -8,6 +8,7 @@ import voyageai
 from supabase import create_client
 
 from client_referencing.config import (
+    INDUSTRY_MATCH_THRESHOLD,
     INDUSTRY_TABLE_NAME,
     SUPABASE_SERVICE_KEY,
     SUPABASE_URL,
@@ -87,12 +88,10 @@ def fetch_all_rows() -> List[dict]:
     return result.data or []
 
 
-def _matches_industry(row: dict, prospect_ind: str) -> bool:
-    """Check if a row matches the prospect industry."""
-    industry_arr = row.get("industry_array") or []
-    arr_match = any(prospect_ind in item.lower() for item in industry_arr)
-    group_match = prospect_ind in (row.get("industry_group") or "").lower()
-    return arr_match or group_match
+def _matches_industry(row: dict, prospect_ind: str, industry_scores: Dict[str, float]) -> bool:
+    """Check if a row's client passes the industry threshold via cosine similarity."""
+    cname = row.get("client_name", "")
+    return industry_scores.get(cname, 0.0) >= INDUSTRY_MATCH_THRESHOLD
 
 
 def _matches_geography(row: dict, prospect_ctry: str) -> bool:
@@ -105,6 +104,7 @@ def filter_candidates(
     rows: List[dict],
     prospect_industry: str,
     prospect_country: str,
+    industry_scores: Dict[str, float] = None,
 ) -> Tuple[List[dict], str, List[str], List[str]]:
     """3-tier pre-filter: Industry+Country → Industry → All.
 
@@ -114,6 +114,7 @@ def filter_candidates(
     """
     prospect_ind = prospect_industry.lower().strip()
     prospect_ctry = prospect_country.lower().strip()
+    scores = industry_scores or {}
 
     tier1_clients = []
     tier2_clients = []
@@ -123,14 +124,14 @@ def filter_candidates(
 
     # Tier 1: Industry + Country
     if prospect_ctry:
-        tier1_rows = [r for r in rows if _matches_industry(r, prospect_ind) and _matches_geography(r, prospect_ctry)]
+        tier1_rows = [r for r in rows if _matches_industry(r, prospect_ind, scores) and _matches_geography(r, prospect_ctry)]
         tier1_clients = sorted(set(r["client_name"] for r in tier1_rows))
 
         if len(tier1_clients) > 4:
             return tier1_rows, "industry_and_geography", tier1_clients, tier2_clients
 
     # Tier 2: Industry only
-    tier2_rows = [r for r in rows if _matches_industry(r, prospect_ind)]
+    tier2_rows = [r for r in rows if _matches_industry(r, prospect_ind, scores)]
     tier2_clients = sorted(set(r["client_name"] for r in tier2_rows))
 
     if len(tier2_clients) > 2:
@@ -260,18 +261,12 @@ def semantic_match(
     return semantic_by_client
 
 
-def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str) -> set:
-    """Compute which clients match the prospect industry (for tiebreaking)."""
+def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str, industry_scores: Dict[str, float]) -> set:
+    """Compute which clients pass the industry threshold via cosine similarity."""
     if not prospect_ind:
         return set()
-    names = set()
-    for r in all_rows:
-        industry_arr = r.get("industry_array") or []
-        arr_match = any(prospect_ind in item.lower() for item in industry_arr)
-        group_match = prospect_ind in (r.get("industry_group") or "").lower()
-        if arr_match or group_match:
-            names.add(r["client_name"])
-    return names
+    return {r["client_name"] for r in all_rows
+            if industry_scores.get(r["client_name"], 0.0) >= INDUSTRY_MATCH_THRESHOLD}
 
 
 def _fetch_industry_embeddings() -> Dict[str, List[float]]:
@@ -455,16 +450,18 @@ def find_matches(
 
     # Step 1: Fetch all rows and compute industry metadata
     all_rows = fetch_all_rows()
-    industry_client_names = _compute_industry_client_names(all_rows, prospect_ind)
     client_meta = _build_client_meta(all_rows)
 
     # Compute continuous industry relevance scores via pre-computed embeddings
     industry_embeddings = _fetch_industry_embeddings()
     industry_scores = _compute_industry_scores(prospect_ind, all_rows, industry_embeddings)
 
+    # Industry client names (threshold-based) for Case YES_I vs NO_I determination
+    industry_client_names = _compute_industry_client_names(all_rows, prospect_ind, industry_scores)
+
     # Step 2: 3-tier pre-filter (Industry+Country → Industry → All)
     candidate_rows, filter_level, tier1_clients, tier2_clients = filter_candidates(
-        all_rows, prospect_ind, prospect_ctry
+        all_rows, prospect_ind, prospect_ctry, industry_scores
     )
     industry_applied = filter_level != "none"
 
