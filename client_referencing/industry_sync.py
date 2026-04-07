@@ -4,6 +4,8 @@ Mirrors the pattern in sync.py but for a simpler single-column table:
   industry_embeddings(id, term, embedding)
 """
 
+from io import BytesIO
+
 import pandas as pd
 import voyageai
 from supabase import create_client
@@ -20,7 +22,7 @@ from client_referencing.config import (
 
 def read_excel(file_bytes: bytes) -> list[dict]:
     """Parse uploaded Excel bytes into a list of industry term dicts."""
-    df = pd.read_excel(file_bytes, engine="openpyxl")
+    df = pd.read_excel(BytesIO(file_bytes), engine="openpyxl")
 
     expected = ["IndustryTerm"]
     if len(df.columns) >= 1 and list(df.columns) != expected:
