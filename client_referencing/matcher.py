@@ -1,5 +1,6 @@
 """VectorMatch: find best-matching existing clients for a prospect."""
 
+import json
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -305,7 +306,7 @@ def _compute_industry_scores(
     # Pre-normalize all industry term vectors
     term_vecs = {}
     for term, emb in industry_embeddings.items():
-        v = np.array(emb)
+        v = np.array(json.loads(emb) if isinstance(emb, str) else emb)
         n = np.linalg.norm(v)
         if n > 0:
             term_vecs[term] = v / n
