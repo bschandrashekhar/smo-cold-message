@@ -467,7 +467,7 @@ def find_matches(
             )
             backfill_entries.extend(bf_shortlist)
 
-        # Debug: generic backfill log (spec line 87)
+        # Debug: generic backfill log (spec line 86) — shows ALL candidates before cap
         if backfill_entries:
             generic_names = list(dict.fromkeys(c for c, _ in backfill_entries))
             debug_log.append((
@@ -475,9 +475,24 @@ def find_matches(
                 ", ".join(generic_names),
             ))
 
-        # Geo backfill if combined count still ≤5
+        # Cap generic backfill at deficit (spec lines 88-90)
+        generic_deficit = 5 - len(shortlist_names)
+        if generic_deficit > 0 and backfill_entries:
+            capped = []
+            capped_seen = set()
+            for entry in backfill_entries:
+                if entry[0] not in capped_seen:
+                    if len(capped_seen) >= generic_deficit:
+                        break
+                    capped_seen.add(entry[0])
+                capped.append(entry)
+            backfill_entries = capped
+        elif generic_deficit <= 0:
+            backfill_entries = []
+
+        # Geo backfill if combined count still ≤5 (spec lines 96-107)
         backfill_names = set(c for c, _ in backfill_entries)
-        combined_count = len(shortlist_names | backfill_names)
+        combined_count = len(shortlist_names) + len(backfill_names)
         if combined_count <= 5 and prospect_ctry:
             deficit = 6 - combined_count
             if deficit > 0:
@@ -537,9 +552,6 @@ def find_matches(
         key=lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_match),
         reverse=True,
     )
-
-    # Cap at 6 results (5 tech + 1 geography max per spec)
-    matches = matches[:6]
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)

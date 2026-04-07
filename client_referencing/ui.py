@@ -19,6 +19,15 @@ def render():
 
 def _render_sync_tab():
     """Render the sync UI (upload Excel, preview diff, apply)."""
+    _render_client_referencing_sync()
+    st.divider()
+    _render_industry_reference_sync()
+
+
+# ── Client Referencing Data Sync ────────────────────────────────────────
+
+def _render_client_referencing_sync():
+    """Client Referencing Data Sync section."""
     st.header("Client Referencing Data Sync")
     st.caption(
         "Upload the client-referencing-data.xlsx file to sync with Supabase. "
@@ -116,6 +125,112 @@ def _render_sync_tab():
             st.error(f"Sync failed: {e}")
             import traceback
             st.code(traceback.format_exc())
+
+
+# ── Industry Reference Data Sync ────────────────────────────────────────
+
+def _render_industry_reference_sync():
+    """Industry Reference Data Sync section."""
+    st.header("Industry Reference Data Sync")
+    st.caption(
+        "Upload industry-reference-data.xlsx to sync industry terms with Supabase. "
+        "Each term gets a Voyage embedding for semantic industry matching during VectorMatch."
+    )
+
+    uploaded = st.file_uploader(
+        "Upload industry-reference-data.xlsx", type=["xlsx"], key="ind_upload"
+    )
+
+    if uploaded is None:
+        _show_current_industry_data()
+        return
+
+    from client_referencing.industry_sync import read_excel, fetch_existing, compute_diff, apply_sync
+
+    try:
+        excel_rows = read_excel(uploaded.getvalue())
+    except Exception as e:
+        st.error(f"Failed to parse Excel: {e}")
+        return
+
+    st.success(f"Parsed **{len(excel_rows)}** industry terms from Excel.")
+
+    with st.spinner("Fetching current industry terms from Supabase..."):
+        try:
+            db_rows = fetch_existing()
+        except Exception as e:
+            st.error(f"Failed to fetch from Supabase: {e}")
+            return
+
+    st.info(f"**{len(db_rows)}** industry terms currently in Supabase.")
+
+    diff = compute_diff(excel_rows, db_rows)
+    n_create = len(diff["create"])
+    n_delete = len(diff["delete"])
+
+    col1, col2 = st.columns(2)
+    col1.metric("To Create", n_create, delta=f"+{n_create}" if n_create else None)
+    col2.metric("To Delete", n_delete, delta=f"-{n_delete}" if n_delete else None, delta_color="inverse")
+
+    if n_create == 0 and n_delete == 0:
+        st.success("Industry terms are in sync. No changes needed.")
+        return
+
+    if n_create > 0:
+        with st.expander(f"New terms to create ({n_create})"):
+            st.dataframe(pd.DataFrame(diff["create"]), use_container_width=True)
+
+    if n_delete > 0:
+        with st.expander(f"Terms to delete ({n_delete})"):
+            delete_display = [{"term": r["term"]} for r in diff["delete"]]
+            st.dataframe(pd.DataFrame(delete_display), use_container_width=True)
+
+    if n_create > 0:
+        st.caption(f"Voyage AI embeddings will be generated for **{n_create}** new terms.")
+
+    if st.button("Apply Industry Sync", type="primary", key="ind_sync_btn"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        def on_progress(current, total, text):
+            if total > 0:
+                progress_bar.progress(min(current / total, 1.0))
+            status_text.text(text)
+
+        try:
+            result = apply_sync(diff, progress_callback=on_progress)
+            progress_bar.progress(1.0)
+            status_text.text("Industry sync complete!")
+            st.success(
+                f"Industry sync complete: **{result['created']}** created, "
+                f"**{result['deleted']}** deleted."
+            )
+        except Exception as e:
+            st.error(f"Industry sync failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+
+def _show_current_industry_data():
+    """Show current industry embeddings when no file is uploaded."""
+    try:
+        from client_referencing.industry_sync import fetch_existing
+        with st.spinner("Loading industry terms..."):
+            db_rows = fetch_existing()
+
+        if not db_rows:
+            st.info("No industry terms in Supabase yet. Upload an Excel file to get started.")
+            return
+
+        st.metric("Total Terms", len(db_rows))
+        df = pd.DataFrame(db_rows)
+        if "embedding" in df.columns:
+            df["embedding"] = df["embedding"].apply(
+                lambda v: str(v)[:50] + "..." if v else None
+            )
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Could not load industry data: {e}")
 
 
 def _show_current_data():
