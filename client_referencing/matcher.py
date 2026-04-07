@@ -584,9 +584,8 @@ def find_matches(
                         ", ".join(geo_added),
                     ))
 
-        # Re-order entire backfill set by industry relevance, then append once
+        # Append backfill (generic first, then geo) without re-sorting
         if backfill_entries:
-            backfill_entries.sort(key=lambda x: (-industry_scores.get(x[0], 0.0), x[0]))
             shortlist.extend(backfill_entries)
 
             # Debug: single combined backfill log
