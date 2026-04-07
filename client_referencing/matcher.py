@@ -1,6 +1,7 @@
 """VectorMatch: find best-matching existing clients for a prospect."""
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -9,6 +10,7 @@ import voyageai
 from supabase import create_client
 
 from client_referencing.config import (
+    CACHE_TTL,
     INDUSTRY_MATCH_THRESHOLD,
     INDUSTRY_TABLE_NAME,
     SUPABASE_SERVICE_KEY,
@@ -80,13 +82,81 @@ def _get_voyage():
     return _voyage
 
 
+class _DataCache:
+    """In-memory cache for industry embeddings, client rows, and prospect vectors."""
+
+    def __init__(self, ttl: int = CACHE_TTL):
+        self.ttl = ttl
+        self._industry_embeddings = None       # {term: raw_embedding}
+        self._industry_term_vecs = None         # {term: normalized_numpy_array}
+        self._all_rows = None                   # List[dict]
+        self._prospect_embeddings = {}          # {prospect_string: normalized_numpy_array}
+        self._last_refresh = 0.0
+
+    def _is_stale(self) -> bool:
+        return time.time() - self._last_refresh > self.ttl
+
+    def get_industry_embeddings(self) -> Dict[str, list]:
+        if self._industry_embeddings is None or self._is_stale():
+            self._refresh()
+        return self._industry_embeddings
+
+    def get_industry_term_vecs(self) -> Dict[str, np.ndarray]:
+        if self._industry_term_vecs is None or self._is_stale():
+            self._refresh()
+        return self._industry_term_vecs
+
+    def get_all_rows(self) -> List[dict]:
+        if self._all_rows is None or self._is_stale():
+            self._refresh()
+        return self._all_rows
+
+    def get_prospect_embedding(self, prospect_ind: str) -> np.ndarray:
+        if prospect_ind not in self._prospect_embeddings:
+            voyage = _get_voyage()
+            result = voyage.embed([prospect_ind], model=VOYAGE_MODEL, input_type="document")
+            vec = np.array(result.embeddings[0])
+            norm = np.linalg.norm(vec)
+            self._prospect_embeddings[prospect_ind] = vec / norm if norm > 0 else vec
+        return self._prospect_embeddings[prospect_ind]
+
+    def _refresh(self):
+        """Reload industry embeddings and client rows from Supabase."""
+        sb = _get_supabase()
+        # Industry embeddings
+        result = sb.table(INDUSTRY_TABLE_NAME).select("term,embedding").execute()
+        self._industry_embeddings = {row["term"]: row["embedding"] for row in (result.data or [])}
+        # Pre-normalize vectors
+        self._industry_term_vecs = {}
+        for term, emb in self._industry_embeddings.items():
+            v = np.array(json.loads(emb) if isinstance(emb, str) else emb)
+            n = np.linalg.norm(v)
+            if n > 0:
+                self._industry_term_vecs[term] = v / n
+        # Client rows
+        cols = ("id,client_name,client_industry,client_geography,client_url,"
+                "industry_array,industry_primary,industry_group,embed_text,exact_key,geo_priority")
+        result = sb.table(TABLE_NAME).select(cols).execute()
+        self._all_rows = result.data or []
+        self._last_refresh = time.time()
+
+    def invalidate(self):
+        """Force cache refresh on next access."""
+        self._last_refresh = 0.0
+        self._prospect_embeddings.clear()
+
+
+_cache = _DataCache()
+
+
+def invalidate_cache():
+    """Public API: call after sync operations to force fresh data on next query."""
+    _cache.invalidate()
+
+
 def fetch_all_rows() -> List[dict]:
-    """Fetch all rows from client_referencing_data (excluding embedding)."""
-    sb = _get_supabase()
-    cols = ("id,client_name,client_industry,client_geography,client_url,"
-            "industry_array,industry_primary,industry_group,embed_text,exact_key,geo_priority")
-    result = sb.table(TABLE_NAME).select(cols).execute()
-    return result.data or []
+    """Fetch all rows from client_referencing_data (cached with TTL)."""
+    return _cache.get_all_rows()
 
 
 def _matches_industry(row: dict, prospect_ind: str, industry_scores: Dict[str, float]) -> bool:
@@ -270,17 +340,14 @@ def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str, indu
             if industry_scores.get(r["client_name"], 0.0) >= INDUSTRY_MATCH_THRESHOLD}
 
 
-def _fetch_industry_embeddings() -> Dict[str, List[float]]:
-    """Fetch all industry term embeddings from Supabase."""
-    sb = _get_supabase()
-    result = sb.table(INDUSTRY_TABLE_NAME).select("term,embedding").execute()
-    return {row["term"]: row["embedding"] for row in (result.data or [])}
+def _fetch_industry_embeddings() -> Dict[str, list]:
+    """Fetch all industry term embeddings from Supabase (cached with TTL)."""
+    return _cache.get_industry_embeddings()
 
 
 def _compute_industry_scores(
     prospect_ind: str,
     all_rows: List[dict],
-    industry_embeddings: Dict[str, List[float]],
 ) -> Dict[str, float]:
     """Compute per-client industry relevance via cosine similarity.
 
@@ -288,29 +355,21 @@ def _compute_industry_scores(
     industry embedding and the embeddings of each term in the client's
     industry_array + industry_group.
 
+    Uses cached industry term vectors and prospect embeddings to avoid
+    redundant Supabase queries and Voyage API calls.
+
     Returns {client_name: score} where score is 0.0 to 1.0.
     """
-    if not prospect_ind or not industry_embeddings:
+    if not prospect_ind:
         return {}
 
-    # Embed the prospect industry term
-    voyage = _get_voyage()
-    # Use input_type="document" to match the stored industry term embeddings (same space)
-    embed_result = voyage.embed([prospect_ind], model=VOYAGE_MODEL, input_type="document")
-    prospect_vec = np.array(embed_result.embeddings[0])
-    prospect_norm = np.linalg.norm(prospect_vec)
-    if prospect_norm == 0:
+    term_vecs = _cache.get_industry_term_vecs()
+    if not term_vecs:
         return {}
 
-    prospect_unit = prospect_vec / prospect_norm
-
-    # Pre-normalize all industry term vectors
-    term_vecs = {}
-    for term, emb in industry_embeddings.items():
-        v = np.array(json.loads(emb) if isinstance(emb, str) else emb)
-        n = np.linalg.norm(v)
-        if n > 0:
-            term_vecs[term] = v / n
+    prospect_unit = _cache.get_prospect_embedding(prospect_ind)
+    if np.linalg.norm(prospect_unit) == 0:
+        return {}
 
     # Build client -> industry terms mapping (deduplicated by client)
     client_terms: Dict[str, set] = {}
@@ -455,9 +514,8 @@ def find_matches(
     all_rows = fetch_all_rows()
     client_meta = _build_client_meta(all_rows)
 
-    # Compute continuous industry relevance scores via pre-computed embeddings
-    industry_embeddings = _fetch_industry_embeddings()
-    industry_scores = _compute_industry_scores(prospect_ind, all_rows, industry_embeddings)
+    # Compute continuous industry relevance scores via cached embeddings
+    industry_scores = _compute_industry_scores(prospect_ind, all_rows)
 
     # Industry client names (threshold-based) for Case YES_I vs NO_I determination
     industry_client_names = _compute_industry_client_names(all_rows, prospect_ind, industry_scores)

@@ -121,6 +121,8 @@ def _render_client_referencing_sync():
                 f"Sync complete: **{result['created']}** created, "
                 f"**{result['updated']}** updated, **{result['deleted']}** deleted."
             )
+            from client_referencing.matcher import invalidate_cache
+            invalidate_cache()
         except Exception as e:
             st.error(f"Sync failed: {e}")
             import traceback
@@ -204,6 +206,8 @@ def _render_industry_reference_sync():
                 f"Industry sync complete: **{result['created']}** created, "
                 f"**{result['deleted']}** deleted."
             )
+            from client_referencing.matcher import invalidate_cache
+            invalidate_cache()
         except Exception as e:
             st.error(f"Industry sync failed: {e}")
             import traceback
@@ -260,8 +264,47 @@ def _show_current_data():
 # ── VectorMatch Tab ──────────────────────────────────────────────────────
 
 def _render_vector_match_tab():
+    """Render the VectorMatch tab with two accordion sections."""
+    # Section 1: Hyper Personalized Message Auto Generator (open by default)
+    with st.expander("Hyper Personalized Message Auto Generator", expanded=True):
+        _render_message_generator_section()
+
+    # Section 2: VectorMatch — Prospect Client Matching (closed by default)
+    with st.expander("VectorMatch — Prospect Client Matching", expanded=False):
+        _render_vectormatch_section()
+
+
+# ── Hyper Personalized Message Auto Generator ────────────────────────────
+
+def _render_message_generator_section():
+    """Render the prospect upload and message generation UI."""
+    st.caption(
+        "Upload a Prospect Data Excel sheet to auto-generate hyper-personalized "
+        "outreach messages using client references, case studies, and AI research."
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        uploaded = st.file_uploader(
+            "Upload Prospect Data Excel", type=["xlsx"], key="prospect_upload"
+        )
+    with col2:
+        st.write("")  # spacer
+        st.write("")  # spacer
+        if st.button("Clear Cache", type="secondary", key="clear_cache_btn"):
+            from client_referencing.matcher import invalidate_cache
+            invalidate_cache()
+            st.success("Cache cleared.")
+
+    if uploaded is not None:
+        st.info("Prospect data upload received. Processing pipeline coming soon.")
+        # TODO: parse Excel, validate columns, run pipeline
+
+
+# ── VectorMatch — Prospect Client Matching ───────────────────────────────
+
+def _render_vectormatch_section():
     """Render the VectorMatch prospect matching UI."""
-    st.header("VectorMatch — Prospect Client Matching")
     st.caption(
         "Enter a prospect's industry and technologies to find the best-matching "
         "existing clients from the reference database."

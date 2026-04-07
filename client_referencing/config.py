@@ -11,3 +11,4 @@ VOYAGE_MODEL = "voyage-4-large"
 VOYAGE_BATCH_SIZE = 128
 EMBEDDING_DIM = 1024
 INDUSTRY_MATCH_THRESHOLD = 0.85
+CACHE_TTL = 3600  # seconds — how long cached embeddings/rows stay fresh
