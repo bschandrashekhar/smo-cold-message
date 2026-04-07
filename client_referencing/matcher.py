@@ -629,6 +629,9 @@ def find_matches(
         reverse=True,
     )
 
+    # Cap at 5 results (spec: "identify upto 5 matches")
+    matches = matches[:5]
+
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
     industry_only = sorted(industry_client_names - result_names) if industry_applied else []
