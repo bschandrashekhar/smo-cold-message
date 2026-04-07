@@ -295,7 +295,8 @@ def _compute_industry_scores(
 
     # Embed the prospect industry term
     voyage = _get_voyage()
-    embed_result = voyage.embed([prospect_ind], model=VOYAGE_MODEL, input_type="query")
+    # Use input_type="document" to match the stored industry term embeddings (same space)
+    embed_result = voyage.embed([prospect_ind], model=VOYAGE_MODEL, input_type="document")
     prospect_vec = np.array(embed_result.embeddings[0])
     prospect_norm = np.linalg.norm(prospect_vec)
     if prospect_norm == 0:
