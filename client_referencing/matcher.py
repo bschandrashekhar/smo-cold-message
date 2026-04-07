@@ -623,18 +623,11 @@ def find_matches(
             match_source=source,
         ))
 
-    # Sort within groups: core shortlist first (preserve order over backfill),
-    # then backfill clients after. Within each group, sort by final_score desc,
-    # with industry_score as tiebreaker (spec line 150).
-    core_sources = {"industry_exact", "industry_semantic", "exact", "semantic"}
-    core = [m for m in matches if m.match_source in core_sources]
-    backfill = [m for m in matches if m.match_source not in core_sources]
-
-    sort_key = lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_score)
-    core.sort(key=sort_key, reverse=True)
-    backfill.sort(key=sort_key, reverse=True)
-
-    matches = (core + backfill)[:6]
+    # Preserve shortlist order (core first, backfill after) per spec.
+    # _build_shortlist already orders: exact clients first, then semantic-only,
+    # with industry_score sorting applied where spec requires it.
+    # Only cap at 6 results (spec line 118).
+    matches = matches[:6]
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
