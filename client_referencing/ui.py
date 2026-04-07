@@ -19,16 +19,16 @@ def render():
 
 def _render_sync_tab():
     """Render the sync UI (upload Excel, preview diff, apply)."""
-    _render_client_referencing_sync()
-    st.divider()
-    _render_industry_reference_sync()
+    with st.expander("Client Referencing Data Sync", expanded=False):
+        _render_client_referencing_sync()
+    with st.expander("Industry Reference Data Sync", expanded=False):
+        _render_industry_reference_sync()
 
 
 # ── Client Referencing Data Sync ────────────────────────────────────────
 
 def _render_client_referencing_sync():
     """Client Referencing Data Sync section."""
-    st.header("Client Referencing Data Sync")
     st.caption(
         "Upload the client-referencing-data.xlsx file to sync with Supabase. "
         "The tool compares your Excel against the database and shows what will be "
@@ -131,7 +131,6 @@ def _render_client_referencing_sync():
 
 def _render_industry_reference_sync():
     """Industry Reference Data Sync section."""
-    st.header("Industry Reference Data Sync")
     st.caption(
         "Upload industry-reference-data.xlsx to sync industry terms with Supabase. "
         "Each term gets a Voyage embedding for semantic industry matching during VectorMatch."
