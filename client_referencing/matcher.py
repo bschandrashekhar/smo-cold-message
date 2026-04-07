@@ -629,8 +629,8 @@ def find_matches(
         reverse=True,
     )
 
-    # Cap at 5 results (spec: "identify upto 5 matches")
-    matches = matches[:5]
+    # Cap at 6 results (spec: 5 core + 1 geo backfill)
+    matches = matches[:6]
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
