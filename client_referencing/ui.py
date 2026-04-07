@@ -359,7 +359,9 @@ def _render_vector_match_tab():
                 st.caption("No semantic technology matches.")
 
             if match.industry_match:
-                st.caption("Passed industry filter")
+                st.caption(f"Industry relevance: {match.industry_score:.3f} (passed filter)")
+            elif match.industry_score > 0:
+                st.caption(f"Industry relevance: {match.industry_score:.3f}")
 
     # Industry-only clients
     if results["industry_filter_applied"] and results["industry_filtered_only"]:

@@ -3,10 +3,12 @@
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+import numpy as np
 import voyageai
 from supabase import create_client
 
 from client_referencing.config import (
+    INDUSTRY_TABLE_NAME,
     SUPABASE_SERVICE_KEY,
     SUPABASE_URL,
     TABLE_NAME,
@@ -48,6 +50,7 @@ class ClientMatch:
     client_geography: str
     client_url: str
     industry_match: bool
+    industry_score: float
     exact_techs: List[str]
     semantic_techs: List[Tuple[str, str, float]]  # (prospect_tech, matched_embed_text, similarity)
     match_ratio: float
@@ -271,6 +274,75 @@ def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str) -> s
     return names
 
 
+def _fetch_industry_embeddings() -> Dict[str, List[float]]:
+    """Fetch all industry term embeddings from Supabase."""
+    sb = _get_supabase()
+    result = sb.table(INDUSTRY_TABLE_NAME).select("term,embedding").execute()
+    return {row["term"]: row["embedding"] for row in (result.data or [])}
+
+
+def _compute_industry_scores(
+    prospect_ind: str,
+    all_rows: List[dict],
+    industry_embeddings: Dict[str, List[float]],
+) -> Dict[str, float]:
+    """Compute per-client industry relevance via cosine similarity.
+
+    For each client, finds the max cosine similarity between the prospect
+    industry embedding and the embeddings of each term in the client's
+    industry_array + industry_group.
+
+    Returns {client_name: score} where score is 0.0 to 1.0.
+    """
+    if not prospect_ind or not industry_embeddings:
+        return {}
+
+    # Embed the prospect industry term
+    voyage = _get_voyage()
+    embed_result = voyage.embed([prospect_ind], model=VOYAGE_MODEL, input_type="query")
+    prospect_vec = np.array(embed_result.embeddings[0])
+    prospect_norm = np.linalg.norm(prospect_vec)
+    if prospect_norm == 0:
+        return {}
+
+    prospect_unit = prospect_vec / prospect_norm
+
+    # Pre-normalize all industry term vectors
+    term_vecs = {}
+    for term, emb in industry_embeddings.items():
+        v = np.array(emb)
+        n = np.linalg.norm(v)
+        if n > 0:
+            term_vecs[term] = v / n
+
+    # Build client -> industry terms mapping (deduplicated by client)
+    client_terms: Dict[str, set] = {}
+    for r in all_rows:
+        cname = r["client_name"]
+        if cname in client_terms:
+            continue
+        terms = set()
+        for item in (r.get("industry_array") or []):
+            terms.add(item.lower().strip())
+        grp = (r.get("industry_group") or "").lower().strip()
+        if grp:
+            terms.add(grp)
+        client_terms[cname] = terms
+
+    # Score each client: max cosine similarity across their industry terms
+    scores = {}
+    for cname, terms in client_terms.items():
+        best = 0.0
+        for term in terms:
+            if term in term_vecs:
+                sim = float(np.dot(prospect_unit, term_vecs[term]))
+                if sim > best:
+                    best = sim
+        scores[cname] = round(best, 4)
+
+    return scores
+
+
 def _build_client_meta(rows: List[dict]) -> Dict[str, dict]:
     """Build {client_name: {industry, geography, url}} lookup from rows."""
     meta = {}
@@ -312,7 +384,7 @@ def _score_client(
 def _build_shortlist(
     exact_by_client: Dict[str, List[str]],
     semantic_by_client: Dict[str, List[Tuple[str, str, float]]],
-    industry_client_names: set,
+    industry_scores: Dict[str, float],
     sort_by_industry: bool,
     source_exact: str,
     source_semantic: str,
@@ -321,7 +393,7 @@ def _build_shortlist(
     """Build ordered list of (client_name, match_source), exact-match clients first.
 
     Clients with exact matches come first, then semantic-only clients.
-    Within each group, optionally sorted by industry relevance.
+    Within each group, optionally sorted by industry relevance score (descending).
     """
     exclude = exclude_clients or set()
 
@@ -329,8 +401,8 @@ def _build_shortlist(
     semantic_only = [c for c in semantic_by_client if c not in exclude and c not in exact_by_client]
 
     if sort_by_industry:
-        exact_clients.sort(key=lambda c: (c not in industry_client_names, c))
-        semantic_only.sort(key=lambda c: (c not in industry_client_names, c))
+        exact_clients.sort(key=lambda c: (-industry_scores.get(c, 0.0), c))
+        semantic_only.sort(key=lambda c: (-industry_scores.get(c, 0.0), c))
 
     result = [(c, source_exact) for c in exact_clients]
     result += [(c, source_semantic) for c in semantic_only]
@@ -386,6 +458,10 @@ def find_matches(
     industry_client_names = _compute_industry_client_names(all_rows, prospect_ind)
     client_meta = _build_client_meta(all_rows)
 
+    # Compute continuous industry relevance scores via pre-computed embeddings
+    industry_embeddings = _fetch_industry_embeddings()
+    industry_scores = _compute_industry_scores(prospect_ind, all_rows, industry_embeddings)
+
     # Step 2: 3-tier pre-filter (Industry+Country → Industry → All)
     candidate_rows, filter_level, tier1_clients, tier2_clients = filter_candidates(
         all_rows, prospect_ind, prospect_ctry
@@ -411,7 +487,7 @@ def find_matches(
     # Build shortlist: exact clients first, then semantic-only
     sort_by_ind = not industry_applied  # sort by industry only when filter was skipped
     shortlist = _build_shortlist(
-        exact_by_client, semantic_by_client, industry_client_names,
+        exact_by_client, semantic_by_client, industry_scores,
         sort_by_industry=sort_by_ind,
         source_exact="industry_exact" if industry_applied else "exact",
         source_semantic="industry_semantic" if industry_applied else "semantic",
@@ -459,7 +535,7 @@ def find_matches(
                 all_semantic.setdefault(c, []).extend(techs)
 
             bf_shortlist = _build_shortlist(
-                bf_exact, bf_semantic, industry_client_names,
+                bf_exact, bf_semantic, industry_scores,
                 sort_by_industry=True,
                 source_exact="backfill_exact",
                 source_semantic="backfill_semantic",
@@ -511,7 +587,7 @@ def find_matches(
 
         # Re-order entire backfill set by industry relevance, then append once
         if backfill_entries:
-            backfill_entries.sort(key=lambda x: (x[0] not in industry_client_names, x[0]))
+            backfill_entries.sort(key=lambda x: (-industry_scores.get(x[0], 0.0), x[0]))
             shortlist.extend(backfill_entries)
 
             # Debug: single combined backfill log
@@ -539,6 +615,7 @@ def find_matches(
             client_geography=meta.get("client_geography", ""),
             client_url=meta.get("client_url", ""),
             industry_match=cname in industry_client_names,
+            industry_score=industry_scores.get(cname, 0.0),
             exact_techs=list(set(all_exact.get(cname, []))),
             semantic_techs=all_semantic.get(cname, []),
             match_ratio=match_ratio,
@@ -547,9 +624,9 @@ def find_matches(
             match_source=source,
         ))
 
-    # Final sort: score desc, then exact-match preference, then industry
+    # Final sort: score desc, then exact-match preference, then industry relevance
     matches.sort(
-        key=lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_match),
+        key=lambda m: (m.final_score, len(m.exact_techs) > 0, m.industry_score),
         reverse=True,
     )
 
