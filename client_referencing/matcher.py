@@ -84,7 +84,7 @@ def fetch_all_rows() -> List[dict]:
     """Fetch all rows from client_referencing_data (excluding embedding)."""
     sb = _get_supabase()
     cols = ("id,client_name,client_industry,client_geography,client_url,"
-            "industry_array,industry_primary,industry_group,embed_text,exact_key")
+            "industry_array,industry_primary,industry_group,embed_text,exact_key,geo_priority")
     result = sb.table(TABLE_NAME).select(cols).execute()
     return result.data or []
 
@@ -411,18 +411,19 @@ def _geography_backfill(
     prospect_country: str,
     exclude_clients: set,
 ) -> List[str]:
-    """Find unique clients matching prospect_country, excluding already-shortlisted."""
+    """Find unique clients matching prospect_country, sorted by geo_priority ascending."""
     if not prospect_country:
         return []
     seen = set()
-    result = []
+    candidates = []
     for r in all_rows:
         cname = r["client_name"]
         geo = (r.get("client_geography") or "").lower()
         if cname not in exclude_clients and cname not in seen and prospect_country in geo:
-            result.append(cname)
+            candidates.append((cname, r.get("geo_priority") or 999))
             seen.add(cname)
-    return result
+    candidates.sort(key=lambda x: x[1])
+    return [c for c, _ in candidates]
 
 
 def find_matches(
