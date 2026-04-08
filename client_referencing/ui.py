@@ -317,7 +317,7 @@ def _render_vectormatch_section():
     )
 
     with st.form("vectormatch_form"):
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
         with col1:
             prospect_industry = st.text_input(
                 "Prospect Industry",
@@ -333,6 +333,10 @@ def _render_vectormatch_section():
                 "Prospect Country",
                 placeholder="e.g. USA, Australia, India",
             )
+        with col4:
+            max_matches = st.number_input(
+                "Max Matches", min_value=1, max_value=20, value=6,
+            )
         submitted = st.form_submit_button("Find Matches", type="primary")
 
     if not submitted:
@@ -346,7 +350,7 @@ def _render_vectormatch_section():
 
     with st.spinner("Matching prospect against client database..."):
         try:
-            results = find_matches(prospect_industry, prospect_technologies, prospect_country)
+            results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches)
         except Exception as e:
             st.error(f"Matching failed: {e}")
             import traceback

@@ -503,6 +503,7 @@ def find_matches(
     prospect_industry: str,
     prospect_technologies: str,
     prospect_country: str = "",
+    max_matches: int = 6,
 ) -> Dict:
     """Main orchestrator with tiered matching and backfill.
 
@@ -641,8 +642,8 @@ def find_matches(
         # Geo backfill if combined count still ≤5 (spec lines 96-107)
         backfill_names = set(c for c, _ in backfill_entries)
         combined_count = len(shortlist_names) + len(backfill_names)
-        if combined_count <= 5 and prospect_ctry:
-            deficit = 6 - combined_count
+        if combined_count <= (max_matches - 1) and prospect_ctry:
+            deficit = max_matches - combined_count
             if deficit > 0:
                 exclude_all = shortlist_names | backfill_names
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, exclude_all)
@@ -698,8 +699,8 @@ def find_matches(
     # Preserve shortlist order (core first, backfill after) per spec.
     # _build_shortlist already orders: exact clients first, then semantic-only,
     # with industry_score sorting applied where spec requires it.
-    # Only cap at 6 results (spec line 118).
-    matches = matches[:6]
+    # Cap at max_matches results.
+    matches = matches[:max_matches]
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
