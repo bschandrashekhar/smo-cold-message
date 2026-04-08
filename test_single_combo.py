@@ -11,7 +11,7 @@ print(f"{'='*80}")
 print(f"INPUT: industry={industry!r}, tech={tech!r}, country={country!r}")
 print(f"{'='*80}")
 
-result = find_matches(industry, tech, country, max_matches=6)
+result = find_matches(industry, tech, country, max_matches=8)
 
 print(f"\nFilter applied: {result['industry_filter_applied']}")
 print(f"Total matches: {len(result['matches'])}")
