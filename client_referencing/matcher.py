@@ -502,8 +502,8 @@ def _geography_backfill(
 def find_matches(
     prospect_industry: str,
     prospect_technologies: str,
-    prospect_country: str = "",
-    max_matches: int = 6,
+    prospect_country: str,
+    max_matches: int,
 ) -> Dict:
     """Main orchestrator with tiered matching and backfill.
 
@@ -514,6 +514,9 @@ def find_matches(
         - total_candidates: int
         - debug_log: List[Tuple[str, str]] named log entries for UI display
     """
+    if max_matches <= 5:
+        raise ValueError("max_matches must be bigger than 5")
+
     prospect_ind = prospect_industry.strip().lower()
     prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
     prospect_ctry = prospect_country.strip().lower()
