@@ -296,6 +296,12 @@ def _render_message_generator_section():
             invalidate_cache()
             st.success("Cache cleared.")
 
+    st.caption(
+        "**Clear Cache** refreshes client data and industry embeddings from Supabase. "
+        "Prospect industry and technology embeddings (Voyage API lookups) are preserved "
+        "across clears since the same input always produces the same output."
+    )
+
     if uploaded is not None:
         st.info("Prospect data upload received. Processing pipeline coming soon.")
         # TODO: parse Excel, validate columns, run pipeline

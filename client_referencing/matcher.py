@@ -91,6 +91,7 @@ class _DataCache:
         self._industry_term_vecs = None         # {term: normalized_numpy_array}
         self._all_rows = None                   # List[dict]
         self._prospect_embeddings = {}          # {prospect_string: normalized_numpy_array}
+        self._tech_embeddings = {}              # {query_text: raw_embedding_list}
         self._last_refresh = 0.0
 
     def _is_stale(self) -> bool:
@@ -120,6 +121,21 @@ class _DataCache:
             self._prospect_embeddings[prospect_ind] = vec / norm if norm > 0 else vec
         return self._prospect_embeddings[prospect_ind]
 
+    def get_tech_embeddings(self, query_texts: List[str]) -> Dict[str, list]:
+        """Return Voyage embeddings for technology query strings, cached per string.
+
+        Only calls Voyage for strings not already in cache. Returns raw
+        embedding lists (not normalized) since they go straight into the
+        Supabase RPC for vector similarity search.
+        """
+        missing = [q for q in query_texts if q not in self._tech_embeddings]
+        if missing:
+            voyage = _get_voyage()
+            result = voyage.embed(missing, model=VOYAGE_MODEL, input_type="query")
+            for text, emb in zip(missing, result.embeddings):
+                self._tech_embeddings[text] = emb
+        return {q: self._tech_embeddings[q] for q in query_texts}
+
     def _refresh(self):
         """Reload industry embeddings and client rows from Supabase."""
         sb = _get_supabase()
@@ -141,9 +157,13 @@ class _DataCache:
         self._last_refresh = time.time()
 
     def invalidate(self):
-        """Force cache refresh on next access."""
+        """Force cache refresh on next access.
+
+        Preserves prospect industry and technology embeddings since those
+        are deterministic (same input string always produces the same
+        Voyage output).
+        """
         self._last_refresh = 0.0
-        self._prospect_embeddings.clear()
 
 
 _cache = _DataCache()
@@ -263,7 +283,6 @@ def semantic_match(
     if not unmatched_techs:
         return {}
 
-    voyage = _get_voyage()
     sb = _get_supabase()
 
     # Normalize and deduplicate query texts
@@ -273,13 +292,8 @@ def semantic_match(
 
     unique_queries = list(set(tech_to_query.values()))
 
-    # Generate embeddings for all unique query texts at once
-    embed_result = voyage.embed(
-        unique_queries,
-        model=VOYAGE_MODEL,
-        input_type="query",
-    )
-    query_embeddings = dict(zip(unique_queries, embed_result.embeddings))
+    # Get embeddings from cache (only calls Voyage for uncached strings)
+    query_embeddings = _cache.get_tech_embeddings(unique_queries)
 
     candidate_client_names = set(r["client_name"] for r in candidate_rows)
     semantic_by_client = {}
