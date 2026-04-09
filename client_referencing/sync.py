@@ -5,6 +5,7 @@ Supports two-table schema:
   - client_tech_data (technologies): exact_key, embed_text, embedding with FK to client
 """
 
+import io
 import json
 
 import pandas as pd
@@ -59,7 +60,8 @@ def read_excel(file_bytes: bytes) -> dict:
     Returns {"clients": [...], "technologies": [...]}.
     """
     # --- Clients sheet ---
-    df_clients = pd.read_excel(file_bytes, sheet_name="Clients", engine="openpyxl")
+    buf = io.BytesIO(file_bytes) if isinstance(file_bytes, bytes) else file_bytes
+    df_clients = pd.read_excel(buf, sheet_name="Clients", engine="openpyxl")
     expected_client_cols = [
         "Client Name", "Client Industry", "Client Geography", "Client URL",
         "IndustryArray", "IndustryPrimary", "IndustryGroup", "GeoPriority",
@@ -94,7 +96,8 @@ def read_excel(file_bytes: bytes) -> dict:
         })
 
     # --- Technologies sheet ---
-    df_techs = pd.read_excel(file_bytes, sheet_name="Technologies", engine="openpyxl")
+    buf.seek(0)  # reset buffer position after reading Clients sheet
+    df_techs = pd.read_excel(buf, sheet_name="Technologies", engine="openpyxl")
     expected_tech_cols = ["Client Name", "ExactKey", "EmbedText"]
     if list(df_techs.columns) != expected_tech_cols:
         if len(df_techs.columns) >= len(expected_tech_cols):
