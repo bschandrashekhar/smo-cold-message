@@ -2,7 +2,7 @@
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -11,11 +11,13 @@ from supabase import create_client
 
 from client_referencing.config import (
     CACHE_TTL,
+    CASE_STUDIES_TABLE_NAME,
     INDUSTRY_MATCH_THRESHOLD,
     INDUSTRY_TABLE_NAME,
     SUPABASE_SERVICE_KEY,
     SUPABASE_URL,
     TABLE_NAME,
+    TECH_TABLE_NAME,
     VOYAGE_API_KEY,
     VOYAGE_MODEL,
 )
@@ -61,6 +63,29 @@ class ClientMatch:
     similarity_score: float
     final_score: float
     match_source: str  # "industry_exact", "industry_semantic", "backfill_exact", "backfill_semantic", "geography"
+    client_id: str = ""
+    case_studies: List[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "client_name": self.client_name,
+            "client_id": self.client_id,
+            "client_industry": self.client_industry,
+            "client_geography": self.client_geography,
+            "client_url": self.client_url,
+            "industry_match": self.industry_match,
+            "industry_score": self.industry_score,
+            "exact_techs": self.exact_techs,
+            "semantic_techs": [
+                {"prospect_tech": t[0], "matched_text": t[1], "similarity": t[2]}
+                for t in self.semantic_techs
+            ],
+            "match_ratio": self.match_ratio,
+            "similarity_score": self.similarity_score,
+            "final_score": self.final_score,
+            "match_source": self.match_source,
+            "case_studies": self.case_studies,
+        }
 
 
 # Lazy-initialized clients
@@ -137,7 +162,7 @@ class _DataCache:
         return {q: self._tech_embeddings[q] for q in query_texts}
 
     def _refresh(self):
-        """Reload industry embeddings and client rows from Supabase."""
+        """Reload industry embeddings and client+tech rows from Supabase."""
         sb = _get_supabase()
         # Industry embeddings
         result = sb.table(INDUSTRY_TABLE_NAME).select("term,embedding").execute()
@@ -149,11 +174,34 @@ class _DataCache:
             n = np.linalg.norm(v)
             if n > 0:
                 self._industry_term_vecs[term] = v / n
-        # Client rows
-        cols = ("id,client_name,client_industry,client_geography,client_url,"
-                "industry_array,industry_primary,industry_group,embed_text,exact_key,geo_priority")
-        result = sb.table(TABLE_NAME).select(cols).execute()
-        self._all_rows = result.data or []
+        # Client rows (metadata only)
+        client_cols = ("id,client_name,client_industry,client_geography,client_url,"
+                       "industry_array,industry_primary,industry_group,geo_priority")
+        client_result = sb.table(TABLE_NAME).select(client_cols).execute()
+        client_lookup = {r["id"]: r for r in (client_result.data or [])}
+        # Tech rows
+        tech_cols = "id,client_id,exact_key,embed_text"
+        tech_result = sb.table(TECH_TABLE_NAME).select(tech_cols).execute()
+        # Join: reconstruct flat rows (same shape as before the split)
+        merged = []
+        for t in (tech_result.data or []):
+            c = client_lookup.get(t["client_id"])
+            if c is None:
+                continue
+            merged.append({
+                "id": c["id"],
+                "client_name": c["client_name"],
+                "client_industry": c["client_industry"],
+                "client_geography": c["client_geography"],
+                "client_url": c["client_url"],
+                "industry_array": c["industry_array"],
+                "industry_primary": c["industry_primary"],
+                "industry_group": c["industry_group"],
+                "geo_priority": c["geo_priority"],
+                "exact_key": t["exact_key"],
+                "embed_text": t["embed_text"],
+            })
+        self._all_rows = merged
         self._last_refresh = time.time()
 
     def invalidate(self):
@@ -221,14 +269,14 @@ def filter_candidates(
         if len(tier1_clients) > 4:
             return tier1_rows, "industry_and_geography", tier1_clients, tier2_clients
 
-    # Tier 2: Industry only
+    # Tier 2: Industry only (when Tier 1 has <= 4 clients)
     tier2_rows = [r for r in rows if _matches_industry(r, prospect_ind, scores)]
     tier2_clients = sorted(set(r["client_name"] for r in tier2_rows))
 
     if len(tier2_clients) > 2:
         return tier2_rows, "industry", tier1_clients, tier2_clients
 
-    # Tier 3: No filter (Case A)
+    # Tier 3: No filter — tech-only shortlist
     return rows, "none", tier1_clients, tier2_clients
 
 
@@ -328,7 +376,7 @@ def semantic_match(
         rerank_query = "Technologies: " + ", ".join(unmatched_techs)
 
         try:
-            rerank_result = voyage.rerank(
+            rerank_result = _get_voyage().rerank(
                 query=rerank_query,
                 documents=rerank_docs,
                 model="rerank-2",
@@ -414,11 +462,12 @@ def _compute_industry_scores(
 
 
 def _build_client_meta(rows: List[dict]) -> Dict[str, dict]:
-    """Build {client_name: {industry, geography, url}} lookup from rows."""
+    """Build {client_name: {client_id, industry, geography, url}} lookup from rows."""
     meta = {}
     for r in rows:
         if r["client_name"] not in meta:
             meta[r["client_name"]] = {
+                "client_id": r["id"],
                 "client_industry": r["client_industry"],
                 "client_geography": r["client_geography"],
                 "client_url": r["client_url"],
@@ -499,6 +548,29 @@ def _geography_backfill(
     return [c for c, _ in candidates]
 
 
+def _fetch_case_studies(client_ids: List[str]) -> Dict[str, List[dict]]:
+    """Batch-fetch case studies for a list of client UUIDs.
+
+    Returns {client_id: [{id, title, url}, ...]}.
+    """
+    if not client_ids:
+        return {}
+    sb = _get_supabase()
+    result = sb.table(CASE_STUDIES_TABLE_NAME).select(
+        "id,client_id,title,url"
+    ).in_("client_id", client_ids).execute()
+
+    studies_by_client: Dict[str, List[dict]] = {}
+    for row in (result.data or []):
+        cid = row["client_id"]
+        studies_by_client.setdefault(cid, []).append({
+            "id": row["id"],
+            "title": row["title"],
+            "url": row["url"],
+        })
+    return studies_by_client
+
+
 def find_matches(
     prospect_industry: str,
     prospect_technologies: str,
@@ -523,10 +595,20 @@ def find_matches(
     total_techs = len(prospect_techs)
     debug_log = []
 
+    explanation = {}  # structured explanation data for UI
+
     if total_techs == 0:
         return {"matches": [], "industry_filtered_only": [],
                 "industry_filter_applied": False, "total_candidates": 0,
-                "debug_log": []}
+                "debug_log": [], "explanation": {}}
+
+    # Print tier reference for log clarity (exact formatting per spec)
+    debug_log.append((
+        "Tier Reference",
+        "\n\t\tTier 1: Industry + Geography Only Shortlist"
+        "\n\t\tTier 2: Industry Only Shortlist"
+        "\n\t\tTier 3: Tech Only Shortlist\n",
+    ))
 
     # Step 1: Fetch all rows and compute industry metadata
     all_rows = fetch_all_rows()
@@ -535,7 +617,7 @@ def find_matches(
     # Compute continuous industry relevance scores via cached embeddings
     industry_scores = _compute_industry_scores(prospect_ind, all_rows)
 
-    # Industry client names (threshold-based) for Case YES_I vs NO_I determination
+    # Industry client names (threshold-based) for tier determination
     industry_client_names = _compute_industry_client_names(all_rows, prospect_ind, industry_scores)
 
     # Step 2: 3-tier pre-filter (Industry+Country → Industry → All)
@@ -543,16 +625,37 @@ def find_matches(
         all_rows, prospect_ind, prospect_ctry, industry_scores
     )
     industry_applied = filter_level != "none"
+    flag_tier_3 = filter_level == "none"
 
-    # Debug: Always log tier 1 (Industry + Geography)
+    # Explanation: tier selection
+    if filter_level == "industry_and_geography":
+        explanation["tier_used"] = "Tier 1 (Industry + Geography)"
+        explanation["tier_reason"] = f"Tier 1 has {len(tier1_clients)} clients (> 4 threshold)"
+    elif filter_level == "industry":
+        explanation["tier_used"] = "Tier 2 (Industry Only)"
+        explanation["tier_reason"] = (
+            f"Tier 1 has {len(tier1_clients)} clients (≤ 4), "
+            f"Tier 2 has {len(tier2_clients)} clients (> 2 threshold)"
+        )
+    else:
+        explanation["tier_used"] = "Tier 3 (Tech Only)"
+        explanation["tier_reason"] = (
+            f"Tier 1 has {len(tier1_clients)} clients (≤ 4), "
+            f"Tier 2 has {len(tier2_clients)} clients (≤ 2) — not enough industry matches"
+        )
+    explanation["tier1_clients"] = tier1_clients
+    explanation["tier2_clients"] = tier2_clients
+    explanation["flag_tier_3"] = flag_tier_3
+
+    # Debug: Always log Tier 1 (Industry + Geography)
     debug_log.append((
-        "Prep shortlistExistingClients (I+G)",
+        "Tier 1 shortlistExistingClients (Shortlist Only)",
         ", ".join(tier1_clients) if tier1_clients else "(empty)",
     ))
-    # Debug: Log tier 2 only if tier 1 was insufficient (≤4)
+    # Debug: Log Tier 2 only if Tier 1 was insufficient (≤4)
     if len(tier1_clients) <= 4:
         debug_log.append((
-            "Prep shortlistExistingClients (I Only)",
+            "Tier 2 shortlistExistingClients (Shortlist Only)",
             ", ".join(tier2_clients) if tier2_clients else "(empty)",
         ))
 
@@ -561,7 +664,7 @@ def find_matches(
     semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
 
     # Build shortlist: exact clients first, then semantic-only
-    sort_by_ind = not industry_applied  # sort by industry only when filter was skipped
+    sort_by_ind = flag_tier_3  # sort by industry only when filter was skipped (Tier 3)
     shortlist = _build_shortlist(
         exact_by_client, semantic_by_client, industry_scores,
         sort_by_industry=sort_by_ind,
@@ -571,34 +674,60 @@ def find_matches(
 
     # Debug: Case-specific logging after core matching
     _shortlist_names = [c for c, _ in shortlist]
-    if not industry_applied:
-        # Case A (NO_I): log after exact, then after semantic separately
+    if flag_tier_3:
+        # Tier 3: log after exact, then after semantic separately
         exact_clients_str = ", ".join(exact_by_client.keys()) if exact_by_client else "(none)"
         debug_log.append((
-            "Case NO_I: shortlistExistingClients (After Exact Match)",
+            "Tier 3: shortlistExistingClients (After Exact Match)",
             exact_clients_str,
         ))
         debug_log.append((
-            "Case NO_I: shortlistExistingClients (After Semantic Search)",
+            "Tier 3: shortlistExistingClients (Order after matches)",
             ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
         ))
     else:
-        # Case B (YES_I): log after both matches together
+        # Tier 1 or Tier 1+2: log after both matches together
         debug_log.append((
-            "Case YES_I: shortlistExistingClients (After Both Matches)",
+            "(Tier 1) or (Tier 1+Tier 2) : shortlistExistingClients (Order after matches)",
             ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
         ))
+
+    # Explanation: core matching results
+    explanation["prospect_techs"] = prospect_techs
+    explanation["unmatched_techs"] = unmatched_techs
+    explanation["core_match_clients"] = [c for c, _ in shortlist]
+    explanation["core_exact_by_client"] = {c: list(set(ts)) for c, ts in exact_by_client.items()}
+    explanation["core_semantic_by_client"] = {
+        c: [(pt, et, sim) for pt, et, sim in ts]
+        for c, ts in semantic_by_client.items()
+    }
 
     # Merge exact + semantic data for scoring (clients can have both)
     all_exact = dict(exact_by_client)
     all_semantic = dict(semantic_by_client)
 
-    # Step 4+5: Combined backfill (generic + geo) collected, sorted, appended once
+    # Truncate shortlist to top 5 before backfill (spec line 90)
+    seen_top5 = set()
+    shortlist_top5 = []
+    for entry in shortlist:
+        if entry[0] not in seen_top5:
+            if len(seen_top5) >= 5:
+                break
+            seen_top5.add(entry[0])
+        shortlist_top5.append(entry)
+    shortlist = shortlist_top5
+
+    # Explanation: top-5 truncation
+    explanation["top5_clients"] = list(dict.fromkeys(c for c, _ in shortlist))
+    explanation["top5_count"] = len(seen_top5)
+
+    # Step 4+5: Backfill logic — depends on FLAG_TIER_3
     shortlist_names = set(c for c, _ in shortlist)
     backfill_entries = []  # List[(client_name, match_source)]
 
-    if len(shortlist_names) <= 5:
-        # Generic backfill: exact + semantic from all clients excluding shortlist
+    if len(shortlist_names) <= 5 and not flag_tier_3:
+        # Branch A: We had industry matches (Tier 1/2), backfill with tech first, then geo
+        bf_exact, bf_semantic = {}, {}
         remaining_rows = [r for r in all_rows if r["client_name"] not in shortlist_names]
         if remaining_rows:
             bf_exact, _ = exact_match(remaining_rows, prospect_techs)
@@ -619,15 +748,23 @@ def find_matches(
             )
             backfill_entries.extend(bf_shortlist)
 
-        # Debug: generic backfill log (spec line 86) — shows ALL candidates before cap
+        # Debug: generic backfill log — shows ALL candidates before cap
+        generic_all_names = []
         if backfill_entries:
-            generic_names = list(dict.fromkeys(c for c, _ in backfill_entries))
+            generic_all_names = list(dict.fromkeys(c for c, _ in backfill_entries))
             debug_log.append((
                 "Case BACKFILL for Generic: shortlistAllBackFillClients",
-                ", ".join(generic_names),
+                ", ".join(generic_all_names),
             ))
 
-        # Cap generic backfill at deficit (spec lines 88-90)
+        explanation["generic_backfill_all"] = generic_all_names
+        explanation["bf_exact_by_client"] = {c: list(set(ts)) for c, ts in bf_exact.items()} if remaining_rows else {}
+        explanation["bf_semantic_by_client"] = {
+            c: [(pt, et, sim) for pt, et, sim in ts]
+            for c, ts in bf_semantic.items()
+        } if remaining_rows else {}
+
+        # Cap generic backfill at deficit to reach 5
         generic_deficit = 5 - len(shortlist_names)
         if generic_deficit > 0 and backfill_entries:
             capped = []
@@ -642,10 +779,10 @@ def find_matches(
         elif generic_deficit <= 0:
             backfill_entries = []
 
-        # Geo backfill if combined count still ≤5 (spec lines 96-107)
+        # Geo backfill if combined count still ≤5
         backfill_names = set(c for c, _ in backfill_entries)
         combined_count = len(shortlist_names) + len(backfill_names)
-        if combined_count <= (max_matches - 1) and prospect_ctry:
+        if combined_count <= 5 and prospect_ctry:
             deficit = max_matches - combined_count
             if deficit > 0:
                 exclude_all = shortlist_names | backfill_names
@@ -654,21 +791,64 @@ def find_matches(
                 for cname in geo_added:
                     backfill_entries.append((cname, "geography"))
 
-                # Debug: geo backfill log — only geo clients (spec line 105)
                 if geo_added:
                     debug_log.append((
                         "Case BACKFILL for Geo: shortlistGeoBackFillClients",
                         ", ".join(geo_added),
                     ))
 
+        explanation["generic_deficit"] = generic_deficit
+        # Separate the picked generic and geo from final backfill_entries
+        explanation["generic_backfill_picked"] = list(dict.fromkeys(
+            c for c, s in backfill_entries if s != "geography"
+        ))
+        explanation["geo_backfill_clients"] = list(dict.fromkeys(
+            c for c, s in backfill_entries if s == "geography"
+        ))
+        explanation["geo_deficit"] = (max_matches - combined_count) if (combined_count <= 5 and prospect_ctry) else 0
+
         # Append backfill (generic first, then geo) without re-sorting
         if backfill_entries:
             shortlist.extend(backfill_entries)
 
-            # Debug: single combined backfill log
             all_names = list(dict.fromkeys(c for c, _ in shortlist))
             debug_log.append((
                 "Case BACKFILL for Generic + Geo: shortlistExistingClients",
+                ", ".join(all_names) if all_names else "(empty)",
+            ))
+
+    elif len(shortlist_names) <= 5 and flag_tier_3:
+        # Branch B: We already used tech for Tier 3 shortlisting, skip tech backfill,
+        # go straight to geo backfill
+        explanation["generic_backfill_all"] = []
+        explanation["generic_backfill_picked"] = []
+        explanation["generic_deficit"] = 0
+        explanation["bf_exact_by_client"] = {}
+        explanation["bf_semantic_by_client"] = {}
+        geo_added = []
+        if prospect_ctry:
+            deficit = max_matches - len(shortlist_names)
+            if deficit > 0:
+                geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
+                geo_added = geo_clients[:deficit]
+                for cname in geo_added:
+                    backfill_entries.append((cname, "geography"))
+
+                if geo_added:
+                    debug_log.append((
+                        "Case BACKFILL for Geo: shortlistGeoBackFillClients",
+                        ", ".join(geo_added),
+                    ))
+
+        explanation["geo_backfill_clients"] = geo_added
+        explanation["geo_deficit"] = deficit if prospect_ctry else 0
+
+        if backfill_entries:
+            shortlist.extend(backfill_entries)
+
+            all_names = list(dict.fromkeys(c for c, _ in shortlist))
+            debug_log.append((
+                "Case BACKFILL for Geo: shortlistExistingClients",
                 ", ".join(all_names) if all_names else "(empty)",
             ))
 
@@ -697,6 +877,7 @@ def find_matches(
             similarity_score=similarity_score,
             final_score=final_score,
             match_source=source,
+            client_id=meta.get("client_id", ""),
         ))
 
     # Preserve shortlist order (core first, backfill after) per spec.
@@ -705,9 +886,23 @@ def find_matches(
     # Cap at max_matches results.
     matches = matches[:max_matches]
 
+    # Batch-fetch case studies for all matched clients
+    cs_client_ids = [m.client_id for m in matches if m.client_id]
+    if cs_client_ids:
+        case_studies_map = _fetch_case_studies(cs_client_ids)
+        for m in matches:
+            m.case_studies = case_studies_map.get(m.client_id, [])
+
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)
     industry_only = sorted(industry_client_names - result_names) if industry_applied else []
+
+    # Explanation: final composition
+    explanation["final_clients"] = [
+        {"name": m.client_name, "source": m.match_source, "score": m.final_score,
+         "industry_score": m.industry_score}
+        for m in matches
+    ]
 
     return {
         "matches": matches,
@@ -715,4 +910,5 @@ def find_matches(
         "industry_filter_applied": industry_applied,
         "total_candidates": len(result_names),
         "debug_log": debug_log,
+        "explanation": explanation,
     }
