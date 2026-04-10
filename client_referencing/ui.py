@@ -6,37 +6,37 @@ import streamlit as st
 
 def render():
     """Render the Client Referencing pipeline with tabs."""
-    tabs = st.tabs(["Data Sync", "Vector Existing Client Match", "VectorCasestudyMatch", "Message Generator"])
+    tabs = st.tabs(["Data Sync", "Message Generator", "Client Matcher", "Casestudy Matcher"])
 
     with tabs[0]:
         _render_sync_tab()
 
     with tabs[1]:
-        _render_vector_match_tab()
+        _render_message_generator_section()
 
     with tabs[2]:
-        _render_casestudy_match_tab()
+        _render_vector_match_tab()
 
     with tabs[3]:
-        _render_message_generator_section()
+        _render_casestudy_match_tab()
 
 
 # ── Data Sync Tab ────────────────────────────────────────────────────────
 
 def _render_sync_tab():
     """Render the sync UI (upload Excel, preview diff, apply)."""
-    with st.expander("Client Referencing Data Sync", expanded=False):
+    with st.expander("Client Reference Data Refresh", expanded=False):
         _render_client_referencing_sync()
-    with st.expander("Industry Reference Data Sync", expanded=False):
+    with st.expander("Industry Reference Data Refresh", expanded=False):
         _render_industry_reference_sync()
-    with st.expander("Casestudies Referencing Data Sync", expanded=False):
+    with st.expander("Casestudies Reference Data Refresh", expanded=False):
         _render_casestudy_sync()
 
 
-# ── Client Referencing Data Sync ────────────────────────────────────────
+# ── Client Reference Data Refresh ────────────────────────────────────────
 
 def _render_client_referencing_sync():
-    """Client Referencing Data Sync section."""
+    """Client Reference Data Refresh section."""
     st.caption(
         "Upload the client-referencing-data.xlsx file (with Clients + Technologies worksheets) "
         "to sync with Supabase. The tool compares your Excel against the database and shows "
