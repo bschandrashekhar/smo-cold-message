@@ -23,6 +23,8 @@ def _render_sync_tab():
         _render_client_referencing_sync()
     with st.expander("Industry Reference Data Sync", expanded=False):
         _render_industry_reference_sync()
+    with st.expander("Casestudies Referencing Data Sync", expanded=False):
+        _render_casestudy_sync()
 
 
 # ── Client Referencing Data Sync ────────────────────────────────────────
@@ -314,6 +316,159 @@ def _show_current_data():
                 st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.warning(f"Could not load current data: {e}")
+
+
+# ── Casestudies Referencing Data Sync ──────────────────────────────────
+
+def _render_casestudy_sync():
+    """Case Studies Data Sync section."""
+    st.caption(
+        "Upload the case studies Excel file (with 'Case Studies Summary' + "
+        "'Case Studies Technology' worksheets) to sync with Supabase. "
+        "New case studies with PDFs will be summarized by Claude and embedded with Voyage AI."
+    )
+
+    uploaded = st.file_uploader(
+        "Upload client-case-studies-mapping.xlsx", type=["xlsx"], key="cs_upload"
+    )
+
+    if uploaded is None:
+        _show_current_casestudy_data()
+        return
+
+    from client_referencing.casestudy_sync import read_excel, fetch_existing, compute_diff, apply_sync
+
+    try:
+        excel_data = read_excel(uploaded.getvalue())
+    except Exception as e:
+        st.error(f"Failed to parse Excel: {e}")
+        return
+
+    st.success(
+        f"Parsed **{len(excel_data['summaries'])}** case studies and "
+        f"**{len(excel_data['technologies'])}** technology mappings from Excel."
+    )
+
+    with st.spinner("Fetching current case studies from Supabase..."):
+        try:
+            db_data = fetch_existing()
+        except Exception as e:
+            st.error(f"Failed to fetch from Supabase: {e}")
+            return
+
+    st.info(
+        f"**{len(db_data['case_studies'])}** case studies and "
+        f"**{len(db_data['technologies'])}** technology mappings currently in Supabase."
+    )
+
+    diff = compute_diff(excel_data, db_data)
+
+    ncs_create = len(diff["cs_create"])
+    ncs_update = len(diff["cs_update"])
+    ncs_delete = len(diff["cs_delete"])
+    nt_create = len(diff["tech_create"])
+    nt_delete = len(diff["tech_delete"])
+
+    total_changes = ncs_create + ncs_update + ncs_delete + nt_create + nt_delete
+
+    st.markdown("**Case Studies**")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("To Create", ncs_create, delta=f"+{ncs_create}" if ncs_create else None)
+    col2.metric("To Update", ncs_update)
+    col3.metric("To Delete", ncs_delete, delta=f"-{ncs_delete}" if ncs_delete else None, delta_color="inverse")
+
+    st.markdown("**Technology Mappings**")
+    col4, col5 = st.columns(2)
+    col4.metric("To Create", nt_create, delta=f"+{nt_create}" if nt_create else None)
+    col5.metric("To Delete", nt_delete, delta=f"-{nt_delete}" if nt_delete else None, delta_color="inverse")
+
+    if total_changes == 0:
+        st.success("Everything is in sync. No changes needed.")
+        return
+
+    if ncs_create > 0:
+        with st.expander(f"New case studies to create ({ncs_create})"):
+            st.dataframe(pd.DataFrame(diff["cs_create"]), use_container_width=True)
+
+    if ncs_update > 0:
+        with st.expander(f"Case studies to update ({ncs_update})"):
+            rows = [{"casestudy_name": u["casestudy_name"], "change": "Add summary from PDF"} for u in diff["cs_update"]]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+    if ncs_delete > 0:
+        with st.expander(f"Case studies to delete ({ncs_delete})"):
+            rows = [{"casestudy_name": cs["casestudy_name"]} for cs in diff["cs_delete"]]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+    if nt_create > 0:
+        with st.expander(f"New tech mappings to create ({nt_create})"):
+            st.dataframe(pd.DataFrame(diff["tech_create"]), use_container_width=True)
+
+    if nt_delete > 0:
+        with st.expander(f"Tech mappings to delete ({nt_delete})"):
+            rows = [{"casestudy_technology": t["casestudy_technology"]} for t in diff["tech_delete"]]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+    if ncs_create + ncs_update > 0:
+        st.caption(
+            f"Claude summaries and Voyage embeddings will be generated for "
+            f"**{ncs_create + ncs_update}** case studies. "
+            f"PDFs must be in the local folder."
+        )
+
+    if st.button("Apply Case Study Sync", type="primary", key="cs_sync_btn"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        def on_progress(current, total, text):
+            if total > 0:
+                progress_bar.progress(min(current / total, 1.0))
+            status_text.text(text)
+
+        try:
+            result = apply_sync(diff, progress_callback=on_progress)
+            progress_bar.progress(1.0)
+            status_text.text("Case study sync complete!")
+            st.success(
+                f"Case study sync complete: "
+                f"**{result['cs_created']}** created, "
+                f"**{result['cs_updated']}** updated, "
+                f"**{result['cs_deleted']}** deleted. "
+                f"Tech mappings: **{result['tech_created']}** created, "
+                f"**{result['tech_deleted']}** deleted."
+            )
+        except Exception as e:
+            st.error(f"Case study sync failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+
+def _show_current_casestudy_data():
+    """Show current case studies data when no file is uploaded."""
+    try:
+        from client_referencing.casestudy_sync import fetch_existing
+        with st.spinner("Loading case studies..."):
+            db_data = fetch_existing()
+
+        cs = db_data.get("case_studies", [])
+        techs = db_data.get("technologies", [])
+
+        if not cs and not techs:
+            st.info("No case studies in Supabase yet. Upload an Excel file to get started.")
+            return
+
+        col1, col2 = st.columns(2)
+        col1.metric("Case Studies", len(cs))
+        col2.metric("Technology Mappings", len(techs))
+
+        if cs:
+            with st.expander(f"Case Studies ({len(cs)})", expanded=False):
+                df = pd.DataFrame(cs)
+                display_cols = [c for c in df.columns if c not in ("summary_embedding",  "summary_problem", "summary_solution", "summary_outcomes")]
+                st.dataframe(df[display_cols], use_container_width=True)
+
+    except Exception as e:
+        st.warning(f"Could not load case study data: {e}")
 
 
 # ── Match Explanation ────────────────────────────────────────────────────
