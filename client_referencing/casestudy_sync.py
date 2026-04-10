@@ -8,10 +8,7 @@ import io
 import os
 import time
 
-import anthropic
 import pandas as pd
-import pdfplumber
-import voyageai
 from supabase import create_client
 
 from prospect_outreach.config import (
@@ -39,8 +36,26 @@ PDF_FOLDER = os.path.normpath(
 )
 
 _sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-_claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-_vo = voyageai.Client(api_key=VOYAGE_API_KEY)
+
+# Lazy-initialized clients (only needed during apply_sync)
+_claude = None
+_vo = None
+
+
+def _get_claude():
+    global _claude
+    if _claude is None:
+        import anthropic
+        _claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return _claude
+
+
+def _get_vo():
+    global _vo
+    if _vo is None:
+        import voyageai
+        _vo = voyageai.Client(api_key=VOYAGE_API_KEY)
+    return _vo
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +197,7 @@ def compute_diff(excel_data: dict, db_data: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def _extract_pdf_text(pdf_path: str) -> str:
+    import pdfplumber
     pages = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -193,7 +209,7 @@ def _extract_pdf_text(pdf_path: str) -> str:
 
 def _summarize_with_claude(pdf_text: str, client_name: str) -> dict:
     """Return {"problem": ..., "solution": ..., "outcomes": ...}."""
-    response = _claude.messages.create(
+    response = _get_claude().messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         messages=[
@@ -239,7 +255,7 @@ def _embed_texts(texts: list[str]) -> dict[str, list[float]]:
     mapping = {}
     for i in range(0, len(unique), VOYAGE_BATCH_SIZE):
         batch = unique[i : i + VOYAGE_BATCH_SIZE]
-        result = _vo.embed(batch, model=VOYAGE_MODEL, input_type="document")
+        result = _get_vo().embed(batch, model=VOYAGE_MODEL, input_type="document")
         for text, emb in zip(batch, result.embeddings):
             mapping[text] = emb
     return mapping
