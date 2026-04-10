@@ -93,6 +93,8 @@ def read_excel(file_bytes) -> dict:
         technologies.append({
             "casestudy_name": str(row["casestudy_name"]).strip(),
             "casestudy_technology": str(row["casestudy_technology"]).strip(),
+            "casestudy_tech_exact_match": str(row["casestudy_tech_exact_match"]).strip().lower()
+            if pd.notna(row.get("casestudy_tech_exact_match")) else None,
         })
 
     return {"summaries": summaries, "technologies": technologies}
@@ -111,7 +113,7 @@ def fetch_existing() -> dict:
     )
     tech_result = (
         _sb.table(TECH_MAPPING_TABLE)
-        .select("id,casestudy_id,casestudy_technology")
+        .select("id,casestudy_id,casestudy_technology,casestudy_tech_exact_match")
         .execute()
     )
     return {
@@ -170,12 +172,23 @@ def compute_diff(excel_data: dict, db_data: dict) -> dict:
         if name not in excel_names:
             cs_delete.append(row)
 
-    # Tech creates
+    # Tech creates and updates
     tech_create = []
+    tech_update = []
     for t in excel_data["technologies"]:
         key = (t["casestudy_name"], t["casestudy_technology"])
         if key not in db_techs_by_key:
             tech_create.append(t)
+        else:
+            db_row = db_techs_by_key[key]
+            excel_exact = t.get("casestudy_tech_exact_match")
+            db_exact = db_row.get("casestudy_tech_exact_match")
+            if excel_exact != db_exact:
+                tech_update.append({
+                    "id": db_row["id"],
+                    "casestudy_technology": t["casestudy_technology"],
+                    "casestudy_tech_exact_match": excel_exact,
+                })
 
     # Tech deletes
     tech_delete = []
@@ -188,6 +201,7 @@ def compute_diff(excel_data: dict, db_data: dict) -> dict:
         "cs_update": cs_update,
         "cs_delete": cs_delete,
         "tech_create": tech_create,
+        "tech_update": tech_update,
         "tech_delete": tech_delete,
     }
 
@@ -283,6 +297,7 @@ def apply_sync(diff: dict, progress_callback=None) -> dict:
         + len(diff["cs_update"])
         + len(diff["cs_delete"])
         + len(diff["tech_create"])
+        + len(diff.get("tech_update", []))
         + len(diff["tech_delete"])
     )
     current = 0
@@ -436,6 +451,7 @@ def apply_sync(diff: dict, progress_callback=None) -> dict:
             record = {
                 "casestudy_id": cs_id,
                 "casestudy_technology": t["casestudy_technology"],
+                "casestudy_tech_exact_match": t.get("casestudy_tech_exact_match"),
             }
             tech_name = t["casestudy_technology"]
             if tech_name in tech_emb_map:
@@ -445,7 +461,16 @@ def apply_sync(diff: dict, progress_callback=None) -> dict:
             tech_created += 1
             _progress(f"Tech: {t['casestudy_technology']}")
 
-    # 5. Delete tech mappings
+    # 5. Update tech mappings (e.g. casestudy_tech_exact_match changed)
+    tech_updated = 0
+    for t in diff.get("tech_update", []):
+        _progress(f"Updating tech: {t['casestudy_technology']}...")
+        _sb.table(TECH_MAPPING_TABLE).update({
+            "casestudy_tech_exact_match": t["casestudy_tech_exact_match"],
+        }).eq("id", t["id"]).execute()
+        tech_updated += 1
+
+    # 6. Delete tech mappings
     tech_deleted = 0
     for t in diff["tech_delete"]:
         _progress(f"Deleting tech: {t['casestudy_technology']}...")
@@ -457,5 +482,6 @@ def apply_sync(diff: dict, progress_callback=None) -> dict:
         "cs_updated": cs_updated,
         "cs_deleted": cs_deleted,
         "tech_created": tech_created,
+        "tech_updated": tech_updated,
         "tech_deleted": tech_deleted,
     }

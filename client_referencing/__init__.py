@@ -1,4 +1,10 @@
-"""Client Referencing — reusable VectorMatch pipeline.
+"""Client Referencing — prospect-to-client matching and reference data management.
+
+Use this module to:
+  1. Match a prospect against the database of existing clients by industry,
+     technology, and geography.
+  2. Refresh/sync reference data (clients, industries, case studies) from
+     Excel uploads via the Streamlit UI.
 
 Install from Git in another project's requirements.txt:
     client-referencing @ git+https://github.com/<org>/smo-cold-message.git

@@ -367,9 +367,10 @@ def _render_casestudy_sync():
     ncs_update = len(diff["cs_update"])
     ncs_delete = len(diff["cs_delete"])
     nt_create = len(diff["tech_create"])
+    nt_update = len(diff.get("tech_update", []))
     nt_delete = len(diff["tech_delete"])
 
-    total_changes = ncs_create + ncs_update + ncs_delete + nt_create + nt_delete
+    total_changes = ncs_create + ncs_update + ncs_delete + nt_create + nt_update + nt_delete
 
     st.markdown("**Case Studies**")
     col1, col2, col3 = st.columns(3)
@@ -378,9 +379,10 @@ def _render_casestudy_sync():
     col3.metric("To Delete", ncs_delete, delta=f"-{ncs_delete}" if ncs_delete else None, delta_color="inverse")
 
     st.markdown("**Technology Mappings**")
-    col4, col5 = st.columns(2)
+    col4, col5, col6 = st.columns(3)
     col4.metric("To Create", nt_create, delta=f"+{nt_create}" if nt_create else None)
-    col5.metric("To Delete", nt_delete, delta=f"-{nt_delete}" if nt_delete else None, delta_color="inverse")
+    col5.metric("To Update", nt_update)
+    col6.metric("To Delete", nt_delete, delta=f"-{nt_delete}" if nt_delete else None, delta_color="inverse")
 
     if total_changes == 0:
         st.success("Everything is in sync. No changes needed.")
@@ -403,6 +405,10 @@ def _render_casestudy_sync():
     if nt_create > 0:
         with st.expander(f"New tech mappings to create ({nt_create})"):
             st.dataframe(pd.DataFrame(diff["tech_create"]), use_container_width=True)
+
+    if nt_update > 0:
+        with st.expander(f"Tech mappings to update ({nt_update})"):
+            st.dataframe(pd.DataFrame(diff["tech_update"]), use_container_width=True)
 
     if nt_delete > 0:
         with st.expander(f"Tech mappings to delete ({nt_delete})"):
@@ -435,6 +441,7 @@ def _render_casestudy_sync():
                 f"**{result['cs_updated']}** updated, "
                 f"**{result['cs_deleted']}** deleted. "
                 f"Tech mappings: **{result['tech_created']}** created, "
+                f"**{result.get('tech_updated', 0)}** updated, "
                 f"**{result['tech_deleted']}** deleted."
             )
         except Exception as e:

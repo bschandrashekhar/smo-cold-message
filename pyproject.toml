@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "client-referencing"
 version = "1.0.0"
-description = "VectorMatch — reusable prospect-to-client matching pipeline"
+description = "Prospect-to-client matching and reference data sync (clients, industries, case studies) via Excel"
 requires-python = ">=3.10"
 dependencies = [
     "voyageai>=0.3.0",
