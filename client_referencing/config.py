@@ -13,4 +13,10 @@ VOYAGE_BATCH_SIZE = 128
 EMBEDDING_DIM = 1024
 INDUSTRY_MATCH_THRESHOLD = 0.85
 CASE_STUDIES_TABLE_NAME = "client_case_studies"
+CASESTUDY_TECH_MAPPING_TABLE = "client_case_studies_technology_mapping"
 CACHE_TTL = 3600  # seconds — how long cached embeddings/rows stay fresh
+
+# CaseStudyMatcher scoring weights
+CS_EXACT_WEIGHT = 0.50
+CS_SEMANTIC_WEIGHT = 0.20
+CS_CONTEXT_WEIGHT = 0.30

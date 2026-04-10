@@ -18,5 +18,9 @@ Usage:
 """
 
 from client_referencing.matcher import ClientMatch, find_matches, invalidate_cache
+from client_referencing.casestudy_matcher import CaseStudyMatch, find_casestudy_matches, invalidate_casestudy_cache
 
-__all__ = ["find_matches", "invalidate_cache", "ClientMatch"]
+__all__ = [
+    "find_matches", "invalidate_cache", "ClientMatch",
+    "find_casestudy_matches", "invalidate_casestudy_cache", "CaseStudyMatch",
+]

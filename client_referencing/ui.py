@@ -1,4 +1,4 @@
-"""Client Referencing pipeline UI — Data Sync + VectorMatch tabs."""
+"""Client Referencing pipeline UI — Data Sync + VectorMatch + VectorCasestudyMatch tabs."""
 
 import pandas as pd
 import streamlit as st
@@ -6,13 +6,19 @@ import streamlit as st
 
 def render():
     """Render the Client Referencing pipeline with tabs."""
-    tabs = st.tabs(["Data Sync", "VectorMatch"])
+    tabs = st.tabs(["Data Sync", "Vector Existing Client Match", "VectorCasestudyMatch", "Message Generator"])
 
     with tabs[0]:
         _render_sync_tab()
 
     with tabs[1]:
         _render_vector_match_tab()
+
+    with tabs[2]:
+        _render_casestudy_match_tab()
+
+    with tabs[3]:
+        _render_message_generator_section()
 
 
 # ── Data Sync Tab ────────────────────────────────────────────────────────
@@ -640,14 +646,8 @@ def _render_match_explanation(exp: dict, prospect_technologies: str, prospect_co
 # ── VectorMatch Tab ──────────────────────────────────────────────────────
 
 def _render_vector_match_tab():
-    """Render the VectorMatch tab with two accordion sections."""
-    # Section 1: Hyper Personalized Message Auto Generator (open by default)
-    with st.expander("Hyper Personalized Message Auto Generator", expanded=True):
-        _render_message_generator_section()
-
-    # Section 2: VectorMatch — Prospect Client Matching (closed by default)
-    with st.expander("VectorMatch — Prospect Client Matching", expanded=False):
-        _render_vectormatch_section()
+    """Render the Vector Existing Client Match tab."""
+    _render_vectormatch_section()
 
 
 # ── Hyper Personalized Message Auto Generator ────────────────────────────
@@ -812,6 +812,107 @@ def _render_vectormatch_section():
     if results.get("explanation"):
         st.divider()
         _render_match_explanation(results["explanation"], prospect_technologies, prospect_country)
+
+    # Debug log
+    if results.get("debug_log"):
+        st.divider()
+        with st.expander("Debug Log", expanded=False):
+            for label, content in results["debug_log"]:
+                st.markdown(f"**{label}:**")
+                st.text(content)
+
+
+# ── VectorCasestudyMatch Tab ────────────────────────────────────────────
+
+def _render_casestudy_match_tab():
+    """Render the case-study matching UI."""
+    st.subheader("Case Study Matcher")
+    st.caption(
+        "Match a prospect against the case study database using technology, "
+        "industry, and contextual signals."
+    )
+
+    with st.form("cs_match_form"):
+        prospect_context = st.text_area(
+            "Prospect Context / Signals",
+            placeholder="e.g. client wants to implement a system to automate prescription management from Salesforce CRM",
+            height=100,
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            prospect_industry = st.text_input("Industry", placeholder="e.g. Healthcare")
+            prospect_technologies = st.text_input(
+                "Technologies (comma-separated)",
+                placeholder="e.g. Salesforce, Mulesoft, Snowflake",
+            )
+        with col2:
+            prospect_country = st.text_input("Country", placeholder="e.g. USA")
+            max_matches = st.number_input("Max Matches", min_value=3, max_value=20, value=8)
+
+        submitted = st.form_submit_button("Find Matching Case Studies", type="primary")
+
+    if not submitted:
+        return
+
+    if not prospect_technologies.strip() and not prospect_context.strip():
+        st.warning("Please provide at least technologies or prospect context.")
+        return
+
+    from client_referencing.casestudy_matcher import find_casestudy_matches
+
+    with st.spinner("Matching case studies..."):
+        results = find_casestudy_matches(
+            prospect_context=prospect_context,
+            prospect_industry=prospect_industry,
+            prospect_technologies=prospect_technologies,
+            prospect_country=prospect_country,
+            max_matches=max_matches,
+        )
+
+    matches = results.get("matches", [])
+
+    if not matches:
+        st.info("No matching case studies found.")
+    else:
+        st.success(f"Found **{len(matches)}** matching case studies.")
+
+        for i, m in enumerate(matches, 1):
+            tier_badge = "🟢 Tier 1" if m.tier == "tier_1" else "🔵 Tier 2"
+            with st.expander(
+                f"#{i} — {m.casestudy_name} ({m.client_name}) — {tier_badge} — Score: {m.final_score:.3f}",
+                expanded=(i <= 3),
+            ):
+                # Metrics row
+                mc1, mc2, mc3, mc4, mc5 = st.columns(5)
+                mc1.metric("Final Score", f"{m.final_score:.3f}")
+                mc2.metric("Exact Ratio", f"{m.match_ratio:.3f}")
+                mc3.metric("Semantic", f"{m.similarity_score:.3f}")
+                mc4.metric("Context", f"{m.context_score:.3f}")
+                mc5.metric("Industry", f"{m.industry_score:.3f}")
+
+                st.markdown(f"**Client:** {m.client_name} | **Industry:** {m.client_industry}")
+
+                if m.url:
+                    st.markdown(f"**Case Study Link:** {m.url}")
+
+                # Tech matches
+                if m.exact_techs:
+                    st.markdown(f"**Exact Tech Matches:** {', '.join(m.exact_techs)}")
+                if m.semantic_techs:
+                    sem_parts = [
+                        f"{t[0]} → {t[1]} ({t[2]:.2f})" for t in m.semantic_techs
+                    ]
+                    st.markdown(f"**Semantic Tech Matches:** {', '.join(sem_parts)}")
+
+                # Summary
+                if m.summary_problem or m.summary_solution or m.summary_outcomes:
+                    st.markdown("---")
+                    if m.summary_problem:
+                        st.markdown(f"**Problem:** {m.summary_problem}")
+                    if m.summary_solution:
+                        st.markdown(f"**Solution:** {m.summary_solution}")
+                    if m.summary_outcomes:
+                        st.markdown(f"**Outcomes:** {m.summary_outcomes}")
 
     # Debug log
     if results.get("debug_log"):
