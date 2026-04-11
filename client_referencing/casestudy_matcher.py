@@ -444,6 +444,7 @@ def find_casestudy_matches(
         - debug_log: List[Tuple[str, str]]
     """
     debug_log: List[Tuple[str, str]] = []
+    explanation: List[Tuple[str, str]] = []  # step-by-step explanation for UI
 
     # Header
     debug_log.append((
@@ -456,7 +457,15 @@ def find_casestudy_matches(
     total_techs = len(prospect_techs)
 
     if total_techs == 0 and not prospect_context.strip():
-        return {"matches": [], "debug_log": debug_log}
+        return {"matches": [], "debug_log": debug_log, "explanation": []}
+
+    explanation.append((
+        "Step 1: Input Processing",
+        f"Prospect technologies expanded (with aliases): {', '.join(prospect_techs)}\n"
+        f"Total tech keywords: {total_techs}\n"
+        f"Prospect industry: {prospect_industry or '(not provided)'}\n"
+        f"Prospect context: {prospect_context[:200] + '...' if len(prospect_context) > 200 else prospect_context or '(not provided)'}",
+    ))
 
     debug_log.append(("Prospect Techs (expanded)", ", ".join(prospect_techs)))
 
@@ -480,6 +489,22 @@ def find_casestudy_matches(
 
     # Context similarity
     context_scores = _compute_context_scores(prospect_context, case_studies)
+
+    # Explanation: exact + semantic + context
+    exact_cs_names = [cs_by_id.get(cid, {}).get("casestudy_name", f"ID:{cid}") for cid in exact_by_cs]
+    semantic_cs_names = [cs_by_id.get(cid, {}).get("casestudy_name", f"ID:{cid}") for cid in semantic_by_cs]
+    explanation.append((
+        "Step 2: Technology Matching",
+        f"Exact matches found in {len(exact_by_cs)} case studies: {', '.join(exact_cs_names) or '(none)'}\n"
+        f"Unmatched techs sent to semantic search: {', '.join(unmatched_techs) or '(none)'}\n"
+        f"Semantic matches found in {len(semantic_by_cs)} case studies: {', '.join(semantic_cs_names) or '(none)'}",
+    ))
+    explanation.append((
+        "Step 3: Context Similarity",
+        f"Context scores computed for {len(context_scores)} case studies "
+        f"(prospect_context vs summary_embedding cosine similarity).\n"
+        f"Scoring formula: final_score = {CS_EXACT_WEIGHT}×match_ratio + {CS_SEMANTIC_WEIGHT}×similarity_score + {CS_CONTEXT_WEIGHT}×context_score",
+    ))
 
     # Score all case studies that have at least some signal
     candidate_cs_ids = set(exact_by_cs.keys()) | set(semantic_by_cs.keys()) | set(
@@ -547,6 +572,13 @@ def find_casestudy_matches(
         ) if tier2_remaining else "(empty)",
     ))
 
+    explanation.append((
+        "Step 4: Industry Filtering (Tier Split)",
+        f"Industry threshold: {INDUSTRY_MATCH_THRESHOLD}\n"
+        f"Tier 1 (industry + tech): {len(tier1_shortlist)} case studies passed industry filter\n"
+        f"Tier 2 (tech only): {len(tier2_remaining)} case studies did not pass industry filter",
+    ))
+
     # --- FINAL SHORTLIST ---
     final_shortlist = tier1_shortlist + tier2_remaining
 
@@ -566,6 +598,28 @@ def find_casestudy_matches(
             f"{cs_by_id.get(s[0], {}).get('casestudy_name', f'ID:{s[0]}')} ({s[4]:.3f})"
             for s in top_results
         ),
+    ))
+
+    # Explanation: final composition
+    explanation_lines = []
+    for idx, (cs_id, mr, ss, cs_score, fs) in enumerate(top_results, 1):
+        cs = cs_by_id.get(cs_id, {})
+        cid = str(cs.get("client_id", ""))
+        ind_score = industry_scores.get(cid, 0.0)
+        tier_label = "Tier 1" if ind_score >= INDUSTRY_MATCH_THRESHOLD else "Tier 2"
+        exact_list = exact_by_cs.get(cs_id, [])
+        sem_list = semantic_by_cs.get(cs_id, [])
+        explanation_lines.append(
+            f"  {idx}. {cs.get('casestudy_name', f'ID:{cs_id}')} [{tier_label}]\n"
+            f"     exact={mr:.3f} ({len(set(exact_list))}/{total_techs}), "
+            f"semantic={ss:.3f}, context={cs_score:.3f} → final={fs:.3f}\n"
+            f"     Exact techs: {', '.join(set(exact_list)) or '(none)'}\n"
+            f"     Semantic: {', '.join(f'{t[0]}→{t[1]}({t[2]:.2f})' for t in sem_list) or '(none)'}"
+        )
+    explanation.append((
+        "Step 5: Final Ranking",
+        f"FINAL_SHORTLIST = Tier 1 ({len(tier1_shortlist)}) + Tier 2 ({len(tier2_remaining)}) = {len(final_shortlist)} total\n"
+        f"Returning top {max_matches}:\n" + "\n".join(explanation_lines),
     ))
 
     # Build CaseStudyMatch objects
@@ -602,4 +656,5 @@ def find_casestudy_matches(
     return {
         "matches": matches,
         "debug_log": debug_log,
+        "explanation": explanation,
     }

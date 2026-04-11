@@ -909,6 +909,14 @@ def _render_casestudy_match_tab():
                     if m.summary_outcomes:
                         st.markdown(f"**Outcomes:** {m.summary_outcomes}")
 
+    # Match Explanation (Step-by-Step)
+    if results.get("explanation"):
+        st.divider()
+        st.subheader("Match Explanation (Step-by-Step)")
+        for step_label, step_detail in results["explanation"]:
+            with st.expander(step_label, expanded=True):
+                st.text(step_detail)
+
     # Debug log
     if results.get("debug_log"):
         st.divider()
