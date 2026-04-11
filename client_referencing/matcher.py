@@ -2,7 +2,7 @@
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -11,7 +11,6 @@ from supabase import create_client
 
 from client_referencing.config import (
     CACHE_TTL,
-    CASE_STUDIES_TABLE_NAME,
     INDUSTRY_MATCH_THRESHOLD,
     INDUSTRY_TABLE_NAME,
     SUPABASE_SERVICE_KEY,
@@ -64,7 +63,6 @@ class ClientMatch:
     final_score: float
     match_source: str  # "industry_exact", "industry_semantic", "backfill_exact", "backfill_semantic", "geography"
     client_id: str = ""
-    case_studies: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -84,7 +82,6 @@ class ClientMatch:
             "similarity_score": self.similarity_score,
             "final_score": self.final_score,
             "match_source": self.match_source,
-            "case_studies": self.case_studies,
         }
 
 
@@ -548,29 +545,6 @@ def _geography_backfill(
     return [c for c, _ in candidates]
 
 
-def _fetch_case_studies(client_ids: List[str]) -> Dict[str, List[dict]]:
-    """Batch-fetch case studies for a list of client UUIDs.
-
-    Returns {client_id: [{id, title, url}, ...]}.
-    """
-    if not client_ids:
-        return {}
-    sb = _get_supabase()
-    result = sb.table(CASE_STUDIES_TABLE_NAME).select(
-        "id,client_id,title,url"
-    ).in_("client_id", client_ids).execute()
-
-    studies_by_client: Dict[str, List[dict]] = {}
-    for row in (result.data or []):
-        cid = row["client_id"]
-        studies_by_client.setdefault(cid, []).append({
-            "id": row["id"],
-            "title": row["title"],
-            "url": row["url"],
-        })
-    return studies_by_client
-
-
 def find_matches(
     prospect_industry: str,
     prospect_technologies: str,
@@ -885,13 +859,6 @@ def find_matches(
     # with industry_score sorting applied where spec requires it.
     # Cap at max_matches results.
     matches = matches[:max_matches]
-
-    # Batch-fetch case studies for all matched clients
-    cs_client_ids = [m.client_id for m in matches if m.client_id]
-    if cs_client_ids:
-        case_studies_map = _fetch_case_studies(cs_client_ids)
-        for m in matches:
-            m.case_studies = case_studies_map.get(m.client_id, [])
 
     # Clients that passed industry filter but didn't make the results
     result_names = set(m.client_name for m in matches)

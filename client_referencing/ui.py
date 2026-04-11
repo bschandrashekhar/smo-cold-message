@@ -792,11 +792,6 @@ def _render_vectormatch_section():
             elif match.industry_score > 0:
                 st.caption(f"Industry relevance: {match.industry_score:.3f}")
 
-            if match.case_studies:
-                st.markdown(f"**Case Studies ({len(match.case_studies)}):**")
-                for cs in match.case_studies:
-                    st.markdown(f"- [{cs['title']}]({cs['url']})")
-
     # Industry-only clients
     if results["industry_filter_applied"] and results["industry_filtered_only"]:
         st.divider()
