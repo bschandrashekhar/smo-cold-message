@@ -841,7 +841,6 @@ def _render_casestudy_match_tab():
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
             )
         with col2:
-            prospect_country = st.text_input("Country", placeholder="e.g. USA")
             max_matches = st.number_input("Max Matches", min_value=3, max_value=20, value=8)
 
         submitted = st.form_submit_button("Find Matching Case Studies", type="primary")
@@ -860,7 +859,7 @@ def _render_casestudy_match_tab():
             prospect_context=prospect_context,
             prospect_industry=prospect_industry,
             prospect_technologies=prospect_technologies,
-            prospect_country=prospect_country,
+            prospect_country="",
             max_matches=max_matches,
         )
 
