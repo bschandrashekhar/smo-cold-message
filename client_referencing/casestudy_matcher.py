@@ -558,14 +558,14 @@ def find_casestudy_matches(
             tier2_remaining.append(entry)
 
     debug_log.append((
-        "TIER 1 shortlist (industry + tech)",
+        "TIER_1_SHORTLIST",
         ", ".join(
             f"{cs_by_id.get(s[0], {}).get('casestudy_name', f'ID:{s[0]}')} ({s[4]:.3f})"
             for s in tier1_shortlist
         ) if tier1_shortlist else "(empty — no industry matches)",
     ))
     debug_log.append((
-        "TIER 2 remaining (tech only)",
+        "TIER_2_SHORTLIST",
         ", ".join(
             f"{cs_by_id.get(s[0], {}).get('casestudy_name', f'ID:{s[0]}')} ({s[4]:.3f})"
             for s in tier2_remaining
