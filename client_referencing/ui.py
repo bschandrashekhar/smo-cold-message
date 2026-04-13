@@ -6,21 +6,18 @@ import streamlit as st
 
 def render():
     """Render the Client Referencing pipeline with tabs."""
-    tabs = st.tabs(["Data Sync", "Message Generator", "Client Matcher", "Casestudy Matcher", "Brand Matcher"])
+    tabs = st.tabs(["Data Sync", "Client Matcher", "Casestudy Matcher", "Brand Matcher"])
 
     with tabs[0]:
         _render_sync_tab()
 
     with tabs[1]:
-        _render_message_generator_section()
-
-    with tabs[2]:
         _render_vector_match_tab()
 
-    with tabs[3]:
+    with tabs[2]:
         _render_casestudy_match_tab()
 
-    with tabs[4]:
+    with tabs[3]:
         _render_brand_match_tab()
 
 
@@ -689,36 +686,6 @@ def _render_vector_match_tab():
 
 # ── Hyper Personalized Message Auto Generator ────────────────────────────
 
-def _render_message_generator_section():
-    """Render the prospect upload and message generation UI."""
-    st.caption(
-        "Upload a Prospect Data Excel sheet to auto-generate hyper-personalized "
-        "outreach messages using client references, case studies, and AI research."
-    )
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        uploaded = st.file_uploader(
-            "Upload Prospect Data Excel", type=["xlsx"], key="prospect_upload"
-        )
-    with col2:
-        st.write("")  # spacer
-        st.write("")  # spacer
-        if st.button("Clear Cache", type="secondary", key="clear_cache_btn"):
-            from client_referencing.matcher import invalidate_cache
-            invalidate_cache()
-            st.success("Cache cleared.")
-
-    st.caption(
-        "**Clear Cache** refreshes client data and industry embeddings from Supabase. "
-        "Prospect industry and technology embeddings (Voyage API lookups) are preserved "
-        "across clears since the same input always produces the same output."
-    )
-
-    if uploaded is not None:
-        st.info("Prospect data upload received. Processing pipeline coming soon.")
-        # TODO: parse Excel, validate columns, run pipeline
-
 
 # ── VectorMatch — Prospect Client Matching ───────────────────────────────
 
@@ -976,16 +943,12 @@ def _render_brand_match_tab():
             placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
         )
         prospect_industry = st.text_input(
-            "Industry",
+            "Industry (optional)",
             placeholder="e.g. Healthcare, Banking, Fintech",
         )
         submitted = st.form_submit_button("Find Brand Match")
 
     if not submitted:
-        return
-
-    if not prospect_industry.strip():
-        st.warning("Please enter an industry.")
         return
 
     from client_referencing.brand_matcher import find_brand_match
