@@ -35,13 +35,23 @@ def render_settings_sidebar():
                 st.caption(f"**{name}** — Not generated")
 
         if st.button("Refresh Brand Knowledge", key="sidebar_refresh_brands"):
-            with st.spinner("Scraping brand websites..."):
+            brands = list(brand_knowledge.BRAND_WEBSITES.keys())
+            progress = st.empty()
+            for i, name in enumerate(brands):
+                progress.info(f"Scraping {name} ({i+1}/{len(brands)})...")
                 try:
-                    brand_knowledge.refresh_brand_profiles()
-                    st.success("Refreshed!")
-                    st.rerun()
+                    brand_knowledge.refresh_single_brand(name)
                 except Exception as e:
-                    st.error(f"Failed: {e}")
+                    st.error(f"Failed on {name}: {e}")
+                    break
+                if i < len(brands) - 1:
+                    progress.info(f"Done {name}. Waiting 65s for rate limit...")
+                    import time
+                    time.sleep(65)
+            else:
+                progress.empty()
+                st.success("All brand profiles refreshed!")
+                st.rerun()
 
 
 def main():
