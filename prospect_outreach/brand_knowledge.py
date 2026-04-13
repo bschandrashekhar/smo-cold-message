@@ -6,7 +6,7 @@ import anthropic
 
 
 MAX_RETRIES = 3
-RETRY_DELAY = 65  # seconds — wait out the 1-minute rate limit window
+RETRY_DELAY = 90  # seconds — wait out the rate limit window (web_search uses extra tokens)
 
 
 def are_brand_files_present():
@@ -111,7 +111,7 @@ def refresh_single_brand(brand_name: str) -> dict:
     path = config.BRAND_JSONS[brand_name]
     with open(path, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2)
-    print(f"[brand_knowledge] Saved {brand_name} → {path}")
+    print(f"[brand_knowledge] Saved {brand_name} -> {path}")
     return profile
 
 
@@ -125,7 +125,7 @@ def refresh_brand_profiles():
         path = config.BRAND_JSONS[name]
         with open(path, "w", encoding="utf-8") as f:
             json.dump(profile, f, indent=2)
-        print(f"[brand_knowledge] Saved {name} → {path}")
+        print(f"[brand_knowledge] Saved {name} -> {path}")
         if i < len(BRAND_WEBSITES) - 1:
             print(f"[brand_knowledge] Waiting 65s for rate limit...")
             time.sleep(65)

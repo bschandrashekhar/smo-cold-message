@@ -28,26 +28,37 @@ def render_settings_sidebar():
 
         for name, exists in status.items():
             path = config.BRAND_JSONS[name]
-            if exists:
-                mod_time = datetime.fromtimestamp(path.stat().st_mtime)
-                st.caption(f"**{name}** — {mod_time.strftime('%Y-%m-%d %H:%M')}")
-            else:
-                st.caption(f"**{name}** — Not generated")
+            col_info, col_btn = st.columns([3, 1])
+            with col_info:
+                if exists:
+                    mod_time = datetime.fromtimestamp(path.stat().st_mtime)
+                    st.caption(f"**{name}** — {mod_time.strftime('%Y-%m-%d %H:%M')}")
+                else:
+                    st.caption(f"**{name}** — Not generated")
+            with col_btn:
+                if st.button("Refresh", key=f"refresh_{name}"):
+                    with st.spinner(f"Scraping {name}..."):
+                        try:
+                            brand_knowledge.refresh_single_brand(name)
+                            st.success(f"{name} refreshed!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed: {e}")
 
-        if st.button("Refresh Brand Knowledge", key="sidebar_refresh_brands"):
+        if st.button("Refresh All Brands", key="sidebar_refresh_brands"):
             brands = list(brand_knowledge.BRAND_WEBSITES.keys())
             progress = st.empty()
-            for i, name in enumerate(brands):
-                progress.info(f"Scraping {name} ({i+1}/{len(brands)})...")
+            for i, bname in enumerate(brands):
+                progress.info(f"Scraping {bname} ({i+1}/{len(brands)})...")
                 try:
-                    brand_knowledge.refresh_single_brand(name)
+                    brand_knowledge.refresh_single_brand(bname)
                 except Exception as e:
-                    st.error(f"Failed on {name}: {e}")
+                    st.error(f"Failed on {bname}: {e}")
                     break
                 if i < len(brands) - 1:
-                    progress.info(f"Done {name}. Waiting 65s for rate limit...")
+                    progress.info(f"Done {bname}. Waiting 90s for rate limit cooldown...")
                     import time
-                    time.sleep(65)
+                    time.sleep(90)
             else:
                 progress.empty()
                 st.success("All brand profiles refreshed!")
