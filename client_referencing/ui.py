@@ -34,8 +34,6 @@ def _render_sync_tab():
         _render_industry_reference_sync()
     with st.expander("Casestudies Reference Data Refresh", expanded=False):
         _render_casestudy_sync()
-    with st.expander("Brand Knowledge Refresh", expanded=False):
-        _render_brand_knowledge_sync()
 
 
 # ── Client Reference Data Refresh ────────────────────────────────────────
