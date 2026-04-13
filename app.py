@@ -2,7 +2,7 @@
 
 Hosts multiple pipelines via sidebar navigation:
   - Prospect Outreach: research + message generation
-  - Event Prospecting: exhibitor scraping + prospect enrichment
+  - MR & CC Knowledge Tools: client/casestudy/brand matching
 
 Run with: streamlit run app.py
 """
@@ -52,7 +52,7 @@ def main():
         st.title("SMO Workbench")
         pipeline = st.radio(
             "Pipeline",
-            ["Prospect Outreach", "Event Prospecting", "MR & CC Knowledge Tools"],
+            ["Prospect Outreach", "MR & CC Knowledge Tools"],
             label_visibility="collapsed",
         )
         st.divider()
@@ -61,9 +61,6 @@ def main():
     # ── Main area ────────────────────────────────────────────────────────
     if pipeline == "Prospect Outreach":
         from prospect_outreach.ui import render
-        render()
-    elif pipeline == "Event Prospecting":
-        from event_prospecting.ui import render
         render()
     elif pipeline == "MR & CC Knowledge Tools":
         from client_referencing.ui import render
