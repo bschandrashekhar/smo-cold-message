@@ -6,7 +6,7 @@ import streamlit as st
 
 def render():
     """Render the Client Referencing pipeline with tabs."""
-    tabs = st.tabs(["Data Sync", "Message Generator", "Client Matcher", "Casestudy Matcher"])
+    tabs = st.tabs(["Data Sync", "Message Generator", "Client Matcher", "Casestudy Matcher", "Brand Matcher"])
 
     with tabs[0]:
         _render_sync_tab()
@@ -19,6 +19,9 @@ def render():
 
     with tabs[3]:
         _render_casestudy_match_tab()
+
+    with tabs[4]:
+        _render_brand_match_tab()
 
 
 # ── Data Sync Tab ────────────────────────────────────────────────────────
@@ -923,3 +926,9 @@ def _render_casestudy_match_tab():
             for label, content in results["debug_log"]:
                 st.markdown(f"**{label}:**")
                 st.text(content)
+
+
+def _render_brand_match_tab():
+    """Render the Brand Matcher UI — placeholder for upcoming requirements."""
+    st.subheader("Brand Matcher")
+    st.info("Requirements coming soon. This tab will be populated once the spec is provided.")
