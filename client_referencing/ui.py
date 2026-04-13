@@ -963,6 +963,60 @@ def _render_casestudy_match_tab():
 
 
 def _render_brand_match_tab():
-    """Render the Brand Matcher UI — placeholder for upcoming requirements."""
+    """Render the Brand Matcher UI."""
     st.subheader("Brand Matcher")
-    st.info("Requirements coming soon. This tab will be populated once the spec is provided.")
+    st.caption(
+        "Match a prospect to the best brand (LendingLogik or CloudChillies) "
+        "based on industry similarity using vector embeddings."
+    )
+
+    with st.form("brand_match_form"):
+        prospect_context = st.text_area(
+            "Prospect Context / Signals",
+            placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
+        )
+        prospect_industry = st.text_input(
+            "Industry",
+            placeholder="e.g. Healthcare, Banking, Fintech",
+        )
+        submitted = st.form_submit_button("Find Brand Match")
+
+    if not submitted:
+        return
+
+    if not prospect_industry.strip():
+        st.warning("Please enter an industry.")
+        return
+
+    from client_referencing.brand_matcher import find_brand_match
+
+    with st.spinner("Matching brand..."):
+        results = find_brand_match(
+            prospect_context=prospect_context,
+            prospect_industry=prospect_industry,
+        )
+
+    # Prominent brand result
+    brand = results["brand"]
+    if brand == "LendingLogik":
+        st.success(f"Recommended Brand: **{brand}**")
+    else:
+        st.info(f"Recommended Brand: **{brand}**")
+
+    # Match details
+    if results["matched_industry_term"]:
+        col1, col2 = st.columns(2)
+        col1.metric("Matched Industry Term", results["matched_industry_term"])
+        col2.metric("Similarity Score", f"{results['similarity_score']:.4f}")
+
+    # All matches above threshold
+    if results["all_matches"]:
+        st.markdown("**All matches above threshold:**")
+        match_df = pd.DataFrame(results["all_matches"], columns=["Industry Term", "Similarity"])
+        st.dataframe(match_df, use_container_width=True, hide_index=True)
+
+    # Debug log
+    with st.expander("Debug Log", expanded=False):
+        for label, content in results["debug_log"]:
+            st.markdown(f"**{label}:**")
+            st.text(content)
