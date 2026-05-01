@@ -938,10 +938,6 @@ def _render_brand_match_tab():
     )
 
     with st.form("brand_match_form"):
-        prospect_context = st.text_area(
-            "Prospect Context / Signals",
-            placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
-        )
         prospect_industry = st.text_input(
             "Industry (optional)",
             placeholder="e.g. Healthcare, Banking, Fintech",
@@ -955,7 +951,6 @@ def _render_brand_match_tab():
 
     with st.spinner("Matching brand..."):
         results = find_brand_match(
-            prospect_context=prospect_context,
             prospect_industry=prospect_industry,
         )
 

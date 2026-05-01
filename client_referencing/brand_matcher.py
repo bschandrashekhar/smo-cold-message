@@ -9,7 +9,6 @@ BRAND_MATCH_THRESHOLD = 0.850
 
 
 def find_brand_match(
-    prospect_context: str,
     prospect_industry: str,
 ) -> dict:
     """Determine which brand best fits a prospect based on industry similarity.
