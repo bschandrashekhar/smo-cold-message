@@ -15,6 +15,6 @@ CREATE TABLE IF NOT EXISTS "Cache_Prospect_Company_Research" (
 -- Keyed by Email. Upsert on re-run overwrites with latest research.
 CREATE TABLE IF NOT EXISTS "Cache_Prospect_Contact_Research" (
     "Email"            text        PRIMARY KEY,
-    "Contact_Research" jsonb       NOT NULL,
+    "Prospect_Research" jsonb       NOT NULL,
     "Date_of_Research" timestamptz NOT NULL DEFAULT now()
 );
