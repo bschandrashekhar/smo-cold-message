@@ -335,7 +335,7 @@ def _get_prospect_research(prospect_name: str, designation: str,
                             linkedin_url: str = "") -> dict:
     """Get prospect research from cache or run fresh."""
     sb = _get_supabase()
-    result = sb.table("Cache_Prospect_Prospect_Research").select("*").eq("Email", email).execute()
+    result = sb.table("Cache_Prospect_Contact_Research").select("*").eq("Email", email).execute()
     if result.data:
         row = result.data[0]
         if not _is_cache_stale(row.get("Date_of_Research")):
@@ -343,7 +343,7 @@ def _get_prospect_research(prospect_name: str, designation: str,
             return cr if isinstance(cr, dict) else json.loads(cr)
 
     research = _run_prospect_research(prospect_name, designation, company_name, city, country, linkedin_url)
-    sb.table("Cache_Prospect_Prospect_Research").upsert({
+    sb.table("Cache_Prospect_Contact_Research").upsert({
         "Email": email,
         "Prospect_Research": research,
         "Date_of_Research": datetime.now(timezone.utc).isoformat(),
