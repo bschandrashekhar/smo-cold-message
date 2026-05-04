@@ -362,7 +362,7 @@ def _extract_technologies(company_research: dict) -> str:
         max_tokens=256,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text.strip()
+    return response.content[0].text.strip() if response.content else ""
 
 
 def _build_research_summary(company_research: dict, prospect_research: dict) -> str:
@@ -377,7 +377,7 @@ def _build_research_summary(company_research: dict, prospect_research: dict) -> 
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text.strip()
+    return response.content[0].text.strip() if response.content else ""
 
 
 def _score_intent(prospect_name: str, designation: str,
@@ -395,7 +395,7 @@ def _score_intent(prospect_name: str, designation: str,
         max_tokens=10,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = response.content[0].text.strip()
+    text = response.content[0].text.strip() if response.content else ""
     match = re.search(r"\d+", text)
     return int(match.group()) if match else 5
 
