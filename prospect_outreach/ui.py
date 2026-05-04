@@ -1,194 +1,254 @@
-"""Prospect Outreach pipeline UI — Research + Generate Messages tabs."""
+"""Prospect Outreach UI — 3-tab Streamlit interface.
 
-import os
+Tab 1: Pass 1 — Research prospects
+Tab 2: Pass 2 — Generate messages
+Tab 3: Settings — Brand knowledge management
+"""
+
+import io
 import tempfile
+from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from prospect_outreach import prospect_research, message_generator
+REQUIRED_COLUMNS = [
+    "First_Name", "Last_Name", "Designation", "Company_Name",
+    "Email", "City", "State", "Country", "Industry", "Website",
+]
 
 
 def render():
-    """Render the Prospect Outreach pipeline tabs."""
-    tabs = st.tabs(["Research", "Generate Messages"])
+    """Render the Prospect Outreach pipeline."""
+    tabs = st.tabs(["Pass 1: Research", "Pass 2: Generate Messages", "Settings"])
 
-    # ── Tab 1: Research ──────────────────────────────────────────────────
     with tabs[0]:
-        st.header("Pass 1: Research Prospects")
-        st.caption("Upload your data.xlsx, run AI research, then download and review before generating messages.")
-
-        uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="po_research_upload")
-
-        if uploaded is not None:
-            try:
-                xls = pd.ExcelFile(uploaded)
-                if "prospects" not in xls.sheet_names:
-                    st.error("Workbook must contain a 'prospects' sheet.")
-                    return
-
-                df = pd.read_excel(xls, sheet_name="prospects")
-
-                if not prospect_research.validate_prospects_sheet(df):
-                    st.error("Missing required columns: Prospect Name, Designation, Company Name, Website, Location of Prospect")
-                    return
-
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Total Prospects", len(df))
-                col2.metric("Unique Companies", df["Company Name"].nunique())
-                has_dates = "dates" in xls.sheet_names
-                col3.metric("Dates Sheet", "Found" if has_dates else "Missing")
-
-                st.subheader("Preview")
-                st.dataframe(df, use_container_width=True)
-
-                if st.button("Run Research", type="primary"):
-                    st.session_state.pop("po_research_output", None)
-                    st.session_state.pop("po_research_count", None)
-
-                    tmp_in = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    tmp_in.write(uploaded.getbuffer())
-                    tmp_in.flush()
-                    tmp_in.close()
-
-                    tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    tmp_out.close()
-
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    def on_progress(current, total, text):
-                        if total > 0:
-                            progress_bar.progress(current / total)
-                        status_text.text(text)
-
-                    try:
-                        prospect_research.research_workbook(
-                            tmp_in.name, tmp_out.name,
-                            progress_callback=on_progress,
-                        )
-                        progress_bar.progress(1.0)
-                        status_text.text("Research complete!")
-
-                        with open(tmp_out.name, "rb") as f:
-                            st.session_state["po_research_output"] = f.read()
-                        st.session_state["po_research_count"] = len(df)
-                    except Exception as e:
-                        st.error(f"Research failed: {e}")
-                    finally:
-                        os.unlink(tmp_in.name)
-
-                if "po_research_output" in st.session_state:
-                    st.success(f"Research complete for {st.session_state.get('po_research_count', '?')} prospects. Download the file below.")
-
-                    result_df = pd.read_excel(st.session_state["po_research_output"], sheet_name="prospects")
-                    st.subheader("Results Preview")
-                    st.dataframe(result_df, use_container_width=True)
-
-                    st.download_button(
-                        "Download data_output.xlsx",
-                        st.session_state["po_research_output"],
-                        file_name="data_output.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary",
-                    )
-
-            except Exception as e:
-                st.error(f"Failed to read workbook: {e}")
-
-    # ── Tab 2: Generate Messages ─────────────────────────────────────────
+        _render_pass1_tab()
     with tabs[1]:
-        st.header("Pass 2: Generate Messages")
-        st.caption("Upload the reviewed data_output.xlsx to generate personalized outreach messages.")
+        _render_pass2_tab()
+    with tabs[2]:
+        _render_settings_tab()
 
-        uploaded2 = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="po_gen_upload")
 
-        if uploaded2 is not None:
-            try:
-                df2 = pd.read_excel(uploaded2, sheet_name="prospects")
-            except Exception as e:
-                st.error(f"Failed to read prospects sheet: {e}")
-                df2 = None
+# ── Pass 1: Research ──────────────────────────────────────────────────────
 
-            if df2 is not None:
-                ready = 0
-                skip_has_message = 0
-                skip_no_research = 0
-                skip_no_score = 0
+def _render_pass1_tab():
+    st.subheader("Pass 1: Research Prospects")
+    st.caption(
+        "Upload data.xlsx with a 'prospects' sheet (and optional 'dates' sheet). "
+        "The pipeline will research each prospect, match case studies and clients, "
+        "and produce data_output.xlsx for your review."
+    )
 
-                for _, row in df2.iterrows():
-                    msg = row.get("Message to send")
-                    if pd.notna(msg) and str(msg).strip() != "":
-                        skip_has_message += 1
-                        continue
-                    research = row.get("Research Summary")
-                    if pd.isna(research) or str(research).strip() == "":
-                        skip_no_research += 1
-                        continue
-                    intent = row.get("Intent Score")
-                    if pd.isna(intent) or str(intent).strip() == "":
-                        skip_no_score += 1
-                        continue
-                    ready += 1
+    uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="pass1_upload")
 
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Ready to Generate", ready)
-                col2.metric("Already Has Message", skip_has_message)
-                col3.metric("No Research (skipped)", skip_no_research)
-                col4.metric("No Score (skipped)", skip_no_score)
+    if uploaded is None:
+        return
 
-                st.subheader("Preview")
-                st.dataframe(df2, use_container_width=True)
+    file_bytes = uploaded.read()
 
-                if ready == 0:
-                    st.warning("No prospects ready for message generation.")
-                elif st.button("Generate Messages", type="primary"):
-                    st.session_state.pop("po_messages_output", None)
-                    st.session_state.pop("po_messages_count", None)
+    try:
+        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="prospects")
+    except Exception as e:
+        st.error(f"Could not read 'prospects' sheet: {e}")
+        return
 
-                    tmp_in2 = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    tmp_in2.write(uploaded2.getbuffer())
-                    tmp_in2.flush()
-                    tmp_in2.close()
+    # Validate required columns
+    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    if missing:
+        st.error(f"Missing required columns: {', '.join(missing)}")
+        return
 
-                    tmp_out2 = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    tmp_out2.close()
+    # Check for dates sheet
+    try:
+        dates_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="dates")
+        has_dates = True
+    except Exception:
+        dates_df = pd.DataFrame()
+        has_dates = False
 
-                    progress_bar2 = st.progress(0)
-                    status_text2 = st.empty()
+    # Summary metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Prospects", len(df))
+    col2.metric("Unique Companies", df["Company_Name"].nunique())
+    col3.metric("Dates Sheet", "Yes" if has_dates else "No")
 
-                    def on_progress2(current, total, text):
-                        if total > 0:
-                            progress_bar2.progress(current / total)
-                        status_text2.text(text)
+    st.dataframe(df[REQUIRED_COLUMNS].head(10), use_container_width=True)
 
+    st.divider()
+
+    # UI options
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        generate_intent = st.toggle("Generate Intent Score", value=True)
+    with col_b:
+        max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5)
+    with col_c:
+        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=20, value=5)
+
+    if st.button("Run Research", type="primary", key="run_research_btn"):
+        from prospect_outreach.research_pipeline import research_workbook
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        def on_progress(current, total, msg):
+            pct = current / total if total > 0 else 0
+            progress_bar.progress(pct)
+            status_text.text(msg)
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            output_path = tmp.name
+
+        try:
+            research_workbook(
+                file_bytes=file_bytes,
+                output_path=output_path,
+                generate_intent_score=generate_intent,
+                max_case_studies=int(max_case_studies),
+                max_client_matches=int(max_clients),
+                progress_callback=on_progress,
+            )
+            progress_bar.progress(1.0)
+            status_text.text("Done!")
+
+            result_df = pd.read_excel(output_path, sheet_name="prospects")
+            st.success(f"Research complete. {len(result_df)} prospects processed.")
+            st.dataframe(result_df.head(10), use_container_width=True)
+
+            with open(output_path, "rb") as f:
+                st.download_button(
+                    "Download data_output.xlsx",
+                    data=f.read(),
+                    file_name="data_output.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+        except Exception as e:
+            st.error(f"Research failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+
+# ── Pass 2: Generate Messages ─────────────────────────────────────────────
+
+def _render_pass2_tab():
+    st.subheader("Pass 2: Generate Messages")
+    st.caption(
+        "Upload the reviewed data_output.xlsx. Rows with a Research_Summary and no existing "
+        "Message_to_send will have messages generated. Rows with empty Research_Summary are skipped."
+    )
+
+    uploaded = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="pass2_upload")
+
+    if uploaded is None:
+        return
+
+    file_bytes = uploaded.read()
+
+    try:
+        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="prospects")
+    except Exception as e:
+        st.error(f"Could not read 'prospects' sheet: {e}")
+        return
+
+    # Preview ready/skipped counts
+    def _is_ready(row):
+        msg = str(row.get("Message_to_send", "")).strip()
+        summary = str(row.get("Research_Summary", "")).strip()
+        return not msg and bool(summary)
+
+    ready = sum(1 for _, row in df.iterrows() if _is_ready(row))
+    skipped = len(df) - ready
+
+    col1, col2 = st.columns(2)
+    col1.metric("Ready to Generate", ready)
+    col2.metric("Skipped", skipped)
+
+    if ready == 0:
+        st.info("No prospects to generate messages for — all rows either already have messages or have empty Research_Summary.")
+        return
+
+    if st.button("Generate Messages", type="primary", key="run_gen_btn"):
+        from prospect_outreach.message_generator import generate_messages
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        def on_progress(current, total, msg):
+            pct = current / total if total > 0 else 0
+            progress_bar.progress(pct)
+            status_text.text(msg)
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            output_path = tmp.name
+
+        try:
+            stats = generate_messages(
+                file_bytes=file_bytes,
+                output_path=output_path,
+                progress_callback=on_progress,
+            )
+            progress_bar.progress(1.0)
+            status_text.text("Done!")
+
+            st.success(f"Generated {stats['ready']} messages. {stats['skipped']} skipped.")
+
+            result_df = pd.read_excel(output_path, sheet_name="prospects")
+            preview_cols = ["First_Name", "Last_Name", "Company_Name", "Message_to_send"]
+            available = [c for c in preview_cols if c in result_df.columns]
+            st.dataframe(result_df[available].head(10), use_container_width=True)
+
+            with open(output_path, "rb") as f:
+                st.download_button(
+                    "Download data_final.xlsx",
+                    data=f.read(),
+                    file_name="data_final.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+        except Exception as e:
+            st.error(f"Message generation failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+
+# ── Settings: Brand Knowledge ─────────────────────────────────────────────
+
+def _render_settings_tab():
+    st.subheader("Settings — Brand Knowledge")
+    st.caption("View and refresh brand profiles scraped from company websites.")
+
+    from prospect_outreach import brand_knowledge, config
+
+    status = brand_knowledge.are_brand_files_present()
+
+    for name, exists in status.items():
+        path = config.BRAND_JSONS[name]
+        st.markdown(f"**{name}**")
+
+        col_info, col_btn = st.columns([4, 1])
+        with col_info:
+            if exists:
+                mod_time = datetime.fromtimestamp(path.stat().st_mtime)
+                st.caption(f"Last updated: {mod_time.strftime('%Y-%m-%d %H:%M')}")
+            else:
+                st.caption("Not generated yet.")
+        with col_btn:
+            if st.button("\u27f3", key=f"settings_refresh_{name}"):
+                with st.spinner(f"Scraping {name}..."):
                     try:
-                        message_generator.generate_messages(
-                            tmp_in2.name, tmp_out2.name,
-                            progress_callback=on_progress2,
-                        )
-                        progress_bar2.progress(1.0)
-                        status_text2.text("Generation complete!")
-
-                        with open(tmp_out2.name, "rb") as f:
-                            st.session_state["po_messages_output"] = f.read()
-                        st.session_state["po_messages_count"] = ready
+                        brand_knowledge.refresh_single_brand(name)
+                        st.success(f"{name} refreshed!")
+                        st.rerun()
                     except Exception as e:
-                        st.error(f"Message generation failed: {e}")
-                    finally:
-                        os.unlink(tmp_in2.name)
+                        st.error(f"Failed: {e}")
 
-                if "po_messages_output" in st.session_state:
-                    st.success(f"Messages generated for {st.session_state.get('po_messages_count', '?')} prospects. Download the file below.")
+        if exists:
+            with st.expander(f"View {name} profile", expanded=False):
+                try:
+                    profile = brand_knowledge.load_brand_profile(name)
+                    st.json(profile)
+                except Exception as e:
+                    st.error(f"Could not load profile: {e}")
 
-                    result_df2 = pd.read_excel(st.session_state["po_messages_output"], sheet_name="prospects")
-                    st.subheader("Results Preview")
-                    st.dataframe(result_df2, use_container_width=True)
-
-                    st.download_button(
-                        "Download data_final.xlsx",
-                        st.session_state["po_messages_output"],
-                        file_name="data_final.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary",
-                    )
+        st.divider()

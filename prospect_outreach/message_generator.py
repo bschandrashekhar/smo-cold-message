@@ -1,267 +1,289 @@
-"""Message generation: Claude synthesizes personalized 3-paragraph outreach messages."""
+"""Prospect Outreach — Pass 2 Message Generation.
 
+For each prospect row that is ready (has Research_Summary, no existing Message_to_send):
+  1. Compress Research_Summary if > 1500 chars
+  2. Load brand profile JSON
+  3. Look up date range from dates sheet by city
+  4. Generate 4-paragraph outreach message via Claude
+"""
+
+import io
 import json
-import time
-import pandas as pd
-from datetime import datetime
-from typing import Optional, Callable, List, Dict
+from typing import Callable, Optional
 
 import anthropic
-from . import config, brand_knowledge
+import pandas as pd
 
-MAX_RETRIES = 3
-RETRY_DELAY = 65
-BATCH_SIZE = 5
-BATCH_DELAY = 3
+from prospect_outreach import config
+from prospect_outreach.brand_knowledge import load_brand_profile
+
+# Approved Salesforce products — do NOT mention anything outside this list
+APPROVED_SF_PRODUCTS = [
+    "Service Cloud", "Sales Cloud", "Non Profit", "NPSP", "Experience Cloud",
+    "Commerce Cloud", "Agentforce", "LWC", "Appexchange Product Development",
+    "Marketing Cloud", "Pardot", "Tableau", "CPQ", "Data Cloud",
+]
+
+COMPRESS_PROMPT = """You are a sales researcher. Compress the following research summary into a shorter version that:
+- Preserves all key technology signals, job openings, and strategic initiatives
+- Is role-aware (designation: {designation})
+- Avoids truncating important signals
+- Stays under 800 characters
+- Uses plain text bullet points (- )
+
+Research Summary:
+{research_summary}
+
+Return ONLY the compressed bullet points."""
+
+MESSAGE_PROMPT = """You are writing a concise, personalized sales outreach email on behalf of {brand_name}.
+
+Brand tone and positioning: {tone_and_positioning}
+Brand services: {services}
+
+Prospect details:
+- First name: {first_name}
+- Designation: {designation}
+- Company: {company_name}
+- Location: {location}
+
+Research summary (key signals):
+{research_summary}
+
+Case studies (use for Para 2, anonymized as "a leading [industry] company"):
+{case_studies}
+
+Industry reference clients (use for Para 3 — mention by name):
+{client_references}
+
+Date window for meeting (Para 4): {date_window}
+
+WRITING RULES — follow every rule strictly:
+1. Address prospect by first name only (e.g. "Hi {first_name},")
+2. Do NOT use hyphens or dashes anywhere in the message
+3. Do NOT reference compliance standards by name (APRA, SOC2, PCI DSS, etc.) — say "compliance standards" instead
+4. Total message must be UNDER 150 words
+5. Case study references are brand-neutral — do NOT mention CloudChillies or LendingLogik within case study descriptions
+6. Industry reference client names CAN be mentioned by name
+7. No subject line, no signature
+8. No specific numbers, metrics, or statistics in Para 1
+
+STRUCTURE — write exactly 4 paragraphs:
+
+Para 1: Show understanding of the prospect's situation. Reference a specific initiative or technology from the research, tailored to their role ({designation}). Naturally mention the specific technology names found (sets up Para 2). Keep to 1-2 sentences.
+
+Para 2: Pick up the GENERAL-PURPOSE technology names from Para 1 (e.g. Boomi, Snowflake, MuleSoft) — NOT proprietary systems. Weave them into a case study narrative. Anonymize as "a leading [industry] company". Show how similar challenges were solved using Salesforce. Only reference these approved Salesforce products (and ONLY if clearly relevant): {approved_sf_products}. If no specific product fits, just say "Salesforce".
+
+Para 3: In a SEPARATE sentence (not joined to Para 2 narrative), list ALL industry reference client names: e.g. "Some of our clients in this space include [Client A], [Client B], and [Client C]."
+
+Para 4: {cta}
+
+Return ONLY the message text, no labels, no "Para 1:" prefixes."""
 
 
-def _call_claude_with_retry(client, **kwargs):
-    """Call Claude API with automatic retry on rate limit errors."""
-    for attempt in range(MAX_RETRIES):
-        try:
-            return client.messages.create(**kwargs)
-        except anthropic.RateLimitError:
-            if attempt < MAX_RETRIES - 1:
-                wait = RETRY_DELAY * (attempt + 1)
-                print(f"Rate limited. Waiting {wait}s before retry {attempt + 2}/{MAX_RETRIES}...")
-                time.sleep(wait)
-            else:
-                raise
-
-
-def format_date(date_value):
-    if pd.isna(date_value):
+def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
+    """Look up meeting date window from dates sheet for a given city/state."""
+    if dates_df.empty:
         return None
-    if isinstance(date_value, datetime):
-        return date_value.strftime("%B %d, %Y")
-    return str(date_value)
+
+    city_lower = city.strip().lower()
+    state_lower = state.strip().lower()
+
+    for _, row in dates_df.iterrows():
+        row_city = str(row.get("City", "")).strip().lower()
+        row_state = str(row.get("State", "")).strip().lower()
+        if row_city == city_lower or (state_lower and row_state == state_lower):
+            start = row.get("Start_Date", "")
+            end = row.get("End_Date", "")
+            if pd.notna(start) and pd.notna(end):
+                if hasattr(start, "strftime"):
+                    start = start.strftime("%B %-d")
+                if hasattr(end, "strftime"):
+                    end = end.strftime("%B %-d")
+                return f"{start} and {end}"
+    return None
 
 
-def _get_date_range(prospect_location: str, dates_df: pd.DataFrame) -> str:
-    """Look up the meeting date range for a prospect's location."""
-    if dates_df.empty or "Location of Prospect" not in dates_df.columns:
-        return "in the coming weeks"
-
-    matching = dates_df[dates_df["Location of Prospect"] == prospect_location]
-    if not matching.empty:
-        start = format_date(matching.iloc[0].get("Start Date"))
-        end = format_date(matching.iloc[0].get("End Date"))
-        if start and end:
-            return f"between {start} and {end}"
-    return "in the coming weeks"
-
-
-def _compress_research(client, research: str, designation: str) -> str:
-    """Compress research summary into key signals, preserving all important details."""
-    if len(research) <= 1500:
-        return research
-
-    prompt = f"""Compress the following prospect research into a dense briefing of key signals. Keep ALL specific facts, numbers, technology names, project names, and strategic initiatives. Remove filler, redundancy, and formatting overhead.
-
-Prioritize signals relevant to a {designation}'s concerns.
-
-RESEARCH:
-{research}
-
-Return ONLY the compressed briefing — no preamble."""
-
-    response = _call_claude_with_retry(
-        client,
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
+def _compress_research(client: anthropic.Anthropic, research_summary: str, designation: str) -> str:
+    """Compress research summary if over 1500 chars."""
+    prompt = COMPRESS_PROMPT.format(research_summary=research_summary, designation=designation)
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-
     return response.content[0].text.strip()
+
+
+def _format_case_studies(case_studies_json: str) -> str:
+    """Format case studies JSON into readable text for the prompt."""
+    try:
+        data = json.loads(case_studies_json) if case_studies_json else []
+    except (json.JSONDecodeError, TypeError):
+        return "No case studies available."
+
+    if isinstance(data, dict) and "error" in data:
+        return "No case studies available."
+
+    if not data:
+        return "No case studies available."
+
+    lines = []
+    for cs in data[:5]:
+        if isinstance(cs, dict):
+            name = cs.get("casestudy_name", cs.get("name", ""))
+            industry = cs.get("industry", "")
+            lines.append(f"- {name} ({industry})")
+    return "\n".join(lines) if lines else "No case studies available."
+
+
+def _format_client_references(refs_json: str) -> str:
+    """Format client references JSON into a list of names."""
+    try:
+        data = json.loads(refs_json) if refs_json else []
+    except (json.JSONDecodeError, TypeError):
+        return "No client references available."
+
+    if isinstance(data, dict) and "error" in data:
+        return "No client references available."
+
+    if not data:
+        return "No client references available."
+
+    names = []
+    for ref in data:
+        if isinstance(ref, dict):
+            name = ref.get("client_name", ref.get("name", ""))
+            if name:
+                names.append(name)
+    return ", ".join(names) if names else "No client references available."
 
 
 def _generate_single_message(
-    prospect: pd.Series,
+    client: anthropic.Anthropic,
+    row: pd.Series,
     dates_df: pd.DataFrame,
     brand_profile: dict,
-    case_studies: List[Dict],
-    industry_references: List[str],
-) -> str:
-    """Use Claude to generate a personalized 3-paragraph outreach message."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+) -> tuple[str, str]:
+    """Generate message for a single prospect. Returns (message, compressed_summary)."""
+    first_name = str(row.get("First_Name", "")).strip()
+    designation = str(row.get("Designation", "")).strip()
+    company_name = str(row.get("Company_Name", "")).strip()
+    city = str(row.get("City", "")).strip()
+    state = str(row.get("State", "")).strip()
+    location = f"{city}, {row.get('Country', '')}".strip(", ")
+    research_summary = str(row.get("Research_Summary", "")).strip()
+    case_studies_json = str(row.get("Case_Studies", ""))
+    refs_json = str(row.get("Industry_Client_References", ""))
 
-    full_name = str(prospect.get("Prospect Name", "")).strip()
-    first_name = full_name.split()[0] if full_name else full_name
-    company = str(prospect.get("Company Name", "")).strip()
-    designation = str(prospect.get("Designation", "")).strip()
-    brand_name = str(prospect.get("Suggested Brand Name to use", "")).strip()
-    research = str(prospect.get("Research Summary", "")).strip()
-    location = str(prospect.get("Location of Prospect", "")).strip()
+    # Compress if needed
+    compressed = ""
+    if len(research_summary) > 1500:
+        compressed = _compress_research(client, research_summary, designation)
+        research_to_use = compressed
+    else:
+        research_to_use = research_summary
 
-    date_range = _get_date_range(location, dates_df)
+    # Date window
+    date_window = _get_date_window(dates_df, city, state)
+    if date_window:
+        cta = f"It will be really good to discuss this over a brief call between {date_window}. Please let me know what works best for you."
+    else:
+        cta = "It would be really good to discuss this over a brief call. Please let me know when we can connect."
 
-    # Compress research summary to preserve all signals without truncation
-    research = _compress_research(client, research, designation)
-
-    # Build case study reference text (brand-neutral)
-    cs_text = ""
-    if case_studies:
-        cs_lines = []
-        for cs in case_studies[:3]:
-            cs_lines.append(
-                f"- Helped a leading {cs.get('industry', 'industry')} company with {cs.get('use_case', 'their project')}. "
-                f"{cs.get('summary', '')[:200]}"
-            )
-        cs_text = "\n".join(cs_lines)
-
-    # Build industry references text
-    refs_text = ""
-    if industry_references:
-        refs_text = ", ".join(industry_references)
-
-    brand_tone = brand_profile.get("tone_and_positioning", "professional")
-    brand_services = json.dumps(brand_profile.get("services", []))
-
-    prompt = f"""Generate a personalized cold outreach message from {brand_name} to {first_name}.
-
-PROSPECT DETAILS:
-- Name: {first_name}
-- Designation: {designation}
-- Company: {company}
-- Location: {location}
-
-RESEARCH FINDINGS:
-{research}
-
-BRAND SENDING THE MESSAGE: {brand_name}
-- Tone/Positioning: {brand_tone}
-- Services: {brand_services}
-
-RELEVANT WORK WE'VE DONE (reference these brand-neutrally — do NOT mention "{brand_name}" when citing case studies):
-{cs_text if cs_text else "No specific case studies available — reference general experience."}
-
-INDUSTRY REFERENCE CLIENTS (clients we've worked with in the same vertical as {company}):
-{refs_text if refs_text else "No specific industry references available."}
-
-MEETING WINDOW: {date_range}
-
-Write exactly 3 short paragraphs. Keep the total message under 150 words.
-
-**Paragraph 1**: Start with "Hi {first_name}," on its own line. One or two concise sentences showing you understand their situation. Reference a specific initiative or strategic direction from the research, and naturally mention the specific technology names found in the research (e.g. Boomi, Snowflake, NextGen ApplyOnline, MuleSoft, AWS — whatever technologies the research mentions). Do NOT cite specific numbers, metrics, or statistics (e.g. avoid "reduced from X to Y", "13% improvement"). It should read like a knowledgeable human wrote it, not a data report.
-
-**Paragraph 2**: Pick up the specific technology names you mentioned in Paragraph 1 and weave them into the case study narrative to create a cohesive story — but only carry over general-purpose/common technologies (e.g. Boomi, Snowflake, MuleSoft), NOT prospect-specific or proprietary systems that wouldn't credibly appear in "work we've done for others." For example, if Para 1 mentions Boomi and Snowflake, Para 2 should reference how we've helped clients with Boomi integration or Snowflake data pipelines leveraging Salesforce. Briefly reference similar work done for clients (anonymized as "a leading [industry] company"), showing how we solved challenges around those same technologies leveraging Salesforce. ONLY reference these Salesforce clouds/products: Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud. Do NOT mention any Salesforce products outside this list (e.g. do NOT use "Financial Services Cloud", "Health Cloud", "Education Cloud" — these are NOT in our list). If no specific cloud is a clear match for the prospect's needs, just say "Salesforce" without naming a specific cloud. You may combine multiple clouds if relevant. Then, in a SEPARATE sentence, mention the industry reference clients. Do NOT join the client names with the description of work — keep them apart. For example: "We've helped leading [industry] companies [do X] leveraging Salesforce. Some of our clients in this space include {refs_text if refs_text else "similar companies"}." You MUST mention ALL client names. Do not drop any.
-
-**Paragraph 3**: Close with something like: "It will be really good to discuss this over a brief call between [start date] and [end date]. Please let me know what works best for you." Use the exact dates from the meeting window above. Keep it warm and simple, not salesy.
-
-IMPORTANT STYLE RULES:
-- Write in {brand_name}'s tone: {brand_tone}
-- Every sentence must reference something specific from the research
-- Do NOT mention the brand name when citing case studies (keep them brand neutral)
-- Industry reference client names CAN be mentioned by name (they are real clients)
-- Do NOT use hyphens (no dashes like - or em dashes) anywhere in the message
-- Do NOT reference specific compliance standards or regulations by name (e.g. no APRA, SOC2, PCI DSS). Use generic terms like "compliance standards" or "regulatory requirements" instead
-- Keep paragraphs short and punchy, not verbose or flowery
-- Do NOT include a subject line
-- Do NOT add a sign-off or signature"""
-
-    response = _call_claude_with_retry(
-        client,
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+    prompt = MESSAGE_PROMPT.format(
+        brand_name=brand_profile.get("name", ""),
+        tone_and_positioning=brand_profile.get("tone_and_positioning", ""),
+        services=", ".join(brand_profile.get("services", [])),
+        first_name=first_name,
+        designation=designation,
+        company_name=company_name,
+        location=location,
+        research_summary=research_to_use,
+        case_studies=_format_case_studies(case_studies_json),
+        client_references=_format_client_references(refs_json),
+        date_window=date_window or "no specific dates — use generic phrasing",
+        approved_sf_products=", ".join(APPROVED_SF_PRODUCTS),
+        cta=cta,
     )
 
-    return response.content[0].text.strip()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip(), compressed
 
 
 def generate_messages(
-    input_path: str,
+    file_bytes: bytes,
     output_path: str,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
-) -> None:
-    """Read reviewed workbook, generate messages via Claude, and save to new file."""
-    xls = pd.ExcelFile(input_path)
-    if "prospects" not in xls.sheet_names:
-        raise ValueError("Workbook must contain a 'prospects' sheet")
+) -> dict:
+    """Run Pass 2 message generation on reviewed data_output.xlsx.
 
-    df = pd.read_excel(xls, sheet_name="prospects")
-    dates_df = pd.DataFrame()
-    if "dates" in xls.sheet_names:
-        dates_df = pd.read_excel(xls, sheet_name="dates")
+    Args:
+        file_bytes: Raw bytes of the uploaded .xlsx file.
+        output_path: Path to write data_final.xlsx.
+        progress_callback: Optional fn(current, total, status_msg).
 
-    # Ensure message column exists with object dtype
-    if "Message to send" not in df.columns:
-        df["Message to send"] = ""
-    df["Message to send"] = df["Message to send"].astype(object)
+    Returns:
+        dict with "ready" and "skipped" counts.
+    """
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="prospects")
 
-    # Determine which rows need messages
-    rows_to_process = []
-    for idx, row in df.iterrows():
-        msg = row.get("Message to send")
-        if pd.notna(msg) and str(msg).strip() != "":
-            continue  # Already has a message
-        research = row.get("Research Summary")
-        if pd.isna(research) or str(research).strip() == "":
-            continue  # No research — skip
-        intent = row.get("Intent Score")
-        if pd.isna(intent) or str(intent).strip() == "":
-            continue  # Not scored — skip
-        rows_to_process.append(idx)
+    try:
+        dates_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="dates")
+    except Exception:
+        dates_df = pd.DataFrame()
 
-    total = len(rows_to_process)
-    if total == 0:
-        # Nothing to process, just save as-is
-        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="prospects", index=False)
-            if not dates_df.empty:
-                dates_df.to_excel(writer, sheet_name="dates", index=False)
-        return
+    if "Message_to_send" not in df.columns:
+        df["Message_to_send"] = ""
+    if "Research_Summary_Compressed" not in df.columns:
+        df["Research_Summary_Compressed"] = ""
 
-    # Load brand profiles
-    brand_profiles = {}
-    for name in config.BRAND_JSONS:
-        try:
-            brand_profiles[name] = brand_knowledge.load_brand_profile(name)
-        except FileNotFoundError:
-            brand_profiles[name] = {"name": name, "services": [], "verticals": []}
+    # Determine ready vs skipped
+    def _is_ready(row):
+        msg = str(row.get("Message_to_send", "")).strip()
+        summary = str(row.get("Research_Summary", "")).strip()
+        return not msg and bool(summary)
 
-    for i, idx in enumerate(rows_to_process):
+    ready_indices = [idx for idx, row in df.iterrows() if _is_ready(row)]
+    skipped = len(df) - len(ready_indices)
+    total = len(ready_indices)
+
+    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+
+    # Brand profile cache
+    brand_cache: dict[str, dict] = {}
+
+    for i, idx in enumerate(ready_indices):
         row = df.loc[idx]
-        prospect_name = str(row.get("Prospect Name", "")).strip()
-        brand_name = str(row.get("Suggested Brand Name to use", "LendingLogik")).strip()
+        brand_name = str(row.get("Suggested_Brand_Name_to_use", "CloudChillies")).strip()
+        if not brand_name:
+            brand_name = "CloudChillies"
 
         if progress_callback:
-            progress_callback(i, total, f"Generating message for: {prospect_name}")
+            first_name = str(row.get("First_Name", "")).strip()
+            progress_callback(i + 1, total, f"Generating message for {first_name}...")
 
-        # Get brand profile
-        brand_profile = brand_profiles.get(brand_name, brand_profiles.get("LendingLogik", {}))
-
-        # Read case studies from spreadsheet (persisted by Pass 1)
-        cs_raw = row.get("Case Studies", "")
-        case_studies = []
-        if pd.notna(cs_raw) and str(cs_raw).strip():
+        if brand_name not in brand_cache:
             try:
-                case_studies = json.loads(str(cs_raw))
-            except json.JSONDecodeError:
-                pass
+                brand_cache[brand_name] = load_brand_profile(brand_name)
+            except FileNotFoundError:
+                brand_cache[brand_name] = {"name": brand_name, "tone_and_positioning": "", "services": []}
 
-        # Read industry references from spreadsheet (persisted by Pass 1)
-        refs_raw = row.get("Industry References", "")
-        industry_references = []
-        if pd.notna(refs_raw) and str(refs_raw).strip():
-            try:
-                industry_references = json.loads(str(refs_raw))
-            except json.JSONDecodeError:
-                pass
+        message, compressed = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
+        df.at[idx, "Message_to_send"] = message
+        if compressed:
+            df.at[idx, "Research_Summary_Compressed"] = compressed
 
-        # Generate message
-        message = _generate_single_message(row, dates_df, brand_profile, case_studies, industry_references)
-        df.at[idx, "Message to send"] = message
-
-        if progress_callback:
-            progress_callback(i + 1, total, f"Completed: {prospect_name}")
-
-        # Rate limiting
-        if (i + 1) % BATCH_SIZE == 0:
-            time.sleep(BATCH_DELAY)
-
-    # Save output
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="prospects", index=False)
         if not dates_df.empty:
             dates_df.to_excel(writer, sheet_name="dates", index=False)
+
+    if progress_callback:
+        progress_callback(total, total, "Message generation complete.")
+
+    return {"ready": total, "skipped": skipped}
