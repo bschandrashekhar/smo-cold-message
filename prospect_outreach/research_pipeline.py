@@ -243,15 +243,19 @@ def _get_company_research(company_name: str, website: str) -> dict:
 # ── Prospect research ──────────────────────────────────────────────────────
 
 def _run_prospect_research(prospect_name: str, designation: str,
-                            company_name: str, city: str, country: str) -> dict:
+                            company_name: str, city: str, country: str,
+                            linkedin_url: str = "") -> dict:
     """Run prospect research using Serper per SKILL.md spec."""
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
-    # Step 1: LinkedIn-first search
-    linkedin_queries = [
-        f'site:linkedin.com/in "{prospect_name}" "{company_name}"',
-        f'site:linkedin.com "{prospect_name}" "{designation}" "{company_name}"',
-    ]
+    # Step 1: LinkedIn-first search — use provided URL if available, else search by name
+    if linkedin_url:
+        linkedin_queries = [linkedin_url]
+    else:
+        linkedin_queries = [
+            f'site:linkedin.com/in "{prospect_name}" "{company_name}"',
+            f'site:linkedin.com "{prospect_name}" "{designation}" "{company_name}"',
+        ]
     linkedin_results = []
     for q in linkedin_queries:
         linkedin_results.extend(_serper_search(q, 5))
@@ -327,7 +331,8 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
 
 
 def _get_prospect_research(prospect_name: str, designation: str,
-                            company_name: str, city: str, country: str, email: str) -> dict:
+                            company_name: str, city: str, country: str, email: str,
+                            linkedin_url: str = "") -> dict:
     """Get prospect research from cache or run fresh."""
     sb = _get_supabase()
     result = sb.table("Cache_Prospect_Contact_Research").select("*").eq("Email", email).execute()
@@ -337,7 +342,7 @@ def _get_prospect_research(prospect_name: str, designation: str,
             cr = row["Contact_Research"]
             return cr if isinstance(cr, dict) else json.loads(cr)
 
-    research = _run_prospect_research(prospect_name, designation, company_name, city, country)
+    research = _run_prospect_research(prospect_name, designation, company_name, city, country, linkedin_url)
     sb.table("Cache_Prospect_Contact_Research").upsert({
         "Email": email,
         "Contact_Research": research,
@@ -452,6 +457,8 @@ def research_workbook(
         company_name = str(row.get("Company_Name", ""))
         email = str(row.get("Email", ""))
         website = str(row.get("Website", ""))
+        _li = row.get("LinkedIn", "") if "LinkedIn" in df.columns else ""
+        linkedin_url = "" if not _li or pd.isna(_li) else str(_li).strip()
         industry = str(row.get("Industry", ""))
         country = str(row.get("Country", ""))
         city = str(row.get("City", ""))
@@ -482,7 +489,7 @@ def research_workbook(
         if progress_callback:
             progress_callback(current, total, f"Researching {prospect_name}...")
         prospect_research = _get_prospect_research(
-            prospect_name, designation, company_name, city, country, email
+            prospect_name, designation, company_name, city, country, email, linkedin_url
         )
 
         # 5. Research summary

@@ -12,3 +12,8 @@ Prospect Outreach Generator: Two-pass Streamlit app that researches prospects, m
 
 ## Search Engine Default
 This project uses **Serper** (Google Search API via serper.dev) as the default search provider for all research steps (company and prospect). Claude Web Search is available as a fallback provider.
+
+## Code Investigation Rule
+Before answering any question about where a column, variable, or function is used, always search the **full codebase** (all .py files, all subdirectories) first. Never answer based on a single file lookup.
+
+Always explicitly state at the start of every answer whether a full codebase search was performed or not, regardless of what was asked.
