@@ -172,7 +172,7 @@ def _run_company_research(company_name: str, website: str) -> dict:
 Rules:
 - Only include keys where data was actually found — no empty lists, no null values
 - Only include findings that explicitly mention "{company_name}" by name
-- For job_openings, only include postings from the last 3 months
+- Only include findings from the last 3 months for ALL sections (technical_initiatives, job_openings, additional_context) — if a result has no visible date, infer from URL or article timestamp; discard if date cannot be determined
 - No generic industry articles, no speculation
 
 INITIATIVE SEARCH RESULTS:
@@ -276,7 +276,7 @@ def _run_prospect_research(prospect_name: str, designation: str,
 Rules:
 - Only include keys where data was actually found — no empty lists, no null values
 - LinkedIn is the primary source; use broader results only to fill gaps
-- Recent activity limited to last 6 months only
+- Recent activity limited to last 3 months only
 - previous_employers from LinkedIn career history only
 - No speculation or unverified claims
 
@@ -460,7 +460,7 @@ def research_workbook(
         _li = row.get("LinkedIn", "") if "LinkedIn" in df.columns else ""
         linkedin_url = "" if not _li or pd.isna(_li) else str(_li).strip()
         industry = str(row.get("Industry", ""))
-        country = str(row.get("Country", ""))
+        country = _apply_emea_coding(str(row.get("Country", "")))
         city = str(row.get("City", ""))
         state = str(row.get("State", ""))
 
@@ -534,8 +534,8 @@ def research_workbook(
             score = _score_intent(prospect_name, designation, company_name, research_summary)
             df.at[idx, "Intent_Score"] = score
 
-        # 9. EMEA coding
-        df.at[idx, "Country"] = _apply_emea_coding(country)
+        # 9. EMEA coding (already applied to local variable at row read; write to df)
+        df.at[idx, "Country"] = country
 
     # Write output
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:

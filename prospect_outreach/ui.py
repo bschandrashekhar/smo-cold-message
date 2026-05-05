@@ -360,13 +360,13 @@ def _render_test_tab():
 
     col_ca, col_cb = st.columns(2)
     with col_ca:
-        use_company_cache = st.toggle("Use Company Cache", value=True, key="test_company_cache")
+        use_company_cache = st.toggle("Use Company Cache", value=False, key="test_company_cache")
     with col_cb:
-        use_prospect_cache = st.toggle("Use Prospect Cache", value=True, key="test_prospect_cache")
+        use_prospect_cache = st.toggle("Use Prospect Cache", value=False, key="test_prospect_cache")
 
     col_ta, col_tb, col_tc = st.columns(3)
     with col_ta:
-        generate_intent = st.toggle("Generate Intent Score", value=True, key="test_intent")
+        generate_intent = st.toggle("Generate Intent Score", value=False, key="test_intent")
     with col_tb:
         max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5, key="test_cs")
     with col_tc:

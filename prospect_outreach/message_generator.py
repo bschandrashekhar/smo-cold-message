@@ -92,14 +92,14 @@ def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
     for _, row in dates_df.iterrows():
         row_city = str(row.get("City", "")).strip().lower()
         row_state = str(row.get("State", "")).strip().lower()
-        if row_city == city_lower or (state_lower and row_state == state_lower):
+        if row_city == city_lower and (not state_lower or row_state == state_lower):
             start = row.get("Start_Date", "")
             end = row.get("End_Date", "")
             if pd.notna(start) and pd.notna(end):
                 if hasattr(start, "strftime"):
-                    start = start.strftime("%B %-d")
+                    start = f"{start.strftime('%B')} {start.day}"
                 if hasattr(end, "strftime"):
-                    end = end.strftime("%B %-d")
+                    end = f"{end.strftime('%B')} {end.day}"
                 return f"{start} and {end}"
     return None
 
@@ -132,8 +132,22 @@ def _format_case_studies(case_studies_json: str) -> str:
     for cs in data[:5]:
         if isinstance(cs, dict):
             name = cs.get("casestudy_name", cs.get("name", ""))
-            industry = cs.get("industry", "")
-            lines.append(f"- {name} ({industry})")
+            industry = cs.get("client_industry", "")
+            problem = cs.get("summary_problem", "")
+            solution = cs.get("summary_solution", "")
+            outcomes = cs.get("summary_outcomes", "")
+            exact_techs = cs.get("exact_techs", [])
+            tech_str = ", ".join(exact_techs) if isinstance(exact_techs, list) else str(exact_techs)
+            parts = [f"- {name} ({industry})"]
+            if problem:
+                parts.append(f"  Problem: {problem}")
+            if solution:
+                parts.append(f"  Solution: {solution}")
+            if outcomes:
+                parts.append(f"  Outcomes: {outcomes}")
+            if tech_str:
+                parts.append(f"  Technologies: {tech_str}")
+            lines.append("\n".join(parts))
     return "\n".join(lines) if lines else "No case studies available."
 
 
