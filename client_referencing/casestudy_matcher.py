@@ -41,7 +41,7 @@ from client_referencing.matcher import (
 
 @dataclass
 class CaseStudyMatch:
-    casestudy_id: int
+    casestudy_id: str  # UUID
     casestudy_name: str
     client_id: str
     client_name: str
@@ -231,13 +231,13 @@ def _exact_match_by_casestudy(
         unmatched_techs: prospect techs with no exact match in any case study
     """
     # Build index: exact_key -> list of (casestudy_id, tech_name)
-    key_index: Dict[str, List[Tuple[int, str]]] = {}
+    key_index: Dict[str, List[Tuple[str, str]]] = {}
     for t in tech_mappings:
         ek = (t.get("casestudy_tech_exact_match") or "").lower().strip()
         if ek:
             key_index.setdefault(ek, []).append((t["casestudy_id"], t["casestudy_technology"]))
 
-    matched_by_cs: Dict[int, List[str]] = {}
+    matched_by_cs: Dict[str, List[str]] = {}
     matched_techs = set()
 
     for tech in prospect_techs:
