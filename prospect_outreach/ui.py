@@ -21,7 +21,7 @@ REQUIRED_COLUMNS = [
 
 def render():
     """Render the Prospect Outreach pipeline."""
-    tabs = st.tabs(["Pass 1: Research", "Pass 2: Generate Messages", "Settings"])
+    tabs = st.tabs(["Pass 1: Research", "Pass 2: Generate Messages", "Settings", "Test Tab"])
 
     with tabs[0]:
         _render_pass1_tab()
@@ -29,6 +29,8 @@ def render():
         _render_pass2_tab()
     with tabs[2]:
         _render_settings_tab()
+    with tabs[3]:
+        _render_test_tab()
 
 
 # ── Pass 1: Research ──────────────────────────────────────────────────────
@@ -85,7 +87,7 @@ def _render_pass1_tab():
     with col_b:
         max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5)
     with col_c:
-        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=20, value=5)
+        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5)
 
     if st.button("Run Research", type="primary", key="run_research_btn"):
         from prospect_outreach.research_pipeline import research_workbook
@@ -252,3 +254,323 @@ def _render_settings_tab():
                     st.error(f"Could not load profile: {e}")
 
         st.divider()
+
+
+# ── Test Tab: Verbose Pass 1 Pipeline ─────────────────────────────────────
+
+def _test_cache_badge(source: str) -> str:
+    badges = {
+        "CACHE HIT": "🟢 CACHE HIT",
+        "CACHE STALE": "🟡 CACHE STALE (re-fetched via Serper)",
+        "CACHE MISS": "🔴 CACHE MISS (fetched via Serper)",
+        "CACHE SKIPPED": "⚪ CACHE SKIPPED (fetched via Serper)",
+        "DEDUPED": "⚪ DEDUPED (reused from earlier row)",
+    }
+    return badges.get(source, source)
+
+
+def _test_get_company_research(company_name: str, website: str, use_cache: bool):
+    import json
+    from prospect_outreach.research_pipeline import (
+        _get_supabase, _is_cache_stale, _run_company_research,
+    )
+    source = None
+    data = None
+    if use_cache:
+        try:
+            sb = _get_supabase()
+            result = sb.table("Cache_Prospect_Company_Research").select("*").eq("Website", website).execute()
+            if result.data:
+                row = result.data[0]
+                if not _is_cache_stale(row.get("Date_of_Research")):
+                    source = "CACHE HIT"
+                    cr = row["Company_Research"]
+                    data = json.loads(cr) if isinstance(cr, str) else cr
+                else:
+                    source = "CACHE STALE"
+            else:
+                source = "CACHE MISS"
+        except Exception as e:
+            source = f"CACHE ERROR: {e}"
+    else:
+        source = "CACHE SKIPPED"
+    if data is None:
+        data = _run_company_research(company_name, website)
+    return data, source
+
+
+def _test_get_prospect_research(prospect_name: str, designation: str, company_name: str,
+                                city: str, country: str, email: str,
+                                linkedin_url: str, use_cache: bool):
+    import json
+    from prospect_outreach.research_pipeline import (
+        _get_supabase, _is_cache_stale, _run_prospect_research,
+    )
+    source = None
+    data = None
+    if use_cache:
+        try:
+            sb = _get_supabase()
+            result = sb.table("Cache_Prospect_Contact_Research").select("*").eq("Email", email).execute()
+            if result.data:
+                row = result.data[0]
+                if not _is_cache_stale(row.get("Date_of_Research")):
+                    source = "CACHE HIT"
+                    pr = row["Prospect_Research"]
+                    data = json.loads(pr) if isinstance(pr, str) else pr
+                else:
+                    source = "CACHE STALE"
+            else:
+                source = "CACHE MISS"
+        except Exception as e:
+            source = f"CACHE ERROR: {e}"
+    else:
+        source = "CACHE SKIPPED"
+    if data is None:
+        data = _run_prospect_research(prospect_name, designation, company_name,
+                                      city, country, linkedin_url)
+    return data, source
+
+
+def _render_test_tab():
+    st.subheader("Test Tab: Verbose Pass 1 Pipeline")
+    st.caption(
+        "Runs the full Pass 1 research pipeline row-by-row with verbose output. "
+        "Use cache toggles to control whether cached data is used for company and prospect research."
+    )
+
+    uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="test_upload")
+    if uploaded is None:
+        return
+
+    file_bytes = uploaded.read()
+
+    try:
+        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="prospects")
+    except Exception as e:
+        st.error(f"Could not read 'prospects' sheet: {e}")
+        return
+
+    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    if missing:
+        st.error(f"Missing required columns: {', '.join(missing)}")
+        return
+
+    st.divider()
+
+    col_ca, col_cb = st.columns(2)
+    with col_ca:
+        use_company_cache = st.toggle("Use Company Cache", value=True, key="test_company_cache")
+    with col_cb:
+        use_prospect_cache = st.toggle("Use Prospect Cache", value=True, key="test_prospect_cache")
+
+    col_ta, col_tb, col_tc = st.columns(3)
+    with col_ta:
+        generate_intent = st.toggle("Generate Intent Score", value=True, key="test_intent")
+    with col_tb:
+        max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5, key="test_cs")
+    with col_tc:
+        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5, key="test_cl")
+
+    if not st.button("Run Test", type="primary", key="run_test_btn"):
+        return
+
+    from prospect_outreach.research_pipeline import (
+        _extract_technologies, _build_research_summary, _score_intent, _apply_emea_coding,
+    )
+    from client_referencing.brand_matcher import find_brand_match
+    from client_referencing.casestudy_matcher import find_casestudy_matches
+    from client_referencing.matcher import find_matches
+
+    company_cache: dict = {}  # website -> (research_dict, source_label)
+    total = len(df)
+
+    for i, (_, row) in enumerate(df.iterrows()):
+        prospect_name = f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
+        designation = str(row.get("Designation", ""))
+        company_name = str(row.get("Company_Name", ""))
+        email = str(row.get("Email", ""))
+        website = str(row.get("Website", ""))
+        industry = str(row.get("Industry", ""))
+        country = str(row.get("Country", ""))
+        city = str(row.get("City", ""))
+        state = str(row.get("State", ""))
+        _li = row.get("LinkedIn", "") if "LinkedIn" in df.columns else ""
+        linkedin_url = "" if not _li or pd.isna(_li) else str(_li).strip()
+
+        with st.expander(f"Prospect {i+1}/{total}: {prospect_name} | {designation} | {company_name}", expanded=(i == 0)):
+
+            # ── Step 1: Brand Match ──────────────────────────────────────
+            st.markdown("#### Step 1 — Brand Match")
+            st.write(f"**Params:** `prospect_industry={industry!r}`")
+            try:
+                brand_result = find_brand_match(prospect_industry=industry)
+                c1, c2 = st.columns(2)
+                c1.metric("Brand", brand_result.get("brand", "—"))
+                c2.metric("Similarity", f"{brand_result.get('similarity_score', 0):.3f}")
+                st.write(f"**Matched term:** `{brand_result.get('matched_industry_term')}`")
+                with st.expander("Full return"):
+                    st.json({
+                        "brand": brand_result.get("brand"),
+                        "matched_industry_term": brand_result.get("matched_industry_term"),
+                        "similarity_score": brand_result.get("similarity_score"),
+                        "all_matches": brand_result.get("all_matches", []),
+                        "debug_log": brand_result.get("debug_log", []),
+                    })
+            except Exception as e:
+                st.error(f"Brand match failed: {e}")
+                brand_result = {"brand": "CloudChillies"}
+
+            st.divider()
+
+            # ── Step 2: Company Research ─────────────────────────────────
+            st.markdown("#### Step 2 — Company Research")
+            st.write(f"**Params:** `company_name={company_name!r}`, `website={website!r}`")
+            try:
+                if website in company_cache:
+                    company_research, co_source = company_cache[website]
+                    co_source = "DEDUPED"
+                else:
+                    company_research, co_source = _test_get_company_research(
+                        company_name, website, use_company_cache
+                    )
+                    company_cache[website] = (company_research, co_source)
+                st.info(_test_cache_badge(co_source))
+                with st.expander("Company Research return"):
+                    st.json(company_research)
+            except Exception as e:
+                st.error(f"Company research failed: {e}")
+                company_research = {"company_name": company_name}
+
+            st.divider()
+
+            # ── Step 3: Technology Extraction ────────────────────────────
+            st.markdown("#### Step 3 — Technology Extraction")
+            st.write("**Params:** `company_research` (dict above)")
+            try:
+                prospect_technologies = _extract_technologies(company_research)
+                st.write(f"**Return:** `{prospect_technologies}`")
+            except Exception as e:
+                st.error(f"Tech extraction failed: {e}")
+                prospect_technologies = ""
+
+            st.divider()
+
+            # ── Step 4: Prospect Research ────────────────────────────────
+            st.markdown("#### Step 4 — Prospect Research")
+            st.write(
+                f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, "
+                f"`company_name={company_name!r}`, `city={city!r}`, `country={country!r}`, "
+                f"`email={email!r}`, `linkedin_url={linkedin_url!r}`"
+            )
+            try:
+                prospect_research, pr_source = _test_get_prospect_research(
+                    prospect_name, designation, company_name,
+                    city, country, email, linkedin_url, use_prospect_cache
+                )
+                st.info(_test_cache_badge(pr_source))
+                with st.expander("Prospect Research return"):
+                    st.json(prospect_research)
+            except Exception as e:
+                st.error(f"Prospect research failed: {e}")
+                prospect_research = {}
+
+            st.divider()
+
+            # ── Step 5: Research Summary ─────────────────────────────────
+            st.markdown("#### Step 5 — Research Summary")
+            st.write("**Params:** `company_research`, `prospect_research`")
+            try:
+                research_summary = _build_research_summary(company_research, prospect_research)
+                st.write("**Return:**")
+                st.text(research_summary)
+            except Exception as e:
+                st.error(f"Research summary failed: {e}")
+                research_summary = ""
+
+            st.divider()
+
+            # ── Step 6: Case Study Matching ──────────────────────────────
+            st.markdown("#### Step 6 — Case Study Matching")
+            cs_params = {
+                "prospect_context": research_summary[:200] + "..." if len(research_summary) > 200 else research_summary,
+                "prospect_industry": industry,
+                "prospect_technologies": prospect_technologies,
+                "prospect_country": "",
+                "max_matches": int(max_case_studies),
+            }
+            st.write("**Params:**")
+            st.json(cs_params)
+            try:
+                cs_result = find_casestudy_matches(
+                    prospect_context=research_summary,
+                    prospect_industry=industry,
+                    prospect_technologies=prospect_technologies,
+                    prospect_country="",
+                    max_matches=int(max_case_studies),
+                )
+                cs_matches = cs_result.get("matches", [])
+                st.write(f"**{len(cs_matches)} match(es) returned**")
+                for j, m in enumerate(cs_matches):
+                    md = m.to_dict() if hasattr(m, "to_dict") else (m if isinstance(m, dict) else vars(m))
+                    with st.expander(f"Match {j+1}: {md.get('casestudy_name', '—')} | {md.get('client_name', '—')} | score={md.get('final_score', 0):.3f} | tier={md.get('tier', '—')}"):
+                        st.json(md)
+                with st.expander("debug_log"):
+                    st.json(cs_result.get("debug_log", []))
+            except Exception as e:
+                st.error(f"Case study matching failed: {e}")
+
+            st.divider()
+
+            # ── Step 7: Client Reference Matching ────────────────────────
+            st.markdown("#### Step 7 — Client Reference Matching")
+            cl_params = {
+                "prospect_industry": industry,
+                "prospect_technologies": prospect_technologies,
+                "prospect_country": country,
+                "max_matches": int(max_clients),
+            }
+            st.write("**Params:**")
+            st.json(cl_params)
+            try:
+                cl_result = find_matches(
+                    prospect_industry=industry,
+                    prospect_technologies=prospect_technologies,
+                    prospect_country=country,
+                    max_matches=int(max_clients),
+                )
+                cl_matches = cl_result.get("matches", [])
+                st.write(f"**{len(cl_matches)} match(es) returned**")
+                col_if, col_tc2 = st.columns(2)
+                col_if.write(f"**industry_filter_applied:** {cl_result.get('industry_filter_applied')}")
+                col_tc2.write(f"**total_candidates:** {cl_result.get('total_candidates')}")
+                for j, m in enumerate(cl_matches):
+                    md = m.to_dict() if hasattr(m, "to_dict") else (m if isinstance(m, dict) else vars(m))
+                    with st.expander(f"Match {j+1}: {md.get('client_name', '—')} | {md.get('client_industry', '—')} | {md.get('client_geography', '—')} | score={md.get('final_score', 0):.3f} | source={md.get('match_source', '—')}"):
+                        st.json(md)
+                with st.expander("debug_log"):
+                    st.json(cl_result.get("debug_log", []))
+            except Exception as e:
+                st.error(f"Client reference matching failed: {e}")
+
+            st.divider()
+
+            # ── Step 8: Intent Score ─────────────────────────────────────
+            if generate_intent:
+                st.markdown("#### Step 8 — Intent Score")
+                st.write(f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, `company_name={company_name!r}`, `research_summary` (above)")
+                try:
+                    score = _score_intent(prospect_name, designation, company_name, research_summary)
+                    st.metric("Intent Score", score)
+                except Exception as e:
+                    st.error(f"Intent scoring failed: {e}")
+                st.divider()
+
+            # ── Step 9: EMEA Coding ──────────────────────────────────────
+            st.markdown("#### Step 9 — EMEA Coding")
+            st.write(f"**Params:** `country={country!r}`")
+            try:
+                coded_country = _apply_emea_coding(country)
+                st.write(f"**Return:** `{country}` → `{coded_country}`")
+            except Exception as e:
+                st.error(f"EMEA coding failed: {e}")

@@ -560,8 +560,8 @@ def find_matches(
         - total_candidates: int
         - debug_log: List[Tuple[str, str]] named log entries for UI display
     """
-    if max_matches <= 5:
-        raise ValueError("max_matches must be bigger than 5")
+    if max_matches < 5 or max_matches > 10:
+        raise ValueError("max_matches must be between 5 and 10")
 
     prospect_ind = prospect_industry.strip().lower()
     prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
