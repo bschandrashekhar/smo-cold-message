@@ -377,8 +377,46 @@ def _parse_json_response(text: str, fallback: dict) -> dict:
         return fallback
 
 
-def _run_company_research_websearch(company_name: str, website: str) -> dict:
-    """Company research via Claude Web Search (Haiku) — test/comparison only."""
+WEBSEARCH_MODEL_HAIKU = "claude-haiku-4-5-20251001"
+WEBSEARCH_MODEL_SONNET = "claude-sonnet-4-6-20250514"
+
+# Pricing per million tokens (USD)
+_MODEL_PRICING = {
+    WEBSEARCH_MODEL_HAIKU: {"input": 1.0, "output": 5.0},
+    WEBSEARCH_MODEL_SONNET: {"input": 3.0, "output": 15.0},
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
+}
+_WEBSEARCH_COST_PER_SEARCH = 0.01  # $10 per 1000 searches
+
+
+def _compute_cost(response, model: str) -> dict:
+    """Compute cost from a Claude API response usage."""
+    usage = response.usage
+    input_tokens = getattr(usage, "input_tokens", 0)
+    output_tokens = getattr(usage, "output_tokens", 0)
+    pricing = _MODEL_PRICING.get(model, {"input": 3.0, "output": 15.0})
+    token_cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
+    # Count web searches from server_tool_use
+    num_searches = 0
+    for block in response.content:
+        if hasattr(block, "type") and block.type == "server_tool_use":
+            num_searches += 1
+    search_cost = num_searches * _WEBSEARCH_COST_PER_SEARCH
+    total = token_cost + search_cost
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "token_cost_usd": round(token_cost, 5),
+        "web_searches": num_searches,
+        "search_cost_usd": round(search_cost, 4),
+        "total_cost_usd": round(total, 5),
+        "model": model,
+    }
+
+
+def _run_company_research_websearch(company_name: str, website: str,
+                                     model: str = WEBSEARCH_MODEL_HAIKU) -> dict:
+    """Company research via Claude Web Search — test/comparison only."""
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
     prompt = f"""You are a sales researcher. Search the web for "{company_name}" (website: {website}).
@@ -414,7 +452,7 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
 }}"""
 
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=model,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
         tools=[{
@@ -424,12 +462,14 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
         }],
     )
     text = _extract_websearch_text(response)
-    return _parse_json_response(text, {"company_name": company_name})
+    cost = _compute_cost(response, model)
+    return _parse_json_response(text, {"company_name": company_name}), cost
 
 
 def _run_prospect_research_websearch(prospect_name: str, designation: str,
-                                      company_name: str, city: str, country: str) -> dict:
-    """Prospect research via Claude Web Search (Haiku) — test/comparison only."""
+                                      company_name: str, city: str, country: str,
+                                      model: str = WEBSEARCH_MODEL_HAIKU) -> dict:
+    """Prospect research via Claude Web Search — test/comparison only."""
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
     prompt = f"""You are a sales researcher. Search the web for "{prospect_name}" who is {designation} at {company_name}, based in {city}, {country}.
@@ -469,7 +509,7 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
 }}"""
 
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=model,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
         tools=[{
@@ -479,12 +519,13 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
         }],
     )
     text = _extract_websearch_text(response)
+    cost = _compute_cost(response, model)
     return _parse_json_response(text, {
         "prospect_name": prospect_name,
         "designation": designation,
         "company_name": company_name,
         "location": f"{city}, {country}",
-    })
+    }), cost
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
