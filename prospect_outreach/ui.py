@@ -436,7 +436,8 @@ def _render_test_tab():
                     )
                     company_cache[website] = (company_research, co_source)
                 st.info(_test_cache_badge(co_source))
-                with st.expander("Company Research return"):
+                st.caption("↓ COMPANY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
+                with st.expander("COMPANY_RESEARCH dict", expanded=True):
                     st.json(company_research)
             except Exception as e:
                 st.error(f"Company research failed: {e}")
@@ -469,7 +470,8 @@ def _render_test_tab():
                     city, country, email, linkedin_url, use_prospect_cache
                 )
                 st.info(_test_cache_badge(pr_source))
-                with st.expander("Prospect Research return"):
+                st.caption("↓ PROSPECT_RESEARCH — synthesized by Claude from Serper/LinkedIn results. Cached in Supabase keyed by Email.")
+                with st.expander("PROSPECT_RESEARCH dict", expanded=True):
                     st.json(prospect_research)
             except Exception as e:
                 st.error(f"Prospect research failed: {e}")
@@ -479,11 +481,13 @@ def _render_test_tab():
 
             # ── Step 5: Research Summary ─────────────────────────────────
             st.markdown("#### Step 5 — Research Summary")
-            st.write("**Params:** `company_research`, `prospect_research`")
+            st.write("**Params:** `company_research` (Step 2) + `prospect_research` (Step 4) merged")
+            st.caption("Claude merges both dicts and produces 5-6 plain-text bullets. This is stored in the `Research_Summary` column in the output Excel.")
             try:
                 research_summary = _build_research_summary(company_research, prospect_research)
-                st.write("**Return:**")
+                st.markdown("**→ `Research_Summary` (stored in Excel):**")
                 st.text(research_summary)
+                st.caption(f"Length: {len(research_summary)} chars")
             except Exception as e:
                 st.error(f"Research summary failed: {e}")
                 research_summary = ""
