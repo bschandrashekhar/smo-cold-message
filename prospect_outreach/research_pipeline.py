@@ -378,7 +378,7 @@ def _parse_json_response(text: str, fallback: dict) -> dict:
 
 
 WEBSEARCH_MODEL_HAIKU = "claude-haiku-4-5-20251001"
-WEBSEARCH_MODEL_SONNET = "claude-sonnet-4-5-20250929"
+WEBSEARCH_MODEL_SONNET = "claude-sonnet-4-6"
 
 # Pricing per million tokens (USD)
 _MODEL_PRICING = {
