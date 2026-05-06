@@ -358,11 +358,19 @@ def _render_test_tab():
 
     st.divider()
 
+    search_provider = st.radio(
+        "Search Provider",
+        ["Serper", "Claude Web Search", "Both (side-by-side)"],
+        horizontal=True, key="test_search_provider",
+    )
+    use_serper = search_provider in ("Serper", "Both (side-by-side)")
+    use_websearch = search_provider in ("Claude Web Search", "Both (side-by-side)")
+
     col_ca, col_cb = st.columns(2)
     with col_ca:
-        use_company_cache = st.toggle("Use Company Cache", value=False, key="test_company_cache")
+        use_company_cache = st.toggle("Use Company Cache (Serper)", value=False, key="test_company_cache")
     with col_cb:
-        use_prospect_cache = st.toggle("Use Prospect Cache", value=False, key="test_prospect_cache")
+        use_prospect_cache = st.toggle("Use Prospect Cache (Serper)", value=False, key="test_prospect_cache")
 
     col_ta, col_tb, col_tc = st.columns(3)
     with col_ta:
@@ -377,6 +385,7 @@ def _render_test_tab():
 
     from prospect_outreach.research_pipeline import (
         _extract_technologies, _build_research_summary, _score_intent, _apply_emea_coding,
+        _run_company_research_websearch, _run_prospect_research_websearch,
     )
     from client_referencing.brand_matcher import find_brand_match
     from client_referencing.casestudy_matcher import find_casestudy_matches
@@ -426,22 +435,57 @@ def _render_test_tab():
             # ── Step 2: Company Research ─────────────────────────────────
             st.markdown("#### Step 2 — Company Research")
             st.write(f"**Params:** `company_name={company_name!r}`, `website={website!r}`")
-            try:
-                if website in company_cache:
-                    company_research, co_source = company_cache[website]
-                    co_source = "DEDUPED"
-                else:
-                    company_research, co_source = _test_get_company_research(
-                        company_name, website, use_company_cache
-                    )
-                    company_cache[website] = (company_research, co_source)
-                st.info(_test_cache_badge(co_source))
-                st.caption("↓ COMPANY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
-                with st.expander("COMPANY_RESEARCH dict", expanded=True):
-                    st.json(company_research)
-            except Exception as e:
-                st.error(f"Company research failed: {e}")
-                company_research = {"company_name": company_name}
+            company_research = {"company_name": company_name}
+            company_research_ws = None
+
+            if use_serper and use_websearch:
+                col_s, col_w = st.columns(2)
+                with col_s:
+                    st.markdown("**Serper**")
+                    try:
+                        if website in company_cache:
+                            company_research, co_source = company_cache[website]
+                            co_source = "DEDUPED"
+                        else:
+                            company_research, co_source = _test_get_company_research(
+                                company_name, website, use_company_cache
+                            )
+                            company_cache[website] = (company_research, co_source)
+                        st.info(_test_cache_badge(co_source))
+                        st.json(company_research)
+                    except Exception as e:
+                        st.error(f"Serper failed: {e}")
+                with col_w:
+                    st.markdown("**Claude Web Search** (Haiku)")
+                    try:
+                        company_research_ws = _run_company_research_websearch(company_name, website)
+                        st.json(company_research_ws)
+                    except Exception as e:
+                        st.error(f"Web Search failed: {e}")
+            elif use_serper:
+                try:
+                    if website in company_cache:
+                        company_research, co_source = company_cache[website]
+                        co_source = "DEDUPED"
+                    else:
+                        company_research, co_source = _test_get_company_research(
+                            company_name, website, use_company_cache
+                        )
+                        company_cache[website] = (company_research, co_source)
+                    st.info(_test_cache_badge(co_source))
+                    st.caption("↓ COMPANY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
+                    with st.expander("COMPANY_RESEARCH dict", expanded=True):
+                        st.json(company_research)
+                except Exception as e:
+                    st.error(f"Company research failed: {e}")
+            else:
+                st.markdown("**Claude Web Search** (Haiku)")
+                try:
+                    company_research = _run_company_research_websearch(company_name, website)
+                    with st.expander("COMPANY_RESEARCH dict", expanded=True):
+                        st.json(company_research)
+                except Exception as e:
+                    st.error(f"Web Search failed: {e}")
 
             st.divider()
 
@@ -464,33 +508,92 @@ def _render_test_tab():
                 f"`company_name={company_name!r}`, `city={city!r}`, `country={country!r}`, "
                 f"`email={email!r}`, `linkedin_url={linkedin_url!r}`"
             )
-            try:
-                prospect_research, pr_source = _test_get_prospect_research(
-                    prospect_name, designation, company_name,
-                    city, country, email, linkedin_url, use_prospect_cache
-                )
-                st.info(_test_cache_badge(pr_source))
-                st.caption("↓ PROSPECT_RESEARCH — synthesized by Claude from Serper/LinkedIn results. Cached in Supabase keyed by Email.")
-                with st.expander("PROSPECT_RESEARCH dict", expanded=True):
-                    st.json(prospect_research)
-            except Exception as e:
-                st.error(f"Prospect research failed: {e}")
-                prospect_research = {}
+            prospect_research = {}
+            prospect_research_ws = None
+
+            if use_serper and use_websearch:
+                col_s, col_w = st.columns(2)
+                with col_s:
+                    st.markdown("**Serper**")
+                    try:
+                        prospect_research, pr_source = _test_get_prospect_research(
+                            prospect_name, designation, company_name,
+                            city, country, email, linkedin_url, use_prospect_cache
+                        )
+                        st.info(_test_cache_badge(pr_source))
+                        st.json(prospect_research)
+                    except Exception as e:
+                        st.error(f"Serper failed: {e}")
+                with col_w:
+                    st.markdown("**Claude Web Search** (Haiku)")
+                    try:
+                        prospect_research_ws = _run_prospect_research_websearch(
+                            prospect_name, designation, company_name, city, country
+                        )
+                        st.json(prospect_research_ws)
+                    except Exception as e:
+                        st.error(f"Web Search failed: {e}")
+            elif use_serper:
+                try:
+                    prospect_research, pr_source = _test_get_prospect_research(
+                        prospect_name, designation, company_name,
+                        city, country, email, linkedin_url, use_prospect_cache
+                    )
+                    st.info(_test_cache_badge(pr_source))
+                    st.caption("↓ PROSPECT_RESEARCH — synthesized by Claude from Serper/LinkedIn results. Cached in Supabase keyed by Email.")
+                    with st.expander("PROSPECT_RESEARCH dict", expanded=True):
+                        st.json(prospect_research)
+                except Exception as e:
+                    st.error(f"Prospect research failed: {e}")
+            else:
+                st.markdown("**Claude Web Search** (Haiku)")
+                try:
+                    prospect_research = _run_prospect_research_websearch(
+                        prospect_name, designation, company_name, city, country
+                    )
+                    with st.expander("PROSPECT_RESEARCH dict", expanded=True):
+                        st.json(prospect_research)
+                except Exception as e:
+                    st.error(f"Web Search failed: {e}")
 
             st.divider()
 
             # ── Step 5: Research Summary ─────────────────────────────────
             st.markdown("#### Step 5 — Research Summary")
-            st.write("**Params:** `company_research` (Step 2) + `prospect_research` (Step 4) merged")
-            st.caption("Claude merges both dicts and produces 5-6 plain-text bullets. This is stored in the `Research_Summary` column in the output Excel.")
-            try:
-                research_summary = _build_research_summary(company_research, prospect_research)
-                st.markdown("**→ `Research_Summary` (stored in Excel):**")
-                st.text(research_summary)
-                st.caption(f"Length: {len(research_summary)} chars")
-            except Exception as e:
-                st.error(f"Research summary failed: {e}")
-                research_summary = ""
+            st.caption("Claude merges both dicts and produces up to 5-6 plain-text bullets. Stored in `Research_Summary` column.")
+            research_summary = ""
+
+            if use_serper and use_websearch:
+                col_s, col_w = st.columns(2)
+                with col_s:
+                    st.markdown("**From Serper research**")
+                    try:
+                        research_summary = _build_research_summary(company_research, prospect_research)
+                        st.text(research_summary)
+                        st.caption(f"Length: {len(research_summary)} chars")
+                    except Exception as e:
+                        st.error(f"Summary failed: {e}")
+                        research_summary = ""
+                with col_w:
+                    st.markdown("**From Claude Web Search research**")
+                    try:
+                        research_summary_ws = _build_research_summary(
+                            company_research_ws or {"company_name": company_name},
+                            prospect_research_ws or {},
+                        )
+                        st.text(research_summary_ws)
+                        st.caption(f"Length: {len(research_summary_ws)} chars")
+                    except Exception as e:
+                        st.error(f"Summary failed: {e}")
+            else:
+                try:
+                    research_summary = _build_research_summary(company_research, prospect_research)
+                    st.markdown("**→ `Research_Summary` (stored in Excel):**")
+                    st.text(research_summary)
+                    st.caption(f"Length: {len(research_summary)} chars")
+                except Exception as e:
+                    st.error(f"Research summary failed: {e}")
+                    research_summary = ""
 
             st.divider()
 
