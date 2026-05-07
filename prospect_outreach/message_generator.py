@@ -221,6 +221,7 @@ def generate_messages(
 
     if "Message_to_send" not in df.columns:
         df["Message_to_send"] = ""
+    df["Message_to_send"] = df["Message_to_send"].astype(object).fillna("")
 
     # Determine ready vs skipped
     def _is_ready(row):

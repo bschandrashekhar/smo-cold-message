@@ -341,7 +341,7 @@ def research_workbook(
     except Exception:
         dates_df = pd.DataFrame()
 
-    # Ensure generated columns exist
+    # Ensure generated columns exist and are object dtype (not float64)
     for col in [
         "Case_Studies", "Industry_Client_References",
         "Suggested_Brand_Name_to_use", "Intent_Score",
@@ -349,6 +349,7 @@ def research_workbook(
     ]:
         if col not in df.columns:
             df[col] = ""
+        df[col] = df[col].astype(object).fillna("")
 
     total = len(df)
 
