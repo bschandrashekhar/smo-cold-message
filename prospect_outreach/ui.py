@@ -81,12 +81,14 @@ def _render_pass1_tab():
     st.divider()
 
     # UI options
-    col_a, col_b, col_c = st.columns(3)
+    col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         generate_intent = st.toggle("Generate Intent Score", value=True)
     with col_b:
-        max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5)
+        use_cache = st.toggle("Use Research Cache", value=True)
     with col_c:
+        max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5)
+    with col_d:
         max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5)
 
     if st.button("Run Research", type="primary", key="run_research_btn"):
@@ -110,6 +112,7 @@ def _render_pass1_tab():
                 generate_intent_score=generate_intent,
                 max_case_studies=int(max_case_studies),
                 max_client_matches=int(max_clients),
+                use_cache=use_cache,
                 progress_callback=on_progress,
             )
             progress_bar.progress(1.0)

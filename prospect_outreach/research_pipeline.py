@@ -225,16 +225,17 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
     return result
 
 
-def _get_technology_research(company_name: str, website: str) -> dict:
+def _get_technology_research(company_name: str, website: str, use_cache: bool = True) -> dict:
     """Get technology research from cache or run fresh."""
     sb = _get_supabase()
-    result = sb.table("Cache_Prospect_Company_Research").select("*").eq("Website", website).execute()
-    if result.data:
-        row = result.data[0]
-        if not _is_cache_stale(row.get("Date_of_Research")):
-            cr = row.get("Technology_Research")
-            if cr is not None:
-                return cr if isinstance(cr, dict) else json.loads(cr)
+    if use_cache:
+        result = sb.table("Cache_Prospect_Company_Research").select("*").eq("Website", website).execute()
+        if result.data:
+            row = result.data[0]
+            if not _is_cache_stale(row.get("Date_of_Research")):
+                cr = row.get("Technology_Research")
+                if cr is not None:
+                    return cr if isinstance(cr, dict) else json.loads(cr)
 
     # Run fresh research
     research = _run_technology_research(company_name, website)
@@ -317,6 +318,7 @@ def research_workbook(
     generate_intent_score: bool = True,
     max_case_studies: int = 5,
     max_client_matches: int = 5,
+    use_cache: bool = True,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> None:
     """Run Pass 1 research pipeline on uploaded Excel workbook.
@@ -327,6 +329,7 @@ def research_workbook(
         generate_intent_score: Whether to generate Intent_Score column.
         max_case_studies: Max matches for find_casestudy_matches.
         max_client_matches: Max matches for find_matches (must be >= 5).
+        use_cache: Whether to use Supabase cache for technology research.
         progress_callback: Optional fn(current, total, status_msg).
     """
     from prospect_outreach.brand_knowledge import ensure_brand_profiles
@@ -381,7 +384,7 @@ def research_workbook(
         if website not in company_cache:
             if progress_callback:
                 progress_callback(current, total, f"Researching {company_name}...")
-            tech_research = _get_technology_research(company_name, website)
+            tech_research = _get_technology_research(company_name, website, use_cache=use_cache)
             company_cache[website] = tech_research
         else:
             tech_research = company_cache[website]
