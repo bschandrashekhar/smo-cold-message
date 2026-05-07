@@ -232,8 +232,9 @@ def _get_technology_research(company_name: str, website: str) -> dict:
     if result.data:
         row = result.data[0]
         if not _is_cache_stale(row.get("Date_of_Research")):
-            cr = row["Technology_Research"]
-            return cr if isinstance(cr, dict) else json.loads(cr)
+            cr = row.get("Technology_Research")
+            if cr is not None:
+                return cr if isinstance(cr, dict) else json.loads(cr)
 
     # Run fresh research
     research = _run_technology_research(company_name, website)
@@ -379,7 +380,6 @@ def research_workbook(
                 prospect_context="",
                 prospect_industry=industry,
                 prospect_technologies=tech_names_csv,
-                prospect_country="",
                 max_matches=max_case_studies,
             )
             df.at[idx, "Case_Studies"] = json.dumps([m.to_excel_dict() if hasattr(m, "to_excel_dict") else m for m in cs_result["matches"]])
