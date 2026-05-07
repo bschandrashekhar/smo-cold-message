@@ -422,7 +422,10 @@ def _render_test_tab():
                 if verbose_info and verbose_info.get("per_query_snippets"):
                     st.caption("↓ Individual Serper query results (input to Claude)")
                     for qi, qs in enumerate(verbose_info["per_query_snippets"], 1):
-                        with st.expander(f"Query {qi}: {qs['query']}", expanded=False):
+                        count = qs.get("result_count", "?")
+                        with st.expander(f"Query {qi} ({count} results): {qs['query']}", expanded=False):
+                            if qs.get("serper_meta"):
+                                st.json(qs["serper_meta"])
                             st.text(qs["results"] if qs["results"] else "(no results)")
 
                 # Show Claude's raw response

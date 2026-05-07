@@ -120,6 +120,28 @@ def _serper_search(query: str, num_results: int = 5) -> list[dict]:
         return []
 
 
+def _serper_search_verbose(query: str, num_results: int = 5) -> tuple[list[dict], dict]:
+    """Run a Serper search returning (organic_results, diagnostic_meta)."""
+    url = "https://google.serper.dev/search"
+    api_key = config.SERPER_API_KEY
+    headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
+    payload = {"q": query, "num": num_results}
+    meta = {"api_key_prefix": api_key[:8] if api_key else "EMPTY", "api_key_length": len(api_key) if api_key else 0}
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+        meta["status_code"] = resp.status_code
+        data = resp.json()
+        meta["response_keys"] = list(data.keys())
+        if "organic" not in data:
+            meta["full_response_preview"] = str(data)[:500]
+        organic = data.get("organic", [])
+        meta["organic_count"] = len(organic)
+        return organic, meta
+    except Exception as e:
+        meta["error"] = str(e)
+        return [], meta
+
+
 def _results_to_text(results: list[dict]) -> str:
     parts = []
     for r in results:
@@ -160,11 +182,18 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
     per_query_snippets = []
     for query_template in TECHNOLOGY_RESEARCH_QUERIES:
         query = query_template.format(name=company_name)
-        results = _serper_search(query, 5)
+        if verbose:
+            results, serper_meta = _serper_search_verbose(query, 5)
+        else:
+            results = _serper_search(query, 5)
+            serper_meta = None
         snippet_text = _results_to_text(results)
         all_snippets += f"\n\nQuery: {query}\n"
         all_snippets += snippet_text
-        per_query_snippets.append({"query": query, "results": snippet_text})
+        entry = {"query": query, "results": snippet_text, "result_count": len(results)}
+        if serper_meta:
+            entry["serper_meta"] = serper_meta
+        per_query_snippets.append(entry)
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
