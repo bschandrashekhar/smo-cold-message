@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env file if present (local dev)
-load_dotenv()
+# Load .env file if present (local dev) — use explicit path to avoid CWD issues
+_ENV_PATH = Path(__file__).parent.parent / ".env"
+load_dotenv(_ENV_PATH)
 
 
 def _get_secret(key: str) -> str:
