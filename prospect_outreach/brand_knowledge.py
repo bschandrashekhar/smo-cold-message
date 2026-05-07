@@ -6,7 +6,7 @@ import anthropic
 
 
 MAX_RETRIES = 3
-RETRY_DELAY = 90  # seconds — wait out the rate limit window (web_search uses extra tokens)
+RETRY_DELAY = 65  # seconds — wait out the 1-minute rate limit window
 
 
 def are_brand_files_present():
@@ -56,7 +56,7 @@ Search their website thoroughly — look at services pages, about pages, case st
 
     response = _call_claude_with_retry(
         client,
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=4096,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
@@ -98,40 +98,30 @@ BRAND_WEBSITES = {
 }
 
 
-def refresh_single_brand(brand_name: str) -> dict:
-    """Scrape a single brand website and persist its JSON profile. Returns the profile."""
-    if brand_name not in BRAND_WEBSITES:
-        raise ValueError(f"Unknown brand: {brand_name}. Known: {list(BRAND_WEBSITES.keys())}")
-
-    config.DATA_DIR.mkdir(exist_ok=True)
-    website = BRAND_WEBSITES[brand_name]
-    print(f"[brand_knowledge] Scraping {brand_name} ({website})...")
-
-    profile = _scrape_brand_with_claude(website, brand_name)
-    path = config.BRAND_JSONS[brand_name]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(profile, f, indent=2)
-    print(f"[brand_knowledge] Saved {brand_name} -> {path}")
-    return profile
-
-
 def refresh_brand_profiles():
     """Scrape brand websites using Claude web search and persist JSON profiles."""
     config.DATA_DIR.mkdir(exist_ok=True)
 
-    for i, (name, website) in enumerate(BRAND_WEBSITES.items()):
-        print(f"[brand_knowledge] ({i+1}/{len(BRAND_WEBSITES)}) Scraping {name} ({website})...")
+    for name, website in BRAND_WEBSITES.items():
         profile = _scrape_brand_with_claude(website, name)
         path = config.BRAND_JSONS[name]
         with open(path, "w", encoding="utf-8") as f:
             json.dump(profile, f, indent=2)
-        print(f"[brand_knowledge] Saved {name} -> {path}")
-        if i < len(BRAND_WEBSITES) - 1:
-            print(f"[brand_knowledge] Waiting 65s for rate limit...")
-            time.sleep(65)
+        time.sleep(65)  # Wait between brands to avoid rate limits
 
-    print("[brand_knowledge] All brands refreshed.")
     return are_brand_files_present()
+
+
+def refresh_single_brand(name: str):
+    """Scrape a single brand website and persist its JSON profile."""
+    config.DATA_DIR.mkdir(exist_ok=True)
+    website = BRAND_WEBSITES.get(name)
+    if not website:
+        raise ValueError(f"Unknown brand: {name}")
+    profile = _scrape_brand_with_claude(website, name)
+    path = config.BRAND_JSONS[name]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(profile, f, indent=2)
 
 
 def ensure_brand_profiles():

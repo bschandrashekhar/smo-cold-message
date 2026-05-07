@@ -1,11 +1,11 @@
--- Migration: Rename Company_Research column to Technology_research
--- and clear all existing cache entries (schema change).
+-- Migration: Add Technology_Research column to Cache_Prospect_Company_Research
+-- Company_Research column is kept (not renamed).
 --
--- Run in Supabase SQL Editor.
+-- Already applied manually on 2026-05-07.
 
--- 1. Clear all existing rows (old COMPANY_RESEARCH schema)
+-- 1. Clear all existing rows (old schema)
 TRUNCATE TABLE "Cache_Prospect_Company_Research";
 
--- 2. Rename column
+-- 2. Add new column (Company_Research kept as-is)
 ALTER TABLE "Cache_Prospect_Company_Research"
-    RENAME COLUMN "Company_Research" TO "Technology_research";
+    ADD COLUMN IF NOT EXISTS "Technology_Research" jsonb;

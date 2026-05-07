@@ -137,8 +137,8 @@ def _render_pass1_tab():
 def _render_pass2_tab():
     st.subheader("Pass 2: Generate Messages")
     st.caption(
-        "Upload the reviewed data_output.xlsx. Rows with a Research_Summary and no existing "
-        "Message_to_send will have messages generated. Rows with empty Research_Summary are skipped."
+        "Upload the reviewed data_output.xlsx. Rows with Prospect_Technologies and no existing "
+        "Message_to_send will have messages generated. Rows with empty Prospect_Technologies are skipped."
     )
 
     uploaded = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="pass2_upload")
@@ -157,8 +157,8 @@ def _render_pass2_tab():
     # Preview ready/skipped counts
     def _is_ready(row):
         msg = str(row.get("Message_to_send", "")).strip()
-        summary = str(row.get("Research_Summary", "")).strip()
-        return not msg and bool(summary)
+        tech_research = str(row.get("Prospect_Technologies", "")).strip()
+        return not msg and bool(tech_research)
 
     ready = sum(1 for _, row in df.iterrows() if _is_ready(row))
     skipped = len(df) - ready
@@ -168,7 +168,7 @@ def _render_pass2_tab():
     col2.metric("Skipped", skipped)
 
     if ready == 0:
-        st.info("No prospects to generate messages for — all rows either already have messages or have empty Research_Summary.")
+        st.info("No prospects to generate messages for — all rows either already have messages or have empty Prospect_Technologies.")
         return
 
     if st.button("Generate Messages", type="primary", key="run_gen_btn"):
@@ -284,7 +284,7 @@ def _test_get_technology_research(company_name: str, website: str, use_cache: bo
                 row = result.data[0]
                 if not _is_cache_stale(row.get("Date_of_Research")):
                     source = "CACHE HIT"
-                    cr = row["Technology_research"]
+                    cr = row["Technology_Research"]
                     data = json.loads(cr) if isinstance(cr, str) else cr
                 else:
                     source = "CACHE STALE"

@@ -11,7 +11,6 @@ For each prospect:
 
 import json
 import re
-import time
 from datetime import datetime, timezone, timedelta
 from typing import Callable, Optional
 
@@ -21,7 +20,6 @@ import requests
 from supabase import create_client
 
 from prospect_outreach import config
-from prospect_outreach.brand_knowledge import load_brand_profile
 from client_referencing.brand_matcher import find_brand_match
 from client_referencing.matcher import find_matches
 from client_referencing.casestudy_matcher import find_casestudy_matches
@@ -192,192 +190,17 @@ def _get_technology_research(company_name: str, website: str) -> dict:
     if result.data:
         row = result.data[0]
         if not _is_cache_stale(row.get("Date_of_Research")):
-            cr = row["Technology_research"]
+            cr = row["Technology_Research"]
             return cr if isinstance(cr, dict) else json.loads(cr)
 
     # Run fresh research
     research = _run_technology_research(company_name, website)
     sb.table("Cache_Prospect_Company_Research").upsert({
         "Website": website,
-        "Technology_research": research,
+        "Technology_Research": research,
         "Date_of_Research": datetime.now(timezone.utc).isoformat(),
     }).execute()
     return research
-
-
-
-
-# ── Claude Web Search alternative ─────────────────────────────────────────
-
-def _extract_websearch_text(response) -> str:
-    """Extract the final text block from a Claude web search response."""
-    for block in response.content:
-        if hasattr(block, "type") and block.type == "text":
-            return block.text.strip()
-    return ""
-
-
-def _parse_json_response(text: str, fallback: dict) -> dict:
-    """Strip markdown fences and parse JSON, returning fallback on failure."""
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return fallback
-
-
-WEBSEARCH_MODEL_HAIKU = "claude-haiku-4-5-20251001"
-WEBSEARCH_MODEL_SONNET = "claude-sonnet-4-6"
-
-# Pricing per million tokens (USD)
-_MODEL_PRICING = {
-    WEBSEARCH_MODEL_HAIKU: {"input": 1.0, "output": 5.0},
-    WEBSEARCH_MODEL_SONNET: {"input": 3.0, "output": 15.0},
-    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
-}
-_WEBSEARCH_COST_PER_SEARCH = 0.01  # $10 per 1000 searches
-
-
-def _compute_cost(response, model: str) -> dict:
-    """Compute cost from a Claude API response usage."""
-    usage = response.usage
-    input_tokens = getattr(usage, "input_tokens", 0)
-    output_tokens = getattr(usage, "output_tokens", 0)
-    pricing = _MODEL_PRICING.get(model, {"input": 3.0, "output": 15.0})
-    token_cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
-    # Count web searches from server_tool_use
-    num_searches = 0
-    for block in response.content:
-        if hasattr(block, "type") and block.type == "server_tool_use":
-            num_searches += 1
-    search_cost = num_searches * _WEBSEARCH_COST_PER_SEARCH
-    total = token_cost + search_cost
-    return {
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "token_cost_usd": round(token_cost, 5),
-        "web_searches": num_searches,
-        "search_cost_usd": round(search_cost, 4),
-        "total_cost_usd": round(total, 5),
-        "model": model,
-    }
-
-
-def _run_company_research_websearch(company_name: str, website: str,
-                                     model: str = WEBSEARCH_MODEL_HAIKU) -> dict:
-    """Company research via Claude Web Search — test/comparison only."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
-    prompt = f"""You are a sales researcher. Search the web for "{company_name}" (website: {website}).
-
-Find ONLY factual, verifiable information from the last 3 months about:
-1. Technical initiatives (digital transformation, cloud migration, AI/automation, technology modernization)
-2. Job openings (Salesforce, Snowflake, data engineering, custom development, other technical)
-3. Additional context (company size, industry, awards, partnerships, recent news)
-
-Rules:
-- Only include findings that explicitly mention "{company_name}" by name
-- Only include findings from the last 3 months — discard anything older or undated
-- No generic industry articles, no speculation
-- Only include keys where data was actually found — no empty lists, no null values
-
-Return ONLY a valid JSON object (no markdown, no code blocks) with this structure (omit any key with no data):
-{{
-  "company_name": "{company_name}",
-  "technical_initiatives": {{
-    "digital_transformation": ["finding"],
-    "technology_modernization": ["finding"],
-    "cloud_migration": ["finding"],
-    "ai_automation": ["finding"]
-  }},
-  "job_openings": {{
-    "salesforce": [{{"title": "str", "date_posted": "str", "tools_mentioned": ["str"]}}],
-    "snowflake": [...],
-    "custom_development": [...],
-    "data_engineering": [...],
-    "other_technical": [...]
-  }},
-  "additional_context": ["finding"]
-}}"""
-
-    response = client.messages.create(
-        model=model,
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
-        tools=[{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 3,
-        }],
-    )
-    text = _extract_websearch_text(response)
-    cost = _compute_cost(response, model)
-    return _parse_json_response(text, {"company_name": company_name}), cost
-
-
-def _run_prospect_research_websearch(prospect_name: str, designation: str,
-                                      company_name: str, city: str, country: str,
-                                      model: str = WEBSEARCH_MODEL_HAIKU) -> dict:
-    """Prospect research via Claude Web Search — test/comparison only."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
-    prompt = f"""You are a sales researcher. Search the web for "{prospect_name}" who is {designation} at {company_name}, based in {city}, {country}.
-
-Search strategy:
-1. First search LinkedIn for their profile
-2. Then search for broader mentions (interviews, keynotes, podcasts, announcements)
-
-Find ONLY factual, verifiable information. Rules:
-- LinkedIn is the primary source; use broader results only to fill gaps
-- Recent activity limited to last 3 months only
-- previous_employers from LinkedIn career history only
-- No speculation or unverified claims
-- Only include keys where data was actually found — no empty lists, no null values
-
-Return ONLY a valid JSON object (no markdown, no code blocks) with this structure (omit any key with no data):
-{{
-  "prospect_name": "{prospect_name}",
-  "designation": "{designation}",
-  "company_name": "{company_name}",
-  "location": "{city}, {country}",
-  "professional_background": {{
-    "location_and_network": ["finding"],
-    "educational_background": ["finding"],
-    "role_scope": ["finding"]
-  }},
-  "strategic_focus_areas": {{
-    "partnership_development": ["finding"],
-    "sales_and_marketing": ["finding"],
-    "domain_expertise": ["finding"]
-  }},
-  "recent_activity": {{
-    "brand_and_initiatives": ["finding"],
-    "thought_leadership": ["finding"]
-  }},
-  "previous_employers": ["Company A", "Company B"]
-}}"""
-
-    response = client.messages.create(
-        model=model,
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
-        tools=[{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 3,
-        }],
-    )
-    text = _extract_websearch_text(response)
-    cost = _compute_cost(response, model)
-    return _parse_json_response(text, {
-        "prospect_name": prospect_name,
-        "designation": designation,
-        "company_name": company_name,
-        "location": f"{city}, {country}",
-    }), cost
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────

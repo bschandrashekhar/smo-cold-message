@@ -44,7 +44,7 @@ Note that this is a two-pass workflow: Pass 1 is "Automated research & manual re
 | End_Date | End date of the meeting window for that location.
 Note: 
   1. If there is no worksheet with this name, then we dont have to weave an inperson meeting request in the message being generated i.e. "Message_to_send".
-  2. If a prospect's location doesn't match any row in "dates" worksheet, then use generic phrasing ("in the coming weeks") as part of the messaging i.e. "Message_to_send".
+  2. If a prospect's location doesn't match any row in "dates" worksheet, then use generic phrasing ("Please let me know when we can connect") as part of the messaging i.e. "Message_to_send".
 
 ## Streamlit App — Two-Pass UI
 
@@ -62,9 +62,9 @@ Note:
 
 ### Offline Review (Part of Pass 1 but taken offline - "human in the loop")
 User opens `data_output.xlsx`:
-- Check research summaries for accuracy
+- Check technology research findings for accuracy
 - Adjust brand assignments if needed
-- Remove low-intent prospects (delete rows or clear Research Summary) - depending on the UI selection for Intent_Score
+- Remove low-intent prospects (delete rows or clear Prospect_Technologies) - depending on the UI selection for Intent_Score
 - Save the file
 
 ### Tab 2: Generate Messages (Pass 2)
@@ -72,7 +72,7 @@ User opens `data_output.xlsx`:
 2. App shows summary: "15 prospects ready, 5 skipped"
 3. Skip logic:
    - Has "Message_to_send" already → skip
-   - Empty "Research Summary" → skip (user removed it)
+   - Empty "Prospect_Technologies" → skip (user removed it)
 4. User clicks **"Generate Messages"**
 5. Pipeline runs Step 3 with progress bar
 6. **Download** button → `data_final.xlsx` with all columns filled
