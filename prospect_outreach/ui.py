@@ -330,6 +330,10 @@ def _render_test_tab():
         st.error(f"Missing required columns: {', '.join(missing)}")
         return
 
+    st.write(f"**{len(df)} prospect(s) loaded**")
+    with st.expander("Preview uploaded data", expanded=False):
+        st.dataframe(df, use_container_width=True)
+
     st.divider()
 
     use_company_cache = st.toggle("Use Technology Research Cache", value=False, key="test_company_cache")
