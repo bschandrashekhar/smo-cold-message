@@ -82,15 +82,24 @@ class CaseStudyMatch:
         }
 
     def to_excel_dict(self) -> dict:
+        # Keep only the best semantic match per prospect_tech, threshold >= 0.40
+        best_by_tech: dict[str, tuple] = {}
+        for t in self.semantic_techs:
+            ptech, mtech, sim = t[0], t[1], t[2]
+            if sim < 0.40:
+                continue
+            if ptech not in best_by_tech or sim > best_by_tech[ptech][2]:
+                best_by_tech[ptech] = (ptech, mtech, sim)
+        semantic_slim = [
+            {"prospect_tech": v[0], "matched_tech": v[1], "similarity": round(v[2], 2)}
+            for v in best_by_tech.values()
+        ]
         return {
             "casestudy_id": self.casestudy_id,
             "client_name": self.client_name,
             "client_industry": self.client_industry,
             "exact_techs": self.exact_techs,
-            "semantic_techs": [
-                {"prospect_tech": t[0], "matched_tech": t[1], "similarity": t[2]}
-                for t in self.semantic_techs
-            ],
+            "semantic_techs": semantic_slim,
             "casestudy_name": self.casestudy_name,
             "summary_problem": self.summary_problem,
             "summary_solution": self.summary_solution,
