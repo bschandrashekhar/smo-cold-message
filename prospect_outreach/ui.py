@@ -454,7 +454,6 @@ def _render_test_tab():
                 "prospect_context": "",
                 "prospect_industry": industry,
                 "prospect_technologies": tech_names_csv,
-                "prospect_country": "",
                 "max_matches": int(max_case_studies),
             }
             st.write("**Params:**")
@@ -464,7 +463,6 @@ def _render_test_tab():
                     prospect_context="",
                     prospect_industry=industry,
                     prospect_technologies=tech_names_csv,
-                    prospect_country="",
                     max_matches=int(max_case_studies),
                 )
                 cs_matches = cs_result.get("matches", [])
