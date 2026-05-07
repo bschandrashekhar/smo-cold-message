@@ -85,7 +85,7 @@ def _render_pass1_tab():
     with col_a:
         generate_intent = st.toggle("Generate Intent Score", value=True)
     with col_b:
-        max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5)
+        max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5)
     with col_c:
         max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5)
 
@@ -342,7 +342,7 @@ def _render_test_tab():
     with col_ta:
         generate_intent = st.toggle("Generate Intent Score", value=False, key="test_intent")
     with col_tb:
-        max_case_studies = st.number_input("Max Case Studies", min_value=1, max_value=20, value=5, key="test_cs")
+        max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5, key="test_cs")
     with col_tc:
         max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5, key="test_cl")
 

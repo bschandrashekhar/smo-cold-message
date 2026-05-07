@@ -12,7 +12,7 @@ Tiered ranking:
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -443,6 +443,7 @@ def find_casestudy_matches(
         - matches: List[CaseStudyMatch]
         - debug_log: List[Tuple[str, str]]
     """
+    max_matches = max(5, min(max_matches, 8))
     debug_log: List[Tuple[str, str]] = []
     explanation: List[Tuple[str, str]] = []  # step-by-step explanation for UI
 
@@ -525,7 +526,7 @@ def find_casestudy_matches(
 
     if not tier2_shortlist:
         debug_log.append(("Result", "No matching case studies found"))
-        return {"matches": [], "debug_log": debug_log}
+        return {"matches": [], "debug_log": debug_log, "explanation": explanation}
 
     debug_log.append((
         "TIER 2 shortlist (all tech matches)",

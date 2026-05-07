@@ -845,7 +845,7 @@ def _render_casestudy_match_tab():
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
             )
         with col2:
-            max_matches = st.number_input("Max Matches", min_value=3, max_value=20, value=8)
+            max_matches = st.number_input("Max Matches", min_value=5, max_value=8, value=8)
 
         submitted = st.form_submit_button("Find Matching Case Studies", type="primary")
 
