@@ -2,13 +2,11 @@
 
 For each prospect:
   1. Brand match via find_brand_match (industry embeddings)
-  2. Company research via Serper (with Supabase cache, 3-month TTL)
-  3. Prospect research via Serper (with Supabase cache, 3-month TTL)
-  4. Research summary (5-6 bullet points)
-  5. Case study matching via find_casestudy_matches
-  6. Client matching via find_matches
-  7. Intent scoring (optional)
-  8. EMEA country coding
+  2. EMEA country coding (early, before matching)
+  3. Technology research via Serper (with Supabase cache, 3-month TTL)
+  4. Case study matching via find_casestudy_matches
+  5. Client matching via find_matches
+  6. Intent scoring (optional)
 """
 
 import json
@@ -50,35 +48,46 @@ EMEA_COUNTRIES = {
     "zambia", "zimbabwe",
 }
 
-TECH_EXTRACTION_PROMPT = """From the following company research JSON, extract only the generic technology platform names mentioned.
-Return a comma-separated list of only well-known, general-purpose platforms (e.g. Salesforce, Snowflake, Boomi, MuleSoft, AWS, Azure, GCP, SAP, ServiceNow, Workday, Tableau, Power BI, Agentforce, .NET, Python).
-Do NOT include proprietary or company-specific product names.
-Return ONLY the comma-separated list, nothing else. If none found, return empty string.
+TECHNOLOGY_RESEARCH_SYSTEM_PROMPT = """You will be given search result snippets for a prospect company.
+Based solely on these snippets, populate the TECHNOLOGY_RESEARCH Python dictionary.
+Only include technologies with actual evidence.
+Confidence levels: "high" = explicitly named in official source,
+"medium" = indirect reliable signal, "low" = weak single mention.
 
-Research JSON:
-{research_json}"""
+Return ONLY a valid JSON object (no markdown, no code blocks, no variable assignment) with this structure:
 
-RESEARCH_SUMMARY_PROMPT = """Based ONLY on the following company and prospect research dicts, write a crisp research summary of up to 5-6 bullet points.
+{
+    "company_name": "<company_name>",
+    "website": "<url>",
+    "research_date": "<YYYY-MM-DD>",
+    "tech_stack": {
+        "crm": [],
+        "data_and_analytics": [],
+        "backend_languages_frameworks": [],
+        "frontend": [],
+        "marketing_tech": [],
+        "ecommerce_cms": [],
+        "other": []
+    }
+}
 
-STRICT RULES:
-- Use ONLY information present in the research dicts below — do NOT add anything from your own training data or general knowledge
-- If the dicts contain little or no data, write fewer bullets (even just 1-2) reflecting only what is actually there
-- Each bullet should be a key finding about the company's technology signals, initiatives, job openings, or the prospect's role and focus
-- Keep each bullet concise (one sentence). Use plain text, no markdown formatting within bullets
+Each array item should be a string like "Salesforce (high)" or "Snowflake (medium)".
+Omit any category that has no findings — do not include empty arrays."""
 
-Company Research:
-{company_research}
-
-Prospect Research:
-{prospect_research}
-
-Return ONLY the bullet points, one per line, each starting with "- ". If there is truly nothing to summarise beyond basic identity, return a single bullet like "- No technology signals or initiatives found for [company name]."."""
+TECHNOLOGY_RESEARCH_QUERIES = [
+    '"{name}" technology software platform',
+    '"{name}" technology partner announcement',
+    '"{name}" site:zoominfo.com',
+    '"{name}" site:linkedin.com jobs',
+    '"{name}" Salesforce',
+    '"{name}" Snowflake',
+]
 
 INTENT_SCORE_PROMPT = """Rate this prospect's likelihood of needing Salesforce/Snowflake/AI/data engineering services on a scale of 1-10.
 
 Prospect: {prospect_name}, {designation} at {company_name}
-Research Summary:
-{research_summary}
+Technology Research:
+{technology_research}
 
 Scoring guide:
 - 8-10: Strong signals (active job postings for Salesforce/Snowflake/data roles, RFPs, digital transformation announcements)
@@ -138,221 +147,64 @@ def _is_cache_stale(date_of_research) -> bool:
     return (datetime.now(timezone.utc) - dt) > timedelta(days=CACHE_TTL_DAYS)
 
 
-def _run_company_research(company_name: str, website: str) -> dict:
-    """Run company research using Serper per SKILL.md spec."""
+def _run_technology_research(company_name: str, website: str) -> dict:
+    """Run technology research using Serper + Claude synthesis.
+
+    Runs 6 Serper queries, concatenates snippets, and asks Claude to
+    populate a TECHNOLOGY_RESEARCH dict with tech_stack categories.
+    """
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
-    # Step 1: Technical initiatives
-    initiative_queries = [
-        f'"{company_name}" digital transformation initiative',
-        f'"{company_name}" technology modernization',
-        f'"{company_name}" cloud migration AWS Azure GCP',
-        f'"{company_name}" AI automation machine learning',
-        f'"{company_name}" technology stack engineering',
-    ]
-    initiative_results = []
-    for q in initiative_queries:
-        initiative_results.extend(_serper_search(q, 3))
-
-    # Step 2: Job openings (last 3 months)
-    job_queries = [
-        f'"{company_name}" jobs Salesforce',
-        f'"{company_name}" jobs Snowflake',
-        f'"{company_name}" jobs "data engineer" OR "data engineering"',
-        f'"{company_name}" jobs "custom development" OR "software engineer" OR "full stack"',
-        f'site:linkedin.com/jobs "{company_name}" Salesforce',
-        f'site:linkedin.com/jobs "{company_name}" Snowflake',
-    ]
-    job_results = []
-    for q in job_queries:
-        job_results.extend(_serper_search(q, 3))
-
-    # Step 3: Additional context
-    context_results = _serper_search(f'"{company_name}" company overview size industry', 5)
-
-    # Ask Claude to synthesize into COMPANY_RESEARCH dict
-    synthesis_prompt = f"""You are a sales researcher. Based on the following search results about "{company_name}", build a COMPANY_RESEARCH Python dict.
-
-Rules:
-- Only include keys where data was actually found — no empty lists, no null values
-- Only include findings that explicitly mention "{company_name}" by name
-- Only include findings from the last 3 months for ALL sections (technical_initiatives, job_openings, additional_context) — if a result has no visible date, infer from URL or article timestamp; discard if date cannot be determined
-- No generic industry articles, no speculation
-
-INITIATIVE SEARCH RESULTS:
-{_results_to_text(initiative_results)}
-
-JOB SEARCH RESULTS:
-{_results_to_text(job_results)}
-
-CONTEXT SEARCH RESULTS:
-{_results_to_text(context_results)}
-
-Return ONLY a valid JSON object (no markdown, no code blocks) with this structure (omit any key with no data):
-{{
-  "company_name": "{company_name}",
-  "technical_initiatives": {{
-    "digital_transformation": ["finding"],
-    "technology_modernization": ["finding"],
-    "cloud_migration": ["finding"],
-    "ai_automation": ["finding"]
-  }},
-  "job_openings": {{
-    "salesforce": [{{"title": "str", "date_posted": "str", "tools_mentioned": ["str"]}}],
-    "snowflake": [...],
-    "custom_development": [...],
-    "data_engineering": [...],
-    "other_technical": [...]
-  }},
-  "additional_context": ["finding"]
-}}"""
+    # Run all 6 Serper queries and concatenate
+    all_snippets = ""
+    for query_template in TECHNOLOGY_RESEARCH_QUERIES:
+        query = query_template.format(name=company_name)
+        results = _serper_search(query, 5)
+        all_snippets += f"\n\nQuery: {query}\n"
+        all_snippets += _results_to_text(results)
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": synthesis_prompt}],
+        max_tokens=1024,
+        system=TECHNOLOGY_RESEARCH_SYSTEM_PROMPT,
+        messages=[{
+            "role": "user",
+            "content": f"company_name='{company_name}'\nwebsite='{website}'\n\n{all_snippets}",
+        }],
     )
-    text = response.content[0].text.strip()
-    # Strip markdown code blocks if present
+    text = response.content[0].text.strip() if response.content else ""
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
     try:
-        return json.loads(text)
+        result = json.loads(text)
+        result["website"] = website
+        return result
     except json.JSONDecodeError:
-        return {"company_name": company_name}
+        return {"company_name": company_name, "website": website}
 
 
-def _get_company_research(company_name: str, website: str) -> dict:
-    """Get company research from cache or run fresh."""
+def _get_technology_research(company_name: str, website: str) -> dict:
+    """Get technology research from cache or run fresh."""
     sb = _get_supabase()
     result = sb.table("Cache_Prospect_Company_Research").select("*").eq("Website", website).execute()
     if result.data:
         row = result.data[0]
         if not _is_cache_stale(row.get("Date_of_Research")):
-            cr = row["Company_Research"]
+            cr = row["Technology_research"]
             return cr if isinstance(cr, dict) else json.loads(cr)
 
     # Run fresh research
-    research = _run_company_research(company_name, website)
+    research = _run_technology_research(company_name, website)
     sb.table("Cache_Prospect_Company_Research").upsert({
         "Website": website,
-        "Company_Research": research,
+        "Technology_research": research,
         "Date_of_Research": datetime.now(timezone.utc).isoformat(),
     }).execute()
     return research
 
 
-# ── Prospect research ──────────────────────────────────────────────────────
-
-def _run_prospect_research(prospect_name: str, designation: str,
-                            company_name: str, city: str, country: str,
-                            linkedin_url: str = "") -> dict:
-    """Run prospect research using Serper per SKILL.md spec."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
-    # Step 1: LinkedIn-first search — use provided URL if available, else search by name
-    if linkedin_url:
-        linkedin_queries = [linkedin_url]
-    else:
-        linkedin_queries = [
-            f'site:linkedin.com/in "{prospect_name}" "{company_name}"',
-            f'site:linkedin.com "{prospect_name}" "{designation}" "{company_name}"',
-        ]
-    linkedin_results = []
-    for q in linkedin_queries:
-        linkedin_results.extend(_serper_search(q, 5))
-
-    # Step 2: Broaden if insufficient
-    broader_results = []
-    if len(linkedin_results) < 3:
-        broader_queries = [
-            f'"{prospect_name}" "{designation}" "{company_name}"',
-            f'"{prospect_name}" "{company_name}" interview OR keynote OR podcast',
-            f'"{prospect_name}" "{company_name}" announcement OR partnership OR initiative',
-        ]
-        for q in broader_queries:
-            broader_results.extend(_serper_search(q, 3))
-
-    synthesis_prompt = f"""You are a sales researcher. Based on the following search results about "{prospect_name}" ({designation} at {company_name}), build a PROSPECT_RESEARCH Python dict.
-
-Rules:
-- Only include keys where data was actually found — no empty lists, no null values
-- LinkedIn is the primary source; use broader results only to fill gaps
-- Recent activity limited to last 3 months only
-- previous_employers from LinkedIn career history only
-- No speculation or unverified claims
-
-LINKEDIN SEARCH RESULTS:
-{_results_to_text(linkedin_results)}
-
-BROADER SEARCH RESULTS:
-{_results_to_text(broader_results)}
-
-Return ONLY a valid JSON object (no markdown, no code blocks) with this structure (omit any key with no data):
-{{
-  "prospect_name": "{prospect_name}",
-  "designation": "{designation}",
-  "company_name": "{company_name}",
-  "location": "{city}, {country}",
-  "professional_background": {{
-    "location_and_network": ["finding"],
-    "educational_background": ["finding"],
-    "role_scope": ["finding"]
-  }},
-  "strategic_focus_areas": {{
-    "partnership_development": ["finding"],
-    "sales_and_marketing": ["finding"],
-    "domain_expertise": ["finding"]
-  }},
-  "recent_activity": {{
-    "brand_and_initiatives": ["finding"],
-    "thought_leadership": ["finding"]
-  }},
-  "previous_employers": ["Company A", "Company B"]
-}}"""
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": synthesis_prompt}],
-    )
-    text = response.content[0].text.strip()
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return {
-            "prospect_name": prospect_name,
-            "designation": designation,
-            "company_name": company_name,
-            "location": f"{city}, {country}",
-        }
-
-
-def _get_prospect_research(prospect_name: str, designation: str,
-                            company_name: str, city: str, country: str, email: str,
-                            linkedin_url: str = "") -> dict:
-    """Get prospect research from cache or run fresh."""
-    sb = _get_supabase()
-    result = sb.table("Cache_Prospect_Contact_Research").select("*").eq("Email", email).execute()
-    if result.data:
-        row = result.data[0]
-        if not _is_cache_stale(row.get("Date_of_Research")):
-            cr = row["Prospect_Research"]
-            return cr if isinstance(cr, dict) else json.loads(cr)
-
-    research = _run_prospect_research(prospect_name, designation, company_name, city, country, linkedin_url)
-    sb.table("Cache_Prospect_Contact_Research").upsert({
-        "Email": email,
-        "Prospect_Research": research,
-        "Date_of_Research": datetime.now(timezone.utc).isoformat(),
-    }).execute()
-    return research
 
 
 # ── Claude Web Search alternative ─────────────────────────────────────────
@@ -530,42 +382,33 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this structur
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def _extract_technologies(company_research: dict) -> str:
-    """Ask Claude to extract generic tech platform names from company research."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    prompt = TECH_EXTRACTION_PROMPT.format(research_json=json.dumps(company_research))
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=256,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text.strip() if response.content else ""
+def _extract_tech_names_from_dict(tech_research: dict) -> str:
+    """Flatten TECHNOLOGY_RESEARCH tech_stack into comma-separated tech names.
 
-
-def _build_research_summary(company_research: dict, prospect_research: dict) -> str:
-    """Generate 5-6 bullet point summary from research dicts."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    prompt = RESEARCH_SUMMARY_PROMPT.format(
-        company_research=json.dumps(company_research),
-        prospect_research=json.dumps(prospect_research),
-    )
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text.strip() if response.content else ""
+    Strips confidence levels like "(high)" from each entry.
+    Used to feed matchers which expect comma-separated input.
+    """
+    tech_stack = tech_research.get("tech_stack", {})
+    names = []
+    for category_techs in tech_stack.values():
+        if isinstance(category_techs, list):
+            for item in category_techs:
+                # Strip confidence annotations like " (high)", " (medium)", " (low)"
+                name = re.sub(r"\s*\((high|medium|low)\)\s*$", "", str(item), flags=re.IGNORECASE).strip()
+                if name:
+                    names.append(name)
+    return ", ".join(names)
 
 
 def _score_intent(prospect_name: str, designation: str,
-                   company_name: str, research_summary: str) -> int:
+                   company_name: str, technology_research: str) -> int:
     """Rate intent 1-10 via Claude."""
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     prompt = INTENT_SCORE_PROMPT.format(
         prospect_name=prospect_name,
         designation=designation,
         company_name=company_name,
-        research_summary=research_summary,
+        technology_research=technology_research,
     )
     response = client.messages.create(
         model="claude-sonnet-4-6",
@@ -615,7 +458,6 @@ def research_workbook(
 
     # Ensure generated columns exist
     for col in [
-        "Research_Summary", "Research_Summary_Compressed",
         "Case_Studies", "Industry_Client_References",
         "Suggested_Brand_Name_to_use", "Intent_Score",
         "Message_to_send", "Prospect_Technologies",
@@ -626,16 +468,13 @@ def research_workbook(
     total = len(df)
 
     # Group by company for deduplication
-    company_cache: dict[str, dict] = {}  # website -> company_research
+    company_cache: dict[str, dict] = {}  # website -> technology_research
 
     for idx, row in df.iterrows():
         prospect_name = f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
         designation = str(row.get("Designation", ""))
         company_name = str(row.get("Company_Name", ""))
-        email = str(row.get("Email", ""))
         website = str(row.get("Website", ""))
-        _li = row.get("LinkedIn", "") if "LinkedIn" in df.columns else ""
-        linkedin_url = "" if not _li or pd.isna(_li) else str(_li).strip()
         industry = str(row.get("Industry", ""))
         country = _apply_emea_coding(str(row.get("Country", "")))
         city = str(row.get("City", ""))
@@ -649,38 +488,32 @@ def research_workbook(
         brand_result = find_brand_match(prospect_industry=industry)
         df.at[idx, "Suggested_Brand_Name_to_use"] = brand_result["brand"]
 
-        # 2. Company research (cached per website)
+        # 2. EMEA coding (already applied to local variable at row read; write to df)
+        df.at[idx, "Country"] = country
+
+        # 3. Technology research (cached per website)
         if website not in company_cache:
             if progress_callback:
                 progress_callback(current, total, f"Researching {company_name}...")
-            company_research = _get_company_research(company_name, website)
-            company_cache[website] = company_research
+            tech_research = _get_technology_research(company_name, website)
+            company_cache[website] = tech_research
         else:
-            company_research = company_cache[website]
+            tech_research = company_cache[website]
 
-        # 3. Extract technologies
-        prospect_technologies = _extract_technologies(company_research)
-        df.at[idx, "Prospect_Technologies"] = prospect_technologies
+        # Store full TECHNOLOGY_RESEARCH dict as JSON in Prospect_Technologies
+        df.at[idx, "Prospect_Technologies"] = json.dumps(tech_research)
 
-        # 4. Prospect research (cached per email)
-        if progress_callback:
-            progress_callback(current, total, f"Researching {prospect_name}...")
-        prospect_research = _get_prospect_research(
-            prospect_name, designation, company_name, city, country, email, linkedin_url
-        )
+        # Extract comma-separated tech names for matchers
+        tech_names_csv = _extract_tech_names_from_dict(tech_research)
 
-        # 5. Research summary
-        research_summary = _build_research_summary(company_research, prospect_research)
-        df.at[idx, "Research_Summary"] = research_summary
-
-        # 6. Case study matching
+        # 4. Case study matching
         if progress_callback:
             progress_callback(current, total, f"Matching case studies for {prospect_name}...")
         try:
             cs_result = find_casestudy_matches(
-                prospect_context=research_summary,
+                prospect_context="",
                 prospect_industry=industry,
-                prospect_technologies=prospect_technologies,
+                prospect_technologies=tech_names_csv,
                 prospect_country="",
                 max_matches=max_case_studies,
             )
@@ -688,13 +521,13 @@ def research_workbook(
         except Exception as e:
             df.at[idx, "Case_Studies"] = json.dumps({"error": str(e)})
 
-        # 7. Client matching
+        # 5. Client matching
         if progress_callback:
             progress_callback(current, total, f"Matching clients for {prospect_name}...")
         try:
             client_result = find_matches(
                 prospect_industry=industry,
-                prospect_technologies=prospect_technologies,
+                prospect_technologies=tech_names_csv,
                 prospect_country=country,
                 max_matches=max(max_client_matches, 5),
             )
@@ -704,15 +537,12 @@ def research_workbook(
         except Exception as e:
             df.at[idx, "Industry_Client_References"] = json.dumps({"error": str(e)})
 
-        # 8. Intent scoring (optional)
+        # 6. Intent scoring (optional)
         if generate_intent_score:
             if progress_callback:
                 progress_callback(current, total, f"Scoring intent for {prospect_name}...")
-            score = _score_intent(prospect_name, designation, company_name, research_summary)
+            score = _score_intent(prospect_name, designation, company_name, json.dumps(tech_research))
             df.at[idx, "Intent_Score"] = score
-
-        # 9. EMEA coding (already applied to local variable at row read; write to df)
-        df.at[idx, "Country"] = country
 
     # Write output
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:

@@ -1,10 +1,9 @@
 """Prospect Outreach — Pass 2 Message Generation.
 
-For each prospect row that is ready (has Research_Summary, no existing Message_to_send):
-  1. Compress Research_Summary if > 1500 chars
-  2. Load brand profile JSON
-  3. Look up date range from dates sheet by city
-  4. Generate 4-paragraph outreach message via Claude
+For each prospect row that is ready (has Prospect_Technologies, no existing Message_to_send):
+  1. Load brand profile JSON
+  2. Look up date range from dates sheet by city
+  3. Generate 4-paragraph outreach message via Claude
 """
 
 import io
@@ -24,18 +23,6 @@ APPROVED_SF_PRODUCTS = [
     "Marketing Cloud", "Pardot", "Tableau", "CPQ", "Data Cloud",
 ]
 
-COMPRESS_PROMPT = """You are a sales researcher. Compress the following research summary into a shorter version that:
-- Preserves all key technology signals, job openings, and strategic initiatives
-- Is role-aware (designation: {designation})
-- Avoids truncating important signals
-- Stays under 800 characters
-- Uses plain text bullet points (- )
-
-Research Summary:
-{research_summary}
-
-Return ONLY the compressed bullet points."""
-
 MESSAGE_PROMPT = """You are writing a concise, personalized sales outreach email on behalf of {brand_name}.
 
 Brand tone and positioning: {tone_and_positioning}
@@ -47,8 +34,8 @@ Prospect details:
 - Company: {company_name}
 - Location: {location}
 
-Research summary (key signals):
-{research_summary}
+Technology research findings:
+{technology_research}
 
 Case studies (use for Para 2, anonymized as "a leading [industry] company"):
 {case_studies}
@@ -102,17 +89,6 @@ def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
                     end = f"{end.strftime('%B')} {end.day}"
                 return f"{start} and {end}"
     return None
-
-
-def _compress_research(client: anthropic.Anthropic, research_summary: str, designation: str) -> str:
-    """Compress research summary if over 1500 chars."""
-    prompt = COMPRESS_PROMPT.format(research_summary=research_summary, designation=designation)
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text.strip()
 
 
 def _format_case_studies(case_studies_json: str) -> str:
@@ -178,25 +154,17 @@ def _generate_single_message(
     row: pd.Series,
     dates_df: pd.DataFrame,
     brand_profile: dict,
-) -> tuple[str, str]:
-    """Generate message for a single prospect. Returns (message, compressed_summary)."""
+) -> str:
+    """Generate message for a single prospect. Returns message text."""
     first_name = str(row.get("First_Name", "")).strip()
     designation = str(row.get("Designation", "")).strip()
     company_name = str(row.get("Company_Name", "")).strip()
     city = str(row.get("City", "")).strip()
     state = str(row.get("State", "")).strip()
     location = f"{city}, {row.get('Country', '')}".strip(", ")
-    research_summary = str(row.get("Research_Summary", "")).strip()
+    technology_research = str(row.get("Prospect_Technologies", "")).strip()
     case_studies_json = str(row.get("Case_Studies", ""))
     refs_json = str(row.get("Industry_Client_References", ""))
-
-    # Compress if needed
-    compressed = ""
-    if len(research_summary) > 1500:
-        compressed = _compress_research(client, research_summary, designation)
-        research_to_use = compressed
-    else:
-        research_to_use = research_summary
 
     # Date window
     date_window = _get_date_window(dates_df, city, state)
@@ -213,7 +181,7 @@ def _generate_single_message(
         designation=designation,
         company_name=company_name,
         location=location,
-        research_summary=research_to_use,
+        technology_research=technology_research,
         case_studies=_format_case_studies(case_studies_json),
         client_references=_format_client_references(refs_json),
         date_window=date_window or "no specific dates — use generic phrasing",
@@ -226,7 +194,7 @@ def _generate_single_message(
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text.strip(), compressed
+    return response.content[0].text.strip()
 
 
 def generate_messages(
@@ -253,14 +221,12 @@ def generate_messages(
 
     if "Message_to_send" not in df.columns:
         df["Message_to_send"] = ""
-    if "Research_Summary_Compressed" not in df.columns:
-        df["Research_Summary_Compressed"] = ""
 
     # Determine ready vs skipped
     def _is_ready(row):
         msg = str(row.get("Message_to_send", "")).strip()
-        summary = str(row.get("Research_Summary", "")).strip()
-        return not msg and bool(summary)
+        tech_research = str(row.get("Prospect_Technologies", "")).strip()
+        return not msg and bool(tech_research)
 
     ready_indices = [idx for idx, row in df.iterrows() if _is_ready(row)]
     skipped = len(df) - len(ready_indices)
@@ -287,10 +253,8 @@ def generate_messages(
             except FileNotFoundError:
                 brand_cache[brand_name] = {"name": brand_name, "tone_and_positioning": "", "services": []}
 
-        message, compressed = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
+        message = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
         df.at[idx, "Message_to_send"] = message
-        if compressed:
-            df.at[idx, "Research_Summary_Compressed"] = compressed
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="prospects", index=False)

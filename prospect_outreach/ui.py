@@ -269,10 +269,10 @@ def _test_cache_badge(source: str) -> str:
     return badges.get(source, source)
 
 
-def _test_get_company_research(company_name: str, website: str, use_cache: bool):
+def _test_get_technology_research(company_name: str, website: str, use_cache: bool):
     import json
     from prospect_outreach.research_pipeline import (
-        _get_supabase, _is_cache_stale, _run_company_research,
+        _get_supabase, _is_cache_stale, _run_technology_research,
     )
     source = None
     data = None
@@ -284,7 +284,7 @@ def _test_get_company_research(company_name: str, website: str, use_cache: bool)
                 row = result.data[0]
                 if not _is_cache_stale(row.get("Date_of_Research")):
                     source = "CACHE HIT"
-                    cr = row["Company_Research"]
+                    cr = row["Technology_research"]
                     data = json.loads(cr) if isinstance(cr, str) else cr
                 else:
                     source = "CACHE STALE"
@@ -295,40 +295,7 @@ def _test_get_company_research(company_name: str, website: str, use_cache: bool)
     else:
         source = "CACHE SKIPPED"
     if data is None:
-        data = _run_company_research(company_name, website)
-    return data, source
-
-
-def _test_get_prospect_research(prospect_name: str, designation: str, company_name: str,
-                                city: str, country: str, email: str,
-                                linkedin_url: str, use_cache: bool):
-    import json
-    from prospect_outreach.research_pipeline import (
-        _get_supabase, _is_cache_stale, _run_prospect_research,
-    )
-    source = None
-    data = None
-    if use_cache:
-        try:
-            sb = _get_supabase()
-            result = sb.table("Cache_Prospect_Contact_Research").select("*").eq("Email", email).execute()
-            if result.data:
-                row = result.data[0]
-                if not _is_cache_stale(row.get("Date_of_Research")):
-                    source = "CACHE HIT"
-                    pr = row["Prospect_Research"]
-                    data = json.loads(pr) if isinstance(pr, str) else pr
-                else:
-                    source = "CACHE STALE"
-            else:
-                source = "CACHE MISS"
-        except Exception as e:
-            source = f"CACHE ERROR: {e}"
-    else:
-        source = "CACHE SKIPPED"
-    if data is None:
-        data = _run_prospect_research(prospect_name, designation, company_name,
-                                      city, country, linkedin_url)
+        data = _run_technology_research(company_name, website)
     return data, source
 
 
@@ -336,7 +303,7 @@ def _render_test_tab():
     st.subheader("Test Tab: Verbose Pass 1 Pipeline")
     st.caption(
         "Runs the full Pass 1 research pipeline row-by-row with verbose output. "
-        "Use cache toggles to control whether cached data is used for company and prospect research."
+        "Use cache toggle to control whether cached data is used for technology research."
     )
 
     uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="test_upload")
@@ -358,20 +325,7 @@ def _render_test_tab():
 
     st.divider()
 
-    search_provider = st.radio(
-        "Search Provider",
-        ["Serper", "Web Search (Haiku)", "Web Search (Sonnet)", "All (side-by-side)"],
-        horizontal=True, key="test_search_provider",
-    )
-    use_serper = search_provider in ("Serper", "All (side-by-side)")
-    use_ws_haiku = search_provider in ("Web Search (Haiku)", "All (side-by-side)")
-    use_ws_sonnet = search_provider in ("Web Search (Sonnet)", "All (side-by-side)")
-
-    col_ca, col_cb = st.columns(2)
-    with col_ca:
-        use_company_cache = st.toggle("Use Company Cache (Serper)", value=False, key="test_company_cache")
-    with col_cb:
-        use_prospect_cache = st.toggle("Use Prospect Cache (Serper)", value=False, key="test_prospect_cache")
+    use_company_cache = st.toggle("Use Technology Research Cache", value=False, key="test_company_cache")
 
     col_ta, col_tb, col_tc = st.columns(3)
     with col_ta:
@@ -385,9 +339,7 @@ def _render_test_tab():
         return
 
     from prospect_outreach.research_pipeline import (
-        _extract_technologies, _build_research_summary, _score_intent, _apply_emea_coding,
-        _run_company_research_websearch, _run_prospect_research_websearch,
-        WEBSEARCH_MODEL_HAIKU, WEBSEARCH_MODEL_SONNET,
+        _score_intent, _apply_emea_coding, _extract_tech_names_from_dict,
     )
     from client_referencing.brand_matcher import find_brand_match
     from client_referencing.casestudy_matcher import find_casestudy_matches
@@ -400,14 +352,11 @@ def _render_test_tab():
         prospect_name = f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
         designation = str(row.get("Designation", ""))
         company_name = str(row.get("Company_Name", ""))
-        email = str(row.get("Email", ""))
         website = str(row.get("Website", ""))
         industry = str(row.get("Industry", ""))
         country = str(row.get("Country", ""))
         city = str(row.get("City", ""))
         state = str(row.get("State", ""))
-        _li = row.get("LinkedIn", "") if "LinkedIn" in df.columns else ""
-        linkedin_url = "" if not _li or pd.isna(_li) else str(_li).strip()
 
         with st.expander(f"Prospect {i+1}/{total}: {prospect_name} | {designation} | {company_name}", expanded=(i == 0)):
 
@@ -434,241 +383,49 @@ def _render_test_tab():
 
             st.divider()
 
-            # ── Step 2: Company Research ─────────────────────────────────
-            st.markdown("#### Step 2 — Company Research")
-            st.write(f"**Params:** `company_name={company_name!r}`, `website={website!r}`")
-            company_research = {"company_name": company_name}
-            company_research_ws_haiku = None
-            company_research_ws_sonnet = None
-
-            if search_provider == "All (side-by-side)":
-                col_s, col_h, col_sn = st.columns(3)
-                with col_s:
-                    st.markdown("**Serper**")
-                    try:
-                        if website in company_cache:
-                            company_research, co_source = company_cache[website]
-                            co_source = "DEDUPED"
-                        else:
-                            company_research, co_source = _test_get_company_research(
-                                company_name, website, use_company_cache
-                            )
-                            company_cache[website] = (company_research, co_source)
-                        st.info(_test_cache_badge(co_source))
-                        st.json(company_research)
-                        st.caption("~12 Serper calls × $0.001 + 1 Sonnet synthesis ≈ $0.01-0.02")
-                    except Exception as e:
-                        st.error(f"Serper failed: {e}")
-                with col_h:
-                    st.markdown("**Web Search (Haiku)**")
-                    try:
-                        company_research_ws_haiku, cost_h = _run_company_research_websearch(
-                            company_name, website, model=WEBSEARCH_MODEL_HAIKU)
-                        st.json(company_research_ws_haiku)
-                        st.success(f"💰 ${cost_h['total_cost_usd']:.4f} ({cost_h['input_tokens']}+{cost_h['output_tokens']} tok, {cost_h['web_searches']} searches)")
-                    except Exception as e:
-                        st.error(f"Haiku failed: {e}")
-                with col_sn:
-                    st.markdown("**Web Search (Sonnet)**")
-                    try:
-                        company_research_ws_sonnet, cost_sn = _run_company_research_websearch(
-                            company_name, website, model=WEBSEARCH_MODEL_SONNET)
-                        st.json(company_research_ws_sonnet)
-                        st.success(f"💰 ${cost_sn['total_cost_usd']:.4f} ({cost_sn['input_tokens']}+{cost_sn['output_tokens']} tok, {cost_sn['web_searches']} searches)")
-                    except Exception as e:
-                        st.error(f"Sonnet failed: {e}")
-            elif use_serper:
-                try:
-                    if website in company_cache:
-                        company_research, co_source = company_cache[website]
-                        co_source = "DEDUPED"
-                    else:
-                        company_research, co_source = _test_get_company_research(
-                            company_name, website, use_company_cache
-                        )
-                        company_cache[website] = (company_research, co_source)
-                    st.info(_test_cache_badge(co_source))
-                    st.caption("↓ COMPANY_RESEARCH — synthesized by Claude from Serper results.")
-                    with st.expander("COMPANY_RESEARCH dict", expanded=True):
-                        st.json(company_research)
-                except Exception as e:
-                    st.error(f"Company research failed: {e}")
-            elif use_ws_haiku:
-                st.markdown("**Web Search (Haiku)**")
-                try:
-                    company_research, cost_h = _run_company_research_websearch(
-                        company_name, website, model=WEBSEARCH_MODEL_HAIKU)
-                    with st.expander("COMPANY_RESEARCH dict", expanded=True):
-                        st.json(company_research)
-                    st.success(f"💰 ${cost_h['total_cost_usd']:.4f} ({cost_h['input_tokens']}+{cost_h['output_tokens']} tok, {cost_h['web_searches']} searches)")
-                except Exception as e:
-                    st.error(f"Haiku failed: {e}")
-            elif use_ws_sonnet:
-                st.markdown("**Web Search (Sonnet)**")
-                try:
-                    company_research, cost_sn = _run_company_research_websearch(
-                        company_name, website, model=WEBSEARCH_MODEL_SONNET)
-                    with st.expander("COMPANY_RESEARCH dict", expanded=True):
-                        st.json(company_research)
-                    st.success(f"💰 ${cost_sn['total_cost_usd']:.4f} ({cost_sn['input_tokens']}+{cost_sn['output_tokens']} tok, {cost_sn['web_searches']} searches)")
-                except Exception as e:
-                    st.error(f"Sonnet failed: {e}")
-
-            st.divider()
-
-            # ── Step 3: Technology Extraction ────────────────────────────
-            st.markdown("#### Step 3 — Technology Extraction")
-            st.write("**Params:** `company_research` (dict above)")
+            # ── Step 2: EMEA Coding ──────────────────────────────────────
+            st.markdown("#### Step 2 — EMEA Coding")
+            st.write(f"**Params:** `country={country!r}`")
             try:
-                prospect_technologies = _extract_technologies(company_research)
-                st.write(f"**Return:** `{prospect_technologies}`")
+                coded_country = _apply_emea_coding(country)
+                st.write(f"**Return:** `{country}` → `{coded_country}`")
+                country = coded_country
             except Exception as e:
-                st.error(f"Tech extraction failed: {e}")
-                prospect_technologies = ""
+                st.error(f"EMEA coding failed: {e}")
 
             st.divider()
 
-            # ── Step 4: Prospect Research ────────────────────────────────
-            st.markdown("#### Step 4 — Prospect Research")
-            st.write(
-                f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, "
-                f"`company_name={company_name!r}`, `city={city!r}`, `country={country!r}`, "
-                f"`email={email!r}`, `linkedin_url={linkedin_url!r}`"
-            )
-            prospect_research = {}
-            prospect_research_ws_haiku = None
-            prospect_research_ws_sonnet = None
-
-            if search_provider == "All (side-by-side)":
-                col_s, col_h, col_sn = st.columns(3)
-                with col_s:
-                    st.markdown("**Serper**")
-                    try:
-                        prospect_research, pr_source = _test_get_prospect_research(
-                            prospect_name, designation, company_name,
-                            city, country, email, linkedin_url, use_prospect_cache
-                        )
-                        st.info(_test_cache_badge(pr_source))
-                        st.json(prospect_research)
-                        st.caption("~5 Serper calls × $0.001 + 1 Sonnet synthesis ≈ $0.005-0.01")
-                    except Exception as e:
-                        st.error(f"Serper failed: {e}")
-                with col_h:
-                    st.markdown("**Web Search (Haiku)**")
-                    try:
-                        prospect_research_ws_haiku, cost_h = _run_prospect_research_websearch(
-                            prospect_name, designation, company_name, city, country,
-                            model=WEBSEARCH_MODEL_HAIKU
-                        )
-                        st.json(prospect_research_ws_haiku)
-                        st.success(f"💰 ${cost_h['total_cost_usd']:.4f} ({cost_h['input_tokens']}+{cost_h['output_tokens']} tok, {cost_h['web_searches']} searches)")
-                    except Exception as e:
-                        st.error(f"Haiku failed: {e}")
-                with col_sn:
-                    st.markdown("**Web Search (Sonnet)**")
-                    try:
-                        prospect_research_ws_sonnet, cost_sn = _run_prospect_research_websearch(
-                            prospect_name, designation, company_name, city, country,
-                            model=WEBSEARCH_MODEL_SONNET
-                        )
-                        st.json(prospect_research_ws_sonnet)
-                        st.success(f"💰 ${cost_sn['total_cost_usd']:.4f} ({cost_sn['input_tokens']}+{cost_sn['output_tokens']} tok, {cost_sn['web_searches']} searches)")
-                    except Exception as e:
-                        st.error(f"Sonnet failed: {e}")
-            elif use_serper:
-                try:
-                    prospect_research, pr_source = _test_get_prospect_research(
-                        prospect_name, designation, company_name,
-                        city, country, email, linkedin_url, use_prospect_cache
+            # ── Step 3: Technology Research ───────────────────────────────
+            st.markdown("#### Step 3 — Technology Research")
+            st.write(f"**Params:** `company_name={company_name!r}`, `website={website!r}`")
+            tech_research = {"company_name": company_name}
+            try:
+                if website in company_cache:
+                    tech_research, co_source = company_cache[website]
+                    co_source = "DEDUPED"
+                else:
+                    tech_research, co_source = _test_get_technology_research(
+                        company_name, website, use_company_cache
                     )
-                    st.info(_test_cache_badge(pr_source))
-                    st.caption("↓ PROSPECT_RESEARCH — synthesized by Claude from Serper/LinkedIn results.")
-                    with st.expander("PROSPECT_RESEARCH dict", expanded=True):
-                        st.json(prospect_research)
-                except Exception as e:
-                    st.error(f"Prospect research failed: {e}")
-            elif use_ws_haiku:
-                st.markdown("**Web Search (Haiku)**")
-                try:
-                    prospect_research, cost_h = _run_prospect_research_websearch(
-                        prospect_name, designation, company_name, city, country,
-                        model=WEBSEARCH_MODEL_HAIKU
-                    )
-                    with st.expander("PROSPECT_RESEARCH dict", expanded=True):
-                        st.json(prospect_research)
-                    st.success(f"💰 ${cost_h['total_cost_usd']:.4f} ({cost_h['input_tokens']}+{cost_h['output_tokens']} tok, {cost_h['web_searches']} searches)")
-                except Exception as e:
-                    st.error(f"Haiku failed: {e}")
-            elif use_ws_sonnet:
-                st.markdown("**Web Search (Sonnet)**")
-                try:
-                    prospect_research, cost_sn = _run_prospect_research_websearch(
-                        prospect_name, designation, company_name, city, country,
-                        model=WEBSEARCH_MODEL_SONNET
-                    )
-                    with st.expander("PROSPECT_RESEARCH dict", expanded=True):
-                        st.json(prospect_research)
-                    st.success(f"💰 ${cost_sn['total_cost_usd']:.4f} ({cost_sn['input_tokens']}+{cost_sn['output_tokens']} tok, {cost_sn['web_searches']} searches)")
-                except Exception as e:
-                    st.error(f"Sonnet failed: {e}")
+                    company_cache[website] = (tech_research, co_source)
+                st.info(_test_cache_badge(co_source))
+                st.caption("↓ TECHNOLOGY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
+                with st.expander("TECHNOLOGY_RESEARCH dict", expanded=True):
+                    st.json(tech_research)
+                tech_names_csv = _extract_tech_names_from_dict(tech_research)
+                st.write(f"**Extracted tech names (for matchers):** `{tech_names_csv}`")
+            except Exception as e:
+                st.error(f"Technology research failed: {e}")
+                tech_names_csv = ""
 
             st.divider()
 
-            # ── Step 5: Research Summary ─────────────────────────────────
-            st.markdown("#### Step 5 — Research Summary")
-            st.caption("Claude merges both dicts and produces up to 5-6 plain-text bullets. Stored in `Research_Summary` column.")
-            research_summary = ""
-
-            if search_provider == "All (side-by-side)":
-                col_s, col_h, col_sn = st.columns(3)
-                with col_s:
-                    st.markdown("**From Serper**")
-                    try:
-                        research_summary = _build_research_summary(company_research, prospect_research)
-                        st.text(research_summary)
-                        st.caption(f"{len(research_summary)} chars")
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
-                with col_h:
-                    st.markdown("**From Haiku**")
-                    try:
-                        rs_haiku = _build_research_summary(
-                            company_research_ws_haiku or {"company_name": company_name},
-                            prospect_research_ws_haiku or {},
-                        )
-                        st.text(rs_haiku)
-                        st.caption(f"{len(rs_haiku)} chars")
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
-                with col_sn:
-                    st.markdown("**From Sonnet**")
-                    try:
-                        rs_sonnet = _build_research_summary(
-                            company_research_ws_sonnet or {"company_name": company_name},
-                            prospect_research_ws_sonnet or {},
-                        )
-                        st.text(rs_sonnet)
-                        st.caption(f"{len(rs_sonnet)} chars")
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
-            else:
-                try:
-                    research_summary = _build_research_summary(company_research, prospect_research)
-                    st.markdown("**→ `Research_Summary` (stored in Excel):**")
-                    st.text(research_summary)
-                    st.caption(f"Length: {len(research_summary)} chars")
-                except Exception as e:
-                    st.error(f"Research summary failed: {e}")
-                    research_summary = ""
-
-            st.divider()
-
-            # ── Step 6: Case Study Matching ──────────────────────────────
-            st.markdown("#### Step 6 — Case Study Matching")
+            # ── Step 4: Case Study Matching ──────────────────────────────
+            st.markdown("#### Step 4 — Case Study Matching")
             cs_params = {
-                "prospect_context": research_summary[:200] + "..." if len(research_summary) > 200 else research_summary,
+                "prospect_context": "",
                 "prospect_industry": industry,
-                "prospect_technologies": prospect_technologies,
+                "prospect_technologies": tech_names_csv,
                 "prospect_country": "",
                 "max_matches": int(max_case_studies),
             }
@@ -676,9 +433,9 @@ def _render_test_tab():
             st.json(cs_params)
             try:
                 cs_result = find_casestudy_matches(
-                    prospect_context=research_summary,
+                    prospect_context="",
                     prospect_industry=industry,
-                    prospect_technologies=prospect_technologies,
+                    prospect_technologies=tech_names_csv,
                     prospect_country="",
                     max_matches=int(max_case_studies),
                 )
@@ -695,11 +452,11 @@ def _render_test_tab():
 
             st.divider()
 
-            # ── Step 7: Client Reference Matching ────────────────────────
-            st.markdown("#### Step 7 — Client Reference Matching")
+            # ── Step 5: Client Reference Matching ────────────────────────
+            st.markdown("#### Step 5 — Client Reference Matching")
             cl_params = {
                 "prospect_industry": industry,
-                "prospect_technologies": prospect_technologies,
+                "prospect_technologies": tech_names_csv,
                 "prospect_country": country,
                 "max_matches": int(max_clients),
             }
@@ -708,7 +465,7 @@ def _render_test_tab():
             try:
                 cl_result = find_matches(
                     prospect_industry=industry,
-                    prospect_technologies=prospect_technologies,
+                    prospect_technologies=tech_names_csv,
                     prospect_country=country,
                     max_matches=int(max_clients),
                 )
@@ -728,22 +485,14 @@ def _render_test_tab():
 
             st.divider()
 
-            # ── Step 8: Intent Score ─────────────────────────────────────
+            # ── Step 6: Intent Score ─────────────────────────────────────
             if generate_intent:
-                st.markdown("#### Step 8 — Intent Score")
-                st.write(f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, `company_name={company_name!r}`, `research_summary` (above)")
+                st.markdown("#### Step 6 — Intent Score")
+                st.write(f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, `company_name={company_name!r}`, `technology_research` (above)")
                 try:
-                    score = _score_intent(prospect_name, designation, company_name, research_summary)
+                    import json as _json
+                    score = _score_intent(prospect_name, designation, company_name, _json.dumps(tech_research))
                     st.metric("Intent Score", score)
                 except Exception as e:
                     st.error(f"Intent scoring failed: {e}")
                 st.divider()
-
-            # ── Step 9: EMEA Coding ──────────────────────────────────────
-            st.markdown("#### Step 9 — EMEA Coding")
-            st.write(f"**Params:** `country={country!r}`")
-            try:
-                coded_country = _apply_emea_coding(country)
-                st.write(f"**Return:** `{country}` → `{coded_country}`")
-            except Exception as e:
-                st.error(f"EMEA coding failed: {e}")
