@@ -863,7 +863,6 @@ def _render_casestudy_match_tab():
             prospect_context=prospect_context,
             prospect_industry=prospect_industry,
             prospect_technologies=prospect_technologies,
-            prospect_country="",
             max_matches=max_matches,
         )
 

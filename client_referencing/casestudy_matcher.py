@@ -26,8 +26,6 @@ from client_referencing.config import (
     CS_SEMANTIC_WEIGHT,
     INDUSTRY_MATCH_THRESHOLD,
     INDUSTRY_TABLE_NAME,
-    SUPABASE_SERVICE_KEY,
-    SUPABASE_URL,
     TABLE_NAME,
     VOYAGE_MODEL,
 )
@@ -450,7 +448,6 @@ def find_casestudy_matches(
     prospect_context: str,
     prospect_industry: str,
     prospect_technologies: str,
-    prospect_country: str,
     max_matches: int = 8,
 ) -> dict:
     """Match a prospect against case study database.
