@@ -535,34 +535,34 @@ def find_casestudy_matches(
         ),
     ))
 
-    # --- TIER 1: Industry + Technology Shortlist ---
+    # --- Step_1_Shortlist: Industry-only shortlist ---
 
     industry_scores = _compute_industry_scores(
         prospect_industry, case_studies, client_data
     )
 
-    # Determine which case studies belong to industry-matching clients
-    tier1_shortlist = []
-    tier2_remaining = []
-
-    for entry in tier2_shortlist:
-        cs_id = entry[0]
-        cs = cs_by_id.get(cs_id)
-        if not cs:
-            continue
+    step1_ids = set()
+    for cs in case_studies:
         cid = str(cs["client_id"])
-        ind_score = industry_scores.get(cid, 0.0)
-        if ind_score >= INDUSTRY_MATCH_THRESHOLD:
-            tier1_shortlist.append(entry)
-        else:
-            tier2_remaining.append(entry)
+        if industry_scores.get(cid, 0.0) >= INDUSTRY_MATCH_THRESHOLD:
+            step1_ids.add(cs["casestudy_id"])
+
+    debug_log.append((
+        "Step_1_Shortlist (industry-only)",
+        f"{len(step1_ids)} case studies passed industry threshold ({INDUSTRY_MATCH_THRESHOLD})"
+        if step1_ids else "(empty — no industry matches)",
+    ))
+
+    # --- TIER 1: Overlap of Step_1 (industry) and Tier_2 (tech) ---
+    tier1_shortlist = [entry for entry in tier2_shortlist if entry[0] in step1_ids]
+    tier2_remaining = [entry for entry in tier2_shortlist if entry[0] not in step1_ids]
 
     debug_log.append((
         "TIER_1_SHORTLIST",
         ", ".join(
             f"{cs_by_id.get(s[0], {}).get('casestudy_name', f'ID:{s[0]}')} ({s[4]:.3f})"
             for s in tier1_shortlist
-        ) if tier1_shortlist else "(empty — no industry matches)",
+        ) if tier1_shortlist else "(empty — no overlap between industry and tech lists)",
     ))
     debug_log.append((
         "TIER_2_SHORTLIST",
@@ -575,8 +575,9 @@ def find_casestudy_matches(
     explanation.append((
         "Step 4: Industry Filtering (Tier Split)",
         f"Industry threshold: {INDUSTRY_MATCH_THRESHOLD}\n"
-        f"Tier 1 (industry + tech): {len(tier1_shortlist)} case studies passed industry filter\n"
-        f"Tier 2 (tech only): {len(tier2_remaining)} case studies did not pass industry filter",
+        f"Step_1_Shortlist (industry-only): {len(step1_ids)} case studies\n"
+        f"Tier 1 (industry ∩ tech): {len(tier1_shortlist)} case studies in both lists\n"
+        f"Tier 2 (tech only): {len(tier2_remaining)} case studies not in industry list",
     ))
 
     # --- FINAL SHORTLIST ---
