@@ -270,12 +270,14 @@ def _test_cache_badge(source: str) -> str:
 
 
 def _test_get_technology_research(company_name: str, website: str, use_cache: bool):
+    """Returns (data, source, verbose_info) where verbose_info has per-query snippets and Claude's raw response."""
     import json
     from prospect_outreach.research_pipeline import (
         _get_supabase, _is_cache_stale, _run_technology_research,
     )
     source = None
     data = None
+    verbose_info = None
     if use_cache:
         try:
             sb = _get_supabase()
@@ -295,8 +297,13 @@ def _test_get_technology_research(company_name: str, website: str, use_cache: bo
     else:
         source = "CACHE SKIPPED"
     if data is None:
-        data = _run_technology_research(company_name, website)
-    return data, source
+        verbose_result = _run_technology_research(company_name, website, verbose=True)
+        data = verbose_result["result"]
+        verbose_info = {
+            "per_query_snippets": verbose_result["per_query_snippets"],
+            "claude_raw_response": verbose_result["claude_raw_response"],
+        }
+    return data, source, verbose_info
 
 
 def _render_test_tab():
@@ -345,7 +352,7 @@ def _render_test_tab():
     from client_referencing.casestudy_matcher import find_casestudy_matches
     from client_referencing.matcher import find_matches
 
-    company_cache: dict = {}  # website -> (research_dict, source_label)
+    company_cache: dict = {}  # website -> (research_dict, source_label, verbose_info)
     total = len(df)
 
     for i, (_, row) in enumerate(df.iterrows()):
@@ -399,16 +406,30 @@ def _render_test_tab():
             st.markdown("#### Step 3 — Technology Research")
             st.write(f"**Params:** `company_name={company_name!r}`, `website={website!r}`")
             tech_research = {"company_name": company_name}
+            verbose_info = None
             try:
                 if website in company_cache:
-                    tech_research, co_source = company_cache[website]
+                    tech_research, co_source, verbose_info = company_cache[website]
                     co_source = "DEDUPED"
                 else:
-                    tech_research, co_source = _test_get_technology_research(
+                    tech_research, co_source, verbose_info = _test_get_technology_research(
                         company_name, website, use_company_cache
                     )
-                    company_cache[website] = (tech_research, co_source)
+                    company_cache[website] = (tech_research, co_source, verbose_info)
                 st.info(_test_cache_badge(co_source))
+
+                # Show per-query Serper results
+                if verbose_info and verbose_info.get("per_query_snippets"):
+                    st.caption("↓ Individual Serper query results (input to Claude)")
+                    for qi, qs in enumerate(verbose_info["per_query_snippets"], 1):
+                        with st.expander(f"Query {qi}: {qs['query']}", expanded=False):
+                            st.text(qs["results"] if qs["results"] else "(no results)")
+
+                # Show Claude's raw response
+                if verbose_info and verbose_info.get("claude_raw_response"):
+                    with st.expander("Claude raw response (before JSON parsing)", expanded=False):
+                        st.code(verbose_info["claude_raw_response"], language="json")
+
                 st.caption("↓ TECHNOLOGY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
                 with st.expander("TECHNOLOGY_RESEARCH dict", expanded=True):
                     st.json(tech_research)

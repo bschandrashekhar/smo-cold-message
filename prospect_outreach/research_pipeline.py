@@ -145,21 +145,26 @@ def _is_cache_stale(date_of_research) -> bool:
     return (datetime.now(timezone.utc) - dt) > timedelta(days=CACHE_TTL_DAYS)
 
 
-def _run_technology_research(company_name: str, website: str) -> dict:
+def _run_technology_research(company_name: str, website: str, verbose: bool = False) -> dict:
     """Run technology research using Serper + Claude synthesis.
 
     Runs 6 Serper queries, concatenates snippets, and asks Claude to
     populate a TECHNOLOGY_RESEARCH dict with tech_stack categories.
+
+    If verbose=True, returns a dict with keys: "result", "per_query_snippets", "claude_raw_response".
     """
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
     # Run all 6 Serper queries and concatenate
     all_snippets = ""
+    per_query_snippets = []
     for query_template in TECHNOLOGY_RESEARCH_QUERIES:
         query = query_template.format(name=company_name)
         results = _serper_search(query, 5)
+        snippet_text = _results_to_text(results)
         all_snippets += f"\n\nQuery: {query}\n"
-        all_snippets += _results_to_text(results)
+        all_snippets += snippet_text
+        per_query_snippets.append({"query": query, "results": snippet_text})
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
@@ -170,7 +175,8 @@ def _run_technology_research(company_name: str, website: str) -> dict:
             "content": f"company_name='{company_name}'\nwebsite='{website}'\n\n{all_snippets}",
         }],
     )
-    text = response.content[0].text.strip() if response.content else ""
+    raw_text = response.content[0].text.strip() if response.content else ""
+    text = raw_text
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
@@ -178,9 +184,16 @@ def _run_technology_research(company_name: str, website: str) -> dict:
     try:
         result = json.loads(text)
         result["website"] = website
-        return result
     except json.JSONDecodeError:
-        return {"company_name": company_name, "website": website}
+        result = {"company_name": company_name, "website": website}
+
+    if verbose:
+        return {
+            "result": result,
+            "per_query_snippets": per_query_snippets,
+            "claude_raw_response": raw_text,
+        }
+    return result
 
 
 def _get_technology_research(company_name: str, website: str) -> dict:
