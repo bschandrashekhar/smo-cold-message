@@ -382,7 +382,7 @@ def research_workbook(
                 prospect_country="",
                 max_matches=max_case_studies,
             )
-            df.at[idx, "Case_Studies"] = json.dumps([m.to_dict() if hasattr(m, "to_dict") else m for m in cs_result["matches"]])
+            df.at[idx, "Case_Studies"] = json.dumps([m.to_excel_dict() if hasattr(m, "to_excel_dict") else m for m in cs_result["matches"]])
         except Exception as e:
             df.at[idx, "Case_Studies"] = json.dumps({"error": str(e)})
 

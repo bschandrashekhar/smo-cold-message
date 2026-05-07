@@ -83,6 +83,22 @@ class CaseStudyMatch:
             "industry_score": self.industry_score,
         }
 
+    def to_excel_dict(self) -> dict:
+        return {
+            "casestudy_id": self.casestudy_id,
+            "client_name": self.client_name,
+            "client_industry": self.client_industry,
+            "exact_techs": self.exact_techs,
+            "semantic_techs": [
+                {"prospect_tech": t[0], "matched_tech": t[1], "similarity": t[2]}
+                for t in self.semantic_techs
+            ],
+            "casestudy_name": self.casestudy_name,
+            "summary_problem": self.summary_problem,
+            "summary_solution": self.summary_solution,
+            "summary_outcomes": self.summary_outcomes,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Cache
