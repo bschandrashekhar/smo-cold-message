@@ -287,10 +287,26 @@ def _score_intent(prospect_name: str, designation: str,
 
 
 def _apply_emea_coding(country: str) -> str:
-    """Return 'EMEA' if country is in Middle East or Africa, else return original."""
-    if country and country.lower() in EMEA_COUNTRIES:
+    """Normalize country to one of: EMEA, USA, UK, Australia, Canada."""
+    if not country:
+        return "USA"
+    c = country.strip().lower()
+    # EMEA: Middle East & Africa
+    if c in EMEA_COUNTRIES:
         return "EMEA"
-    return country
+    # USA aliases
+    if c in {"united states", "united states of america", "america", "usa", "us"}:
+        return "USA"
+    # UK aliases
+    if c in {"united kingdom", "great britain", "gb", "britain", "uk"}:
+        return "UK"
+    # Pass-through
+    if c == "australia":
+        return "Australia"
+    if c == "canada":
+        return "Canada"
+    # Default: everything else maps to USA
+    return "USA"
 
 
 # ── Main entry point ───────────────────────────────────────────────────────
@@ -313,6 +329,9 @@ def research_workbook(
         max_client_matches: Max matches for find_matches (must be >= 5).
         progress_callback: Optional fn(current, total, status_msg).
     """
+    from prospect_outreach.brand_knowledge import ensure_brand_profiles
+    ensure_brand_profiles()
+
     import io
     df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="prospects")
 

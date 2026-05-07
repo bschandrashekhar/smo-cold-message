@@ -84,9 +84,9 @@ def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
             end = row.get("End_Date", "")
             if pd.notna(start) and pd.notna(end):
                 if hasattr(start, "strftime"):
-                    start = f"{start.strftime('%B')} {start.day}"
+                    start = f"{start.strftime('%B')} {start.day}, {start.year}"
                 if hasattr(end, "strftime"):
-                    end = f"{end.strftime('%B')} {end.day}"
+                    end = f"{end.strftime('%B')} {end.day}, {end.year}"
                 return f"{start} and {end}"
     return None
 
