@@ -285,9 +285,12 @@ def _test_get_technology_research(company_name: str, website: str, use_cache: bo
             if result.data:
                 row = result.data[0]
                 if not _is_cache_stale(row.get("Date_of_Research")):
-                    source = "CACHE HIT"
-                    cr = row["Technology_Research"]
-                    data = json.loads(cr) if isinstance(cr, str) else cr
+                    cr = row.get("Technology_Research")
+                    if cr is not None:
+                        source = "CACHE HIT"
+                        data = cr if isinstance(cr, dict) else json.loads(cr)
+                    else:
+                        source = "CACHE NULL"
                 else:
                     source = "CACHE STALE"
             else:
@@ -297,12 +300,23 @@ def _test_get_technology_research(company_name: str, website: str, use_cache: bo
     else:
         source = "CACHE SKIPPED"
     if data is None:
+        from datetime import datetime, timezone
         verbose_result = _run_technology_research(company_name, website, verbose=True)
         data = verbose_result["result"]
         verbose_info = {
             "per_query_snippets": verbose_result["per_query_snippets"],
             "claude_raw_response": verbose_result["claude_raw_response"],
         }
+        # Write back to cache (same as Pass 1 pipeline)
+        try:
+            sb = _get_supabase()
+            sb.table("Cache_Prospect_Company_Research").upsert({
+                "Website": website,
+                "Technology_Research": data,
+                "Date_of_Research": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        except Exception:
+            pass  # cache write failure is non-critical
     return data, source, verbose_info
 
 
