@@ -91,19 +91,16 @@ class CaseStudyMatch:
             if ptech not in best_by_tech or sim > best_by_tech[ptech][2]:
                 best_by_tech[ptech] = (ptech, mtech, sim)
         semantic_slim = [
-            {"prospect_tech": v[0], "matched_tech": v[1], "similarity": round(v[2], 2)}
+            {"prospect_tech": v[0], "matched_tech": v[1]}
             for v in best_by_tech.values()
         ]
         return {
-            "casestudy_id": self.casestudy_id,
             "client_name": self.client_name,
             "client_industry": self.client_industry,
             "exact_techs": self.exact_techs,
             "semantic_techs": semantic_slim,
             "casestudy_name": self.casestudy_name,
-            "summary_problem": self.summary_problem,
             "summary_solution": self.summary_solution,
-            "summary_outcomes": self.summary_outcomes,
         }
 
 
