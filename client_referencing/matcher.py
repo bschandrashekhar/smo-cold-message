@@ -119,11 +119,6 @@ class _DataCache:
     def _is_stale(self) -> bool:
         return time.time() - self._last_refresh > self.ttl
 
-    def get_industry_embeddings(self) -> Dict[str, list]:
-        if self._industry_embeddings is None or self._is_stale():
-            self._refresh()
-        return self._industry_embeddings
-
     def get_industry_term_vecs(self) -> Dict[str, np.ndarray]:
         if self._industry_term_vecs is None or self._is_stale():
             self._refresh()
@@ -173,7 +168,7 @@ class _DataCache:
                 self._industry_term_vecs[term] = v / n
         # Client rows (metadata only)
         client_cols = ("id,client_name,client_industry,client_geography,client_url,"
-                       "industry_array,industry_primary,industry_group,geo_priority")
+                       "industry_array,industry_group,geo_priority")
         client_result = sb.table(TABLE_NAME).select(client_cols).execute()
         client_lookup = {r["id"]: r for r in (client_result.data or [])}
         # Tech rows
@@ -192,7 +187,6 @@ class _DataCache:
                 "client_geography": c["client_geography"],
                 "client_url": c["client_url"],
                 "industry_array": c["industry_array"],
-                "industry_primary": c["industry_primary"],
                 "industry_group": c["industry_group"],
                 "geo_priority": c["geo_priority"],
                 "exact_key": t["exact_key"],
@@ -224,7 +218,7 @@ def fetch_all_rows() -> List[dict]:
     return _cache.get_all_rows()
 
 
-def _matches_industry(row: dict, prospect_ind: str, industry_scores: Dict[str, float]) -> bool:
+def _matches_industry(row: dict, industry_scores: Dict[str, float]) -> bool:
     """Check if a row's client passes the industry threshold via cosine similarity."""
     cname = row.get("client_name", "")
     return industry_scores.get(cname, 0.0) >= INDUSTRY_MATCH_THRESHOLD
@@ -260,15 +254,17 @@ def filter_candidates(
 
     # Tier 1: Industry + Country
     if prospect_ctry:
-        tier1_rows = [r for r in rows if _matches_industry(r, prospect_ind, scores) and _matches_geography(r, prospect_ctry)]
-        tier1_clients = sorted(set(r["client_name"] for r in tier1_rows))
+        tier1_rows = [r for r in rows if _matches_industry(r, scores) and _matches_geography(r, prospect_ctry)]
+        tier1_clients = sorted(set(r["client_name"] for r in tier1_rows),
+                               key=lambda c: -scores.get(c, 0.0))
 
         if len(tier1_clients) > 4:
             return tier1_rows, "industry_and_geography", tier1_clients, tier2_clients
 
     # Tier 2: Industry only (when Tier 1 has <= 4 clients)
-    tier2_rows = [r for r in rows if _matches_industry(r, prospect_ind, scores)]
-    tier2_clients = sorted(set(r["client_name"] for r in tier2_rows))
+    tier2_rows = [r for r in rows if _matches_industry(r, scores)]
+    tier2_clients = sorted(set(r["client_name"] for r in tier2_rows),
+                           key=lambda c: -scores.get(c, 0.0))
 
     if len(tier2_clients) > 2:
         return tier2_rows, "industry", tier1_clients, tier2_clients
@@ -397,11 +393,6 @@ def _compute_industry_client_names(all_rows: List[dict], prospect_ind: str, indu
         return set()
     return {r["client_name"] for r in all_rows
             if industry_scores.get(r["client_name"], 0.0) >= INDUSTRY_MATCH_THRESHOLD}
-
-
-def _fetch_industry_embeddings() -> Dict[str, list]:
-    """Fetch all industry term embeddings from Supabase (cached with TTL)."""
-    return _cache.get_industry_embeddings()
 
 
 def _compute_industry_scores(
@@ -565,16 +556,21 @@ def find_matches(
 
     prospect_ind = prospect_industry.strip().lower()
     prospect_techs = [t.strip().lower() for t in prospect_technologies.split(",") if t.strip()]
+    # Expand aliases into prospect_techs (spec line 41):
+    # e.g. "ios" → also add "mobile application development"
+    expanded = list(prospect_techs)
+    seen = set(prospect_techs)
+    for tech in prospect_techs:
+        alias = EXACT_KEY_ALIASES.get(tech)
+        if alias and alias not in seen:
+            expanded.append(alias)
+            seen.add(alias)
+    prospect_techs = expanded
     prospect_ctry = prospect_country.strip().lower()
     total_techs = len(prospect_techs)
     debug_log = []
 
     explanation = {}  # structured explanation data for UI
-
-    if total_techs == 0:
-        return {"matches": [], "industry_filtered_only": [],
-                "industry_filter_applied": False, "total_candidates": 0,
-                "debug_log": [], "explanation": {}}
 
     # Print tier reference for log clarity (exact formatting per spec)
     debug_log.append((
@@ -623,36 +619,77 @@ def find_matches(
 
     # Debug: Always log Tier 1 (Industry + Geography)
     debug_log.append((
-        "Tier 1 shortlistExistingClients (Shortlist Only)",
+        "Tier 1 shortlistExistingClients (Shortlist on Ind + Geo)",
         ", ".join(tier1_clients) if tier1_clients else "(empty)",
     ))
     # Debug: Log Tier 2 only if Tier 1 was insufficient (≤4)
     if len(tier1_clients) <= 4:
         debug_log.append((
-            "Tier 2 shortlistExistingClients (Shortlist Only)",
+            "Tier 2 shortlistExistingClients (Shortlist on Ind)",
             ", ".join(tier2_clients) if tier2_clients else "(empty)",
         ))
 
     # Step 3: Core matching (exact + semantic on candidate rows)
-    exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
-    semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
+    if total_techs > 0:
+        exact_by_client, unmatched_techs = exact_match(candidate_rows, prospect_techs)
+        semantic_by_client = semantic_match(candidate_rows, unmatched_techs)
+    else:
+        exact_by_client, unmatched_techs = {}, []
+        semantic_by_client = {}
 
     # Build shortlist: exact clients first, then semantic-only
-    sort_by_ind = flag_tier_3  # sort by industry only when filter was skipped (Tier 3)
-    shortlist = _build_shortlist(
-        exact_by_client, semantic_by_client, industry_scores,
-        sort_by_industry=sort_by_ind,
-        source_exact="industry_exact" if industry_applied else "exact",
-        source_semantic="industry_semantic" if industry_applied else "semantic",
-    )
+    # No industry sorting here — we sort by final_score below (spec lines 80, 90-91)
+    if total_techs > 0:
+        shortlist = _build_shortlist(
+            exact_by_client, semantic_by_client, industry_scores,
+            sort_by_industry=False,
+            source_exact="industry_exact" if industry_applied else "exact",
+            source_semantic="industry_semantic" if industry_applied else "semantic",
+        )
+    else:
+        # No technologies — rank industry-filtered candidates by industry_score
+        candidate_names = list(dict.fromkeys(r["client_name"] for r in candidate_rows))
+        candidate_names.sort(key=lambda c: (-industry_scores.get(c, 0.0), c))
+        shortlist = [(c, "industry") for c in candidate_names]
 
-    # Debug: Case-specific logging after core matching
-    _shortlist_names = [c for c, _ in shortlist]
+    # Merge exact + semantic data for scoring (clients can have both)
+    all_exact = dict(exact_by_client)
+    all_semantic = dict(semantic_by_client)
+
+    # Sort shortlist before top-5 truncation (spec lines 74, 80, 84-85, 97)
+    # Tier 3: exact matches first (by industry_score), then semantic-only (by final_score, industry_score tiebreaker)
+    # Tier 1/2: entire list by final_score desc
+    _cached_scores = {}  # {cname: (match_ratio, similarity_score, final_score)}
+    if total_techs > 0:
+        for cname, _ in shortlist:
+            if cname not in _cached_scores:
+                _cached_scores[cname] = _score_client(cname, all_exact, all_semantic, total_techs)
+
+        if flag_tier_3:
+            exact_set = set(all_exact.keys())
+            # Split into exact-match and semantic-only, deduplicating
+            seen = set()
+            exact_entries, semantic_entries = [], []
+            for entry in shortlist:
+                if entry[0] in seen:
+                    continue
+                seen.add(entry[0])
+                if entry[0] in exact_set:
+                    exact_entries.append(entry)
+                else:
+                    semantic_entries.append(entry)
+            exact_entries.sort(key=lambda e: -industry_scores.get(e[0], 0))
+            semantic_entries.sort(key=lambda e: (-_cached_scores[e[0]][2], -industry_scores.get(e[0], 0)))
+            shortlist = exact_entries + semantic_entries
+        else:
+            shortlist.sort(key=lambda e: -_cached_scores.get(e[0], (0, 0, 0))[2])
+
+    # Debug: Case-specific logging after core matching (after final_score sort)
+    _shortlist_names = list(dict.fromkeys(c for c, _ in shortlist))
     if flag_tier_3:
-        # Tier 3: log after exact, then after semantic separately
         exact_clients_str = ", ".join(exact_by_client.keys()) if exact_by_client else "(none)"
         debug_log.append((
-            "Tier 3: shortlistExistingClients (After Exact Match)",
+            "Tier 3: shortlistExistingClients (Shortlist on Exact Tech)",
             exact_clients_str,
         ))
         debug_log.append((
@@ -660,7 +697,6 @@ def find_matches(
             ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
         ))
     else:
-        # Tier 1 or Tier 1+2: log after both matches together
         debug_log.append((
             "(Tier 1) or (Tier 1+Tier 2) : shortlistExistingClients (Order after matches)",
             ", ".join(_shortlist_names) if _shortlist_names else "(empty)",
@@ -676,11 +712,7 @@ def find_matches(
         for c, ts in semantic_by_client.items()
     }
 
-    # Merge exact + semantic data for scoring (clients can have both)
-    all_exact = dict(exact_by_client)
-    all_semantic = dict(semantic_by_client)
-
-    # Truncate shortlist to top 5 before backfill (spec line 90)
+    # Truncate shortlist to top 5 before backfill (spec line 104)
     seen_top5 = set()
     shortlist_top5 = []
     for entry in shortlist:
@@ -703,7 +735,7 @@ def find_matches(
         # Branch A: We had industry matches (Tier 1/2), backfill with tech first, then geo
         bf_exact, bf_semantic = {}, {}
         remaining_rows = [r for r in all_rows if r["client_name"] not in shortlist_names]
-        if remaining_rows:
+        if remaining_rows and total_techs > 0:
             bf_exact, _ = exact_match(remaining_rows, prospect_techs)
             bf_semantic = semantic_match(remaining_rows, unmatched_techs)
 
@@ -834,8 +866,8 @@ def find_matches(
             continue
         seen.add(cname)
 
-        match_ratio, similarity_score, final_score = _score_client(
-            cname, all_exact, all_semantic, total_techs
+        match_ratio, similarity_score, final_score = _cached_scores.get(
+            cname, _score_client(cname, all_exact, all_semantic, total_techs)
         )
         meta = client_meta.get(cname, {})
         matches.append(ClientMatch(
@@ -854,9 +886,7 @@ def find_matches(
             client_id=meta.get("client_id", ""),
         ))
 
-    # Preserve shortlist order (core first, backfill after) per spec.
-    # _build_shortlist already orders: exact clients first, then semantic-only,
-    # with industry_score sorting applied where spec requires it.
+    # Shortlist order preserved: core matches (sorted by score) first, then backfill.
     # Cap at max_matches results.
     matches = matches[:max_matches]
 
