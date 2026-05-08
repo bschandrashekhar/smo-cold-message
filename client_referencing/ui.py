@@ -911,6 +911,14 @@ def _render_casestudy_match_tab():
                     if m.summary_outcomes:
                         st.markdown(f"**Outcomes:** {m.summary_outcomes}")
 
+    # Excel JSON output (6-field format)
+    if matches:
+        import json
+        st.divider()
+        with st.expander("Excel JSON Output (6-field format)", expanded=False):
+            excel_json = [m.to_excel_dict() for m in matches]
+            st.code(json.dumps(excel_json, indent=2), language="json")
+
     # Match Explanation (Step-by-Step)
     if results.get("explanation"):
         st.divider()
