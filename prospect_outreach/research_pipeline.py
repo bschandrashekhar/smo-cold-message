@@ -348,7 +348,7 @@ def research_workbook(
     for col in [
         "Case_Studies", "Industry_Client_References",
         "Suggested_Brand_Name_to_use", "Intent_Score",
-        "Message_to_send", "Prospect_Technologies",
+        "WARM_MESSAGE", "Prospect_Technologies",
     ]:
         if col not in df.columns:
             df[col] = ""

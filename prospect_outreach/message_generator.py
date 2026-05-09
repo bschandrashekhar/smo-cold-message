@@ -1,6 +1,6 @@
 """Prospect Outreach — Pass 2 Message Generation.
 
-For each prospect row that is ready (has Prospect_Technologies, no existing Message_to_send):
+For each prospect row that is ready (has Prospect_Technologies, no existing WARM_MESSAGE):
   1. Load brand profile JSON
   2. Look up date range from dates sheet by city
   3. Generate 4-paragraph outreach message via Claude
@@ -40,32 +40,22 @@ Technology research findings:
 Case studies (use for Para 2, anonymized as "a leading [industry] company"):
 {case_studies}
 
-Industry reference clients (use for Para 3 — mention by name):
-{client_references}
-
-Date window for meeting (Para 4): {date_window}
-
 WRITING RULES — follow every rule strictly:
 1. Address prospect by first name only (e.g. "Hi {first_name},")
 2. Do NOT use hyphens or dashes anywhere in the message
 3. Do NOT reference compliance standards by name (APRA, SOC2, PCI DSS, etc.) — say "compliance standards" instead
 4. Total message must be UNDER 150 words
 5. Case study references are brand-neutral — do NOT mention CloudChillies or LendingLogik within case study descriptions
-6. Industry reference client names CAN be mentioned by name
-7. No subject line, no signature
-8. No specific numbers, metrics, or statistics in Para 1
+6. No subject line, no signature
+7. No specific numbers, metrics, or statistics in Para 1
 
-STRUCTURE — write exactly 4 paragraphs:
+STRUCTURE — write exactly 2 paragraphs:
 
-Para 1: Show understanding of the prospect's situation. Reference a specific initiative or technology from the research, tailored to their role ({designation}). Naturally mention the specific technology names found (sets up Para 2). Keep to 1-2 sentences.
+Para 1: Show understanding of the prospect's technological situation, tailored to their role ({designation}). Naturally mention specific technology names found in the research (sets up Para 2). Do NOT use prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline"). Keep to 1-2 sentences.
 
 Para 2: Pick up the GENERAL-PURPOSE technology names from Para 1 (e.g. Boomi, Snowflake, MuleSoft) — NOT proprietary systems. Weave them into a case study narrative. Anonymize as "a leading [industry] company". Show how similar challenges were solved using Salesforce. Only reference these approved Salesforce products (and ONLY if clearly relevant): {approved_sf_products}. If no specific product fits, just say "Salesforce".
 
-Para 3: In a SEPARATE sentence (not joined to Para 2 narrative), list ALL industry reference client names: e.g. "Some of our clients in this space include [Client A], [Client B], and [Client C]."
-
-Para 4: {cta}
-
-Return ONLY the message text, no labels, no "Para 1:" prefixes."""
+Return ONLY the 2 paragraphs of message text, no labels, no "Para 1:" prefixes."""
 
 
 def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
@@ -79,7 +69,7 @@ def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
     for _, row in dates_df.iterrows():
         row_city = str(row.get("City", "")).strip().lower()
         row_state = str(row.get("State", "")).strip().lower()
-        if row_city == city_lower and (not state_lower or row_state == state_lower):
+        if row_city == city_lower and row_state == state_lower:
             start = row.get("Start_Date", "")
             end = row.get("End_Date", "")
             if pd.notna(start) and pd.notna(end):
@@ -164,13 +154,7 @@ def _generate_single_message(
     case_studies_json = str(row.get("Case_Studies", ""))
     refs_json = str(row.get("Industry_Client_References", ""))
 
-    # Date window
-    date_window = _get_date_window(dates_df, city, state)
-    if date_window:
-        cta = f"It will be really good to discuss this over a brief call between {date_window}. Please let me know what works best for you."
-    else:
-        cta = "It would be really good to discuss this over a brief call. Please let me know when we can connect."
-
+    # Para 1+2: GenAI via Claude
     prompt = MESSAGE_PROMPT.format(
         brand_name=brand_profile.get("name", ""),
         tone_and_positioning=brand_profile.get("tone_and_positioning", ""),
@@ -181,10 +165,7 @@ def _generate_single_message(
         location=location,
         technology_research=technology_research,
         case_studies=_format_case_studies(case_studies_json),
-        client_references=_format_client_references(refs_json),
-        date_window=date_window or "no specific dates — use generic phrasing",
         approved_sf_products=", ".join(APPROVED_SF_PRODUCTS),
-        cta=cta,
     )
 
     response = client.messages.create(
@@ -192,7 +173,21 @@ def _generate_single_message(
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text.strip()
+    warm_message = response.content[0].text.strip()
+
+    # Para 3: Fixed template
+    client_refs = _format_client_references(refs_json)
+    if client_refs and client_refs != "No client references available.":
+        warm_message += f"\n\nSome of our existing clients in similar space such as yours include: {client_refs}."
+
+    # Para 4: Fixed template
+    date_window = _get_date_window(dates_df, city, state)
+    if date_window:
+        warm_message += f"\n\nIt will be really good to discuss this over a brief call between {date_window}. Please let me know what works best for you."
+    else:
+        warm_message += "\n\nIt would be really good to discuss this over a brief call. Please let me know when we can connect."
+
+    return warm_message
 
 
 def generate_messages(
@@ -217,13 +212,13 @@ def generate_messages(
     except Exception:
         dates_df = pd.DataFrame()
 
-    if "Message_to_send" not in df.columns:
-        df["Message_to_send"] = ""
-    df["Message_to_send"] = df["Message_to_send"].astype(object).fillna("")
+    if "WARM_MESSAGE" not in df.columns:
+        df["WARM_MESSAGE"] = ""
+    df["WARM_MESSAGE"] = df["WARM_MESSAGE"].astype(object).fillna("")
 
     # Determine ready vs skipped
     def _is_ready(row):
-        msg = str(row.get("Message_to_send", "")).strip()
+        msg = str(row.get("WARM_MESSAGE", "")).strip()
         tech_research = str(row.get("Prospect_Technologies", "")).strip()
         return not msg and bool(tech_research)
 
@@ -253,7 +248,7 @@ def generate_messages(
                 brand_cache[brand_name] = {"name": brand_name, "tone_and_positioning": "", "services": []}
 
         message = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
-        df.at[idx, "Message_to_send"] = message
+        df.at[idx, "WARM_MESSAGE"] = message
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="prospects", index=False)

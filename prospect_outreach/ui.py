@@ -141,7 +141,7 @@ def _render_pass2_tab():
     st.subheader("Pass 2: Generate Messages")
     st.caption(
         "Upload the reviewed data_output.xlsx. Rows with Prospect_Technologies and no existing "
-        "Message_to_send will have messages generated. Rows with empty Prospect_Technologies are skipped."
+        "WARM_MESSAGE will have messages generated. Rows with empty Prospect_Technologies are skipped."
     )
 
     uploaded = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="pass2_upload")
@@ -159,7 +159,7 @@ def _render_pass2_tab():
 
     # Preview ready/skipped counts
     def _is_ready(row):
-        msg = str(row.get("Message_to_send", "")).strip()
+        msg = str(row.get("WARM_MESSAGE", "")).strip()
         tech_research = str(row.get("Prospect_Technologies", "")).strip()
         return not msg and bool(tech_research)
 
@@ -200,7 +200,7 @@ def _render_pass2_tab():
             st.success(f"Generated {stats['ready']} messages. {stats['skipped']} skipped.")
 
             result_df = pd.read_excel(output_path, sheet_name="prospects")
-            preview_cols = ["First_Name", "Last_Name", "Company_Name", "Message_to_send"]
+            preview_cols = ["First_Name", "Last_Name", "Company_Name", "WARM_MESSAGE"]
             available = [c for c in preview_cols if c in result_df.columns]
             st.dataframe(result_df[available].head(10), use_container_width=True)
 
