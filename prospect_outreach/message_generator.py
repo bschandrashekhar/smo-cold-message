@@ -140,13 +140,11 @@ def _format_client_references(refs_json: str) -> str:
     if not data:
         return "No client references available."
 
-    names = []
     for ref in data:
-        if isinstance(ref, dict):
-            name = ref.get("client_name", ref.get("name", ""))
-            if name:
-                names.append(name)
-    return ", ".join(names) if names else "No client references available."
+        if isinstance(ref, dict) and "client_names" in ref:
+            return ref["client_names"] if ref["client_names"] else "No client references available."
+
+    return "No client references available."
 
 
 def _generate_single_message(

@@ -419,9 +419,11 @@ def research_workbook(
                 prospect_country=country,
                 max_matches=max(max_client_matches, 5),
             )
-            df.at[idx, "Industry_Client_References"] = json.dumps([
-                m.to_dict() if hasattr(m, "to_dict") else m for m in client_result["matches"]
-            ])
+            client_names = ", ".join(
+                m.client_name if hasattr(m, "client_name") else str(m)
+                for m in client_result["matches"]
+            )
+            df.at[idx, "Industry_Client_References"] = json.dumps([{"client_names": client_names}])
         except Exception as e:
             df.at[idx, "Industry_Client_References"] = json.dumps({"error": str(e)})
 
