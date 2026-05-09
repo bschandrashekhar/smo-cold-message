@@ -159,9 +159,13 @@ def _render_pass2_tab():
 
     # Preview ready/skipped counts
     def _is_ready(row):
-        msg = str(row.get("WARM_MESSAGE", "")).strip()
+        # Check both old and new column names for backwards compatibility
+        msg = row.get("WARM_MESSAGE") or row.get("Message_to_send") or ""
+        msg = str(msg).strip()
+        if msg and msg.lower() != "nan":
+            return False
         tech_research = str(row.get("Prospect_Technologies", "")).strip()
-        return not msg and bool(tech_research)
+        return bool(tech_research) and tech_research.lower() != "nan"
 
     ready = sum(1 for _, row in df.iterrows() if _is_ready(row))
     skipped = len(df) - ready
@@ -172,6 +176,15 @@ def _render_pass2_tab():
 
     if ready == 0:
         st.info("No prospects to generate messages for — all rows either already have messages or have empty Prospect_Technologies.")
+        with st.expander("Debug: skip reasons per row"):
+            for idx, row in df.iterrows():
+                msg = str(row.get("WARM_MESSAGE", "")).strip()
+                tech = str(row.get("Prospect_Technologies", "")).strip()
+                name = f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
+                has_msg = "YES" if msg else "NO"
+                has_tech = "YES" if (tech and tech != "nan") else "NO"
+                st.text(f"Row {idx}: {name} | WARM_MESSAGE={has_msg} | Prospect_Technologies={has_tech}")
+            st.caption(f"Columns in file: {list(df.columns)}")
         return
 
     if st.button("Generate Messages", type="primary", key="run_gen_btn"):

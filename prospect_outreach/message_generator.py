@@ -212,6 +212,9 @@ def generate_messages(
     except Exception:
         dates_df = pd.DataFrame()
 
+    # Handle old column name: rename Message_to_send → WARM_MESSAGE
+    if "Message_to_send" in df.columns and "WARM_MESSAGE" not in df.columns:
+        df.rename(columns={"Message_to_send": "WARM_MESSAGE"}, inplace=True)
     if "WARM_MESSAGE" not in df.columns:
         df["WARM_MESSAGE"] = ""
     df["WARM_MESSAGE"] = df["WARM_MESSAGE"].astype(object).fillna("")
@@ -219,8 +222,10 @@ def generate_messages(
     # Determine ready vs skipped
     def _is_ready(row):
         msg = str(row.get("WARM_MESSAGE", "")).strip()
+        if msg and msg.lower() != "nan":
+            return False
         tech_research = str(row.get("Prospect_Technologies", "")).strip()
-        return not msg and bool(tech_research)
+        return bool(tech_research) and tech_research.lower() != "nan"
 
     ready_indices = [idx for idx, row in df.iterrows() if _is_ready(row)]
     skipped = len(df) - len(ready_indices)
