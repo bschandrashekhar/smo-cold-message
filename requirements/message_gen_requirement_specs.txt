@@ -226,19 +226,15 @@ User opens `data_output.xlsx`:
       case_study_matching_result 
         [
           {
-              "client_name": "MedTech Corp",
-              "client_industry": "Healthcare",
+              "casestudy_name": "Pharma Order Pipeline Automation",
               "exact_techs": ["salesforce", "mulesoft"],
               "semantic_techs": [{"prospect_tech": "snowflake", "matched_tech": "Fabric"}],
-              "casestudy_name": "Pharma Order Pipeline Automation",
-              "summary_solution": "Implemented Salesforce + Mulesoft integration...",
+              "summary_solution": "Implemented Salesforce, Mulesoft integration...",
           },
           {
-              "client_name": "FinServ Global",
-              "client_industry": "Financial Services",
+              "casestudy_name": "Loan Origination Platform",
               "exact_techs": ["salesforce"],
               "semantic_techs": [],
-              "casestudy_name": "Loan Origination Platform",
               "summary_solution": "Built Salesforce Service Cloud workflow...",
           }
         ]
@@ -258,11 +254,9 @@ User opens `data_output.xlsx`:
       //Call find_matches with the parameters as mentioned below.
       Following is template structure of existing_client_matching_result;
       existing_client_matching_result 
-        [
-          {
-              "client_names": "MedTech Corp, FinServ Global, FinServ Global",
-          }
-        ]
+        {
+            "client_names": "MedTech Corp, FinServ Global, FinServ Global",
+        }
 
       existing_client_matching_result = find_matches(
           prospect_industry: Industry,
