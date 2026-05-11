@@ -81,14 +81,12 @@ def _render_pass1_tab():
     st.divider()
 
     # UI options
-    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a, col_b, col_c = st.columns(3)
     with col_a:
-        generate_intent = st.toggle("Generate Intent Score", value=True)
-    with col_b:
         use_cache = st.toggle("Use Research Cache", value=True)
-    with col_c:
+    with col_b:
         max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5)
-    with col_d:
+    with col_c:
         max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5)
 
     if st.button("Run Research", type="primary", key="run_research_btn"):
@@ -109,7 +107,6 @@ def _render_pass1_tab():
             research_workbook(
                 file_bytes=file_bytes,
                 output_path=output_path,
-                generate_intent_score=generate_intent,
                 max_case_studies=int(max_case_studies),
                 max_client_matches=int(max_clients),
                 use_cache=use_cache,
@@ -368,19 +365,17 @@ def _render_test_tab():
 
     use_company_cache = st.toggle("Use Technology Research Cache", value=False, key="test_company_cache")
 
-    col_ta, col_tb, col_tc = st.columns(3)
+    col_ta, col_tb = st.columns(2)
     with col_ta:
-        generate_intent = st.toggle("Generate Intent Score", value=False, key="test_intent")
-    with col_tb:
         max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5, key="test_cs")
-    with col_tc:
+    with col_tb:
         max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5, key="test_cl")
 
     if not st.button("Run Test", type="primary", key="run_test_btn"):
         return
 
     from prospect_outreach.research_pipeline import (
-        _score_intent, _apply_emea_coding, _extract_tech_names_from_dict,
+        _apply_emea_coding, _extract_tech_names_from_dict,
     )
     from client_referencing.brand_matcher import find_brand_match
     from client_referencing.casestudy_matcher import find_casestudy_matches
@@ -540,15 +535,3 @@ def _render_test_tab():
                 st.error(f"Client reference matching failed: {e}")
 
             st.divider()
-
-            # ── Step 6: Intent Score ─────────────────────────────────────
-            if generate_intent:
-                st.markdown("#### Step 6 — Intent Score")
-                st.write(f"**Params:** `prospect_name={prospect_name!r}`, `designation={designation!r}`, `company_name={company_name!r}`, `technology_research` (above)")
-                try:
-                    import json as _json
-                    score = _score_intent(prospect_name, designation, company_name, _json.dumps(tech_research))
-                    st.metric("Intent Score", score)
-                except Exception as e:
-                    st.error(f"Intent scoring failed: {e}")
-                st.divider()

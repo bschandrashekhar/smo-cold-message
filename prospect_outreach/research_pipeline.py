@@ -6,7 +6,6 @@ For each prospect:
   3. Technology research via Serper (with Supabase cache, 3-month TTL)
   4. Case study matching via find_casestudy_matches
   5. Client matching via find_matches
-  6. Intent scoring (optional)
 """
 
 import json
@@ -81,18 +80,6 @@ TECHNOLOGY_RESEARCH_QUERIES = [
     '"{name}" Snowflake',
 ]
 
-INTENT_SCORE_PROMPT = """Rate this prospect's likelihood of needing Salesforce/Snowflake/AI/data engineering services on a scale of 1-10.
-
-Prospect: {prospect_name}, {designation} at {company_name}
-Technology Research:
-{technology_research}
-
-Scoring guide:
-- 8-10: Strong signals (active job postings for Salesforce/Snowflake/data roles, RFPs, digital transformation announcements)
-- 5-7: Moderate signals (technology initiatives, some relevant hiring, growth indicators)
-- 1-4: Weak signals (no tech signals, no relevant hiring, generic company info only)
-
-Return ONLY a single integer from 1 to 10, nothing else."""
 
 # ── Supabase client ────────────────────────────────────────────────────────
 
@@ -267,25 +254,6 @@ def _extract_tech_names_from_dict(tech_research: dict) -> str:
     return ", ".join(names)
 
 
-def _score_intent(prospect_name: str, designation: str,
-                   company_name: str, technology_research: str) -> int:
-    """Rate intent 1-10 via Claude."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    prompt = INTENT_SCORE_PROMPT.format(
-        prospect_name=prospect_name,
-        designation=designation,
-        company_name=company_name,
-        technology_research=technology_research,
-    )
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=10,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = response.content[0].text.strip() if response.content else ""
-    match = re.search(r"\d+", text)
-    return int(match.group()) if match else 5
-
 
 def _apply_emea_coding(country: str) -> str:
     """Normalize country to one of: EMEA, USA, UK, Australia, Canada."""
@@ -315,7 +283,6 @@ def _apply_emea_coding(country: str) -> str:
 def research_workbook(
     file_bytes: bytes,
     output_path: str,
-    generate_intent_score: bool = True,
     max_case_studies: int = 5,
     max_client_matches: int = 5,
     use_cache: bool = True,
@@ -326,7 +293,6 @@ def research_workbook(
     Args:
         file_bytes: Raw bytes of the uploaded .xlsx file.
         output_path: Path to write data_output.xlsx.
-        generate_intent_score: Whether to generate Intent_Score column.
         max_case_studies: Max matches for find_casestudy_matches.
         max_client_matches: Max matches for find_matches (must be >= 5).
         use_cache: Whether to use Supabase cache for technology research.
@@ -347,7 +313,7 @@ def research_workbook(
     # Ensure generated columns exist and are object dtype (not float64)
     for col in [
         "Case_Studies", "Industry_Client_References",
-        "Suggested_Brand_Name_to_use", "Intent_Score",
+        "Suggested_Brand_Name_to_use",
         "WARM_MESSAGE", "Prospect_Technologies",
     ]:
         if col not in df.columns:
@@ -426,13 +392,6 @@ def research_workbook(
             df.at[idx, "Industry_Client_References"] = json.dumps([{"client_names": client_names}])
         except Exception as e:
             df.at[idx, "Industry_Client_References"] = json.dumps({"error": str(e)})
-
-        # 6. Intent scoring (optional)
-        if generate_intent_score:
-            if progress_callback:
-                progress_callback(current, total, f"Scoring intent for {prospect_name}...")
-            score = _score_intent(prospect_name, designation, company_name, json.dumps(tech_research))
-            df.at[idx, "Intent_Score"] = score
 
     # Write output
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
