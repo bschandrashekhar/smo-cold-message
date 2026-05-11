@@ -97,20 +97,13 @@ def _format_case_studies(case_studies_json: str) -> str:
     lines = []
     for cs in data[:5]:
         if isinstance(cs, dict):
-            name = cs.get("casestudy_name", cs.get("name", ""))
-            industry = cs.get("client_industry", "")
-            problem = cs.get("summary_problem", "")
+            name = cs.get("casestudy_name", "")
             solution = cs.get("summary_solution", "")
-            outcomes = cs.get("summary_outcomes", "")
             exact_techs = cs.get("exact_techs", [])
             tech_str = ", ".join(exact_techs) if isinstance(exact_techs, list) else str(exact_techs)
-            parts = [f"- {name} ({industry})"]
-            if problem:
-                parts.append(f"  Problem: {problem}")
+            parts = [f"- {name}"]
             if solution:
                 parts.append(f"  Solution: {solution}")
-            if outcomes:
-                parts.append(f"  Outcomes: {outcomes}")
             if tech_str:
                 parts.append(f"  Technologies: {tech_str}")
             lines.append("\n".join(parts))
@@ -120,19 +113,15 @@ def _format_case_studies(case_studies_json: str) -> str:
 def _format_client_references(refs_json: str) -> str:
     """Format client references JSON into a list of names."""
     try:
-        data = json.loads(refs_json) if refs_json else []
+        data = json.loads(refs_json) if refs_json else {}
     except (json.JSONDecodeError, TypeError):
         return "No client references available."
 
-    if isinstance(data, dict) and "error" in data:
+    if not data or (isinstance(data, dict) and "error" in data):
         return "No client references available."
 
-    if not data:
-        return "No client references available."
-
-    for ref in data:
-        if isinstance(ref, dict) and "client_names" in ref:
-            return ref["client_names"] if ref["client_names"] else "No client references available."
+    if isinstance(data, dict) and "client_names" in data:
+        return data["client_names"] if data["client_names"] else "No client references available."
 
     return "No client references available."
 

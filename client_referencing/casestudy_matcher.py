@@ -95,11 +95,9 @@ class CaseStudyMatch:
             for v in best_by_tech.values()
         ]
         return {
-            "client_name": self.client_name,
-            "client_industry": self.client_industry,
+            "casestudy_name": self.casestudy_name,
             "exact_techs": self.exact_techs,
             "semantic_techs": semantic_slim,
-            "casestudy_name": self.casestudy_name,
             "summary_solution": self.summary_solution,
         }
 
