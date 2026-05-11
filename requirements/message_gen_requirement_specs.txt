@@ -29,7 +29,6 @@ Note that this is a two-pass workflow: Pass 1 is "Automated research & manual re
 | Case_Studies | JSON array of matched case studies from Supabase vector search (persisted to be used in Pass 2). To use CaseStudyMatcher module already developed.
 | Industry_Client_References | JSON array of top 5 client names from client_references table, matched by industry vertical with geography & technology priority. To use ClientMatcher module already developed.
 | Suggested_Brand_Name_to_use | "LendingLogik" or "CloudChillies" — Claude's assessment based on company's industry. To use BrandMatcher module already developed.
-| Intent_Score | Prospect's likelihood of needing our services, rated X/10 based on signals found. This can be made optional, from the front end when uploading the excel sheet.
 | Message_to_send | Personalized 3-paragraph outreach message tailored to the selected brand (to be generated in pass 2).
 | Country | Modify this field to use country as "EMEA" for all the countries that are in Middle East, and Africa. This we are doing as we have in our database limited countries to cater to this geography so we are going to have more options while researching case studies and existing clients to present to them.
 | Prospect_Technologies | The list of generic technologies that the prospect uses in JSON format, derived from Technology Research as shown below.
@@ -50,12 +49,12 @@ Note:
 
 ### Tab 1: Research (Pass 1)
 1. User uploads `data.xlsx` (must have "prospects" + optional "dates" worksheets)
-2. App validates required columns, shows preview table. Make an UI element to generate or not generate "Intent_Score" column.
+2. App validates required columns, shows preview table. 
 3. User clicks "Run Research" button on UI.
 4. Pipeline runs Steps 1-2:
    - Uses Brand knowledge (one-time, skipped if JSONs exist)
    - Research per company/prospect (with progress bar)
-   - Compute columns in "prospects" sheet for Case_Studies, Suggested_Brand_Name_to_use, Industry_Client_References, Intent_Score (depending on the UI selection for Intent_Score) & Country (Only updations to this field)
+   - Compute columns in "prospects" sheet for Case_Studies, Suggested_Brand_Name_to_use, Industry_Client_References & Country (Only updations to this field)
 5. Results shown in preview table
 6. Show a "Download" button → `data_output.xlsx`
 7. "Message to send" column left blank — user reviews offline first the output of Pass 1
@@ -64,7 +63,7 @@ Note:
 User opens `data_output.xlsx`:
 - Check technology research findings for accuracy
 - Adjust brand assignments if needed
-- Remove low-intent prospects (delete rows or clear Prospect_Technologies) - depending on the UI selection for Intent_Score
+- Remove low-intent prospects (delete rows or clear Prospect_Technologies)
 - Save the file
 
 ### Tab 2: Generate Messages (Pass 2)
@@ -121,7 +120,7 @@ User opens `data_output.xlsx`:
   }
   """
 
-#### Pipeline orchestration:
+### Step 2 (Pass 1) Pipeline orchestration:
 - Read uploaded XLSX — "prospects" sheet for prospect list, "dates" sheet for location→date mapping, if the user has indicated to use it.
 - Group prospects by company (deduplication — research company once, personalize per prospect)
 
@@ -137,7 +136,15 @@ User opens `data_output.xlsx`:
 
   - **Country coding**: //We do this early so that client reference matches can be better
     {
-      Modify "Country" field in the input to use country as "EMEA" for all the countries that are in Middle East, and Africa. Update the field accordingly.
+      Modify "Country" field in the input as per the following: 
+      {
+        - Use "Country" field as "EMEA" for all the countries that are in Middle East, and Africa.
+        - Use "Country" field as "USA" for input that says "United States", "United States of America" or "America".
+        - Use "Country" field as "UK" for input that says "United Kingdom", "Great Britain", "GB" or "Britain".
+        - Make sure that "Country" field is mapped to "EMEA", "USA", "Australia", "Canada" & "UK" only. Any country that skips the above mentioned 3 conditions, should have "Country" field default to "USA".
+      }
+
+      Update the "Country" field accordingly.
     }
 
   - **Company Research**:
@@ -214,36 +221,58 @@ User opens `data_output.xlsx`:
 
   - **Case study matching**: 
     {
-      //Call find_casestudy_matches with the parameters as mentioned below.
+      //Call find_casestudy_matches with the parameters as mentioned below.      
+      Following is template structure of case_study_matching_result;
+      case_study_matching_result 
+        [
+          {
+              "client_name": "MedTech Corp",
+              "client_industry": "Healthcare",
+              "exact_techs": ["salesforce", "mulesoft"],
+              "semantic_techs": [{"prospect_tech": "snowflake", "matched_tech": "Fabric"}],
+              "casestudy_name": "Pharma Order Pipeline Automation",
+              "summary_solution": "Implemented Salesforce + Mulesoft integration...",
+          },
+          {
+              "client_name": "FinServ Global",
+              "client_industry": "Financial Services",
+              "exact_techs": ["salesforce"],
+              "semantic_techs": [],
+              "casestudy_name": "Loan Origination Platform",
+              "summary_solution": "Built Salesforce Service Cloud workflow...",
+          }
+        ]
+
       case_study_matching_result = find_casestudy_matches(
-          prospect_context = "" //I will work on this later to generate this via serper only,
+          prospect_context = Prospect_Context,
           prospect_industry = Industry,
           prospect_technologies = Prospect_Technologies,
-          prospect_country="NULL", This is not used at this moment so keeping it null,
-          max_matches = (Take this numeric field from the UI element)
+          max_matches = (Take this numeric field from the UI element or passed as parameter to function)
       )
-      Store the results in "Case_Studies" column;      
+      
+      Store the case_study_matching_result JSON in "Case_Studies" column of the excel sheet;
     }
 
   - **Existing client matching**: 
-    {
+    {    
       //Call find_matches with the parameters as mentioned below.
+      Following is template structure of existing_client_matching_result;
+      existing_client_matching_result 
+        [
+          {
+              "client_names": "MedTech Corp, FinServ Global, FinServ Global",
+          }
+        ]
+
       existing_client_matching_result = find_matches(
           prospect_industry: Industry,
           prospect_technologies: Prospect_Technologies, 
           prospect_country: Country,
           max_matches: (This must be >= 5. Take this numeric field from the UI element)
       )
-      Store the results in "Industry_Client_References" column;
+      Store the existing_client_matching_result JSON in "Industry_Client_References" column of the excel sheet;
     }
 
-  - **Intent scoring**: 
-    {
-      If (User has chosen to generate Intent_Score) 
-      {
-        Claude rates X/10 based on strength of signals (job postings = strong, general initiatives = moderate, no signals = low)
-      }      
-    }
   }
 
 ### Step 3 (Pass 2) — Message Generation
@@ -258,21 +287,59 @@ Style rules for message generation:
 
 For each record in the input excel sheet 
 {
-    - Inputs: Technology research findings (Technology_Research), brand-neutral case studies (Case_Studies), matching client names (Industry_Client_References), the exact brand profile JSON to use (Suggested_Brand_Name_to_use), date range from "dates" sheet (since it is optional, so the messaging will be generated appropriately)
+  - Inputs:     
+    - Technology research findings (Prospect_Technologies), 
+    - Role of the person (Designation),
+    - Brand-neutral case studies (Case_Studies), 
+    - Matching client names (Industry_Client_References), 
+    - Exact brand profile JSON to use (Suggested_Brand_Name_to_use), 
+    - City of the Prospect (City),
+    - State of the Prospect (State)
+    - "dates" sheet (since it is optional, so the messaging will be generated appropriately)
 
-    - Use Claude to generate a 4-paragraph message in the selected brand's tone:
+  - Output: 
+    - Generate a 4-paragraph message in the selected brand's tone, the para description are below:
+    {
+      WARM_MESSAGE = "";
 
-      - **Para 1**: Articulate understanding of the prospect's situation — reference a specific initiative or strategic direction, tailored to their role. Naturally mention specific technology names found in the research (e.g. Boomi, Snowflake, NextGen ApplyOnline, MuleSoft) — these set up the thread for Para 2. Address by first name only. Keep it concise (1-2 sentences). Do NOT cite specific numbers, metrics, or statistics — it should read like a knowledgeable human wrote it, not a data report.
+      - **Para 1** (to be generated using GenAI):
+          - Articulate understanding of the prospect's technological situation — tailored to their role (Designation). 
+          - Naturally mention specific technology names found in the research (e.g. Boomi, Snowflake, MuleSoft) — these set up the thread for the following Para 2. 
+          - Do not use prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline") 
+          - Address by first name only. 
+          - Keep it concise (1-2 sentences). 
+          - Do NOT cite specific numbers, metrics, or statistics — it should read like a knowledgeable human wrote it, not a data report.
 
-      - **Para 2**: Pick up the specific technology names from Para 1 and weave them into the case study narrative, but only carry over general-purpose/common technologies (e.g. Boomi, Snowflake, MuleSoft, .NET) — NOT prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline") that wouldn't credibly appear in "work we've done for others." If Para 1 mentions Boomi, Para 2 references how we've helped clients with Boomi integration leveraging Salesforce. Reference similar work done for other clients (from case studies, anonymized as "a leading [industry] company"), showing how we solved challenges around those same technologies leveraging Salesforce. Only reference these Salesforce clouds/products: Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud — do NOT mention any Salesforce products outside this list. If no specific product is a clear match, just say "Salesforce" without naming a specific Salesforce Product. Multiple clouds may be combined if relevant. Connect to the prospect's needs. 
+          WARM_MESSAGE = "Para 1"
 
-      - **Para 3**: Then in a SEPARATE sentence, mention ALL industry reference clients by name (e.g. "Some of our clients in this space include Cellulant, GIB, and Verifone."). Do NOT join client names with the work description — keep them apart to stay accurate in the narrative.
+      - **Para 2** (to be generated using GenAI): 
+          - Pick up the specific technology names from Para 1 and weave them into the case study narrative (Using Case_Studies), but only carry over general-purpose/common technologies (e.g. Boomi, Snowflake, MuleSoft, .NET) — NOT prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline") that wouldn't credibly appear in "work we've done for others." 
+          
+          - If Para 1 mentions Boomi, Para 2 references how we've helped clients with Boomi integration leveraging Salesforce. Reference similar work done for other clients (from case studies, anonymized as "a leading [industry] company"), showing how we solved challenges around those same technologies leveraging Salesforce. 
 
-      - **Para 4**: 
-        - If "dates" worksheet is provided then close with: "It will be really good to discuss this over a brief call between [start date] and [end date]. Please let me know what works best for you." Dates come from the "dates" worksheet, matched by prospect's city.
-        - If "dates" worksheet is NOT provided then close with: "It would be really good to discuss this over a brief call. Please let me know when we can connect."
+          - Only reference these Salesforce clouds/products: Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud — do NOT mention any Salesforce products outside this list. If no specific product is a clear match, just say "Salesforce" without naming a specific Salesforce Product. Multiple clouds may be combined if relevant.
+
+          WARM_MESSAGE += "Para 2"
+
+        - **Para 3** (Generated using a fixed template): 
+            TEMPLATED_PARA_3 = "Some of our existing clients in similar space such as yours include: ";
+            TEMPLATED_PARA_3 += Industry_Client_References; 
+            WARM_MESSAGE += TEMPLATED_PARA_3;
+
+        - **Para 4** (Generated using a fixed template): 
+            TEMPLATED_PARA_4 = "";
+            - If ("dates" worksheet is present) {
+                //City and State string comparisions to be made case-insensitive
+                If ((City && State) is present in "dates" worksheet in the same row) {
+                  TEMPLATED_PARA_4 = "It will be really good to discuss this over a brief call between " + [visit_start_date] + " and " + [visit_endc_date] + " Please let me know what works best for you."              
+                }
+            } else {
+              TEMPLATED_PARA_4 = "It would be really good to discuss this over a brief call. Please let me know when we can connect."
+            }
+            WARM_MESSAGE += TEMPLATED_PARA_4;          
+      Store WARM_MESSAGE in "WARM_MESSAGE" column of the excel sheet;
+    }
 }
-
 ## Re-run Scenarios
 | Scenario | What to do |
 |----------|-----------|
