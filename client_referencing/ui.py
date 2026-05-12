@@ -687,7 +687,7 @@ def _render_vectormatch_section():
     )
 
     with st.form("vectormatch_form"):
-        col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
+        col1, col2, col3, col4 = st.columns([3, 3, 3, 2])
         with col1:
             prospect_industry = st.text_input(
                 "Prospect Industry",
