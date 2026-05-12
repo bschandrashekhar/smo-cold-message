@@ -57,6 +57,31 @@ Para 2: Pick up the GENERAL-PURPOSE technology names from Para 1 (e.g. Boomi, Sn
 
 Return ONLY the 2 paragraphs of message text, no labels, no "Para 1:" prefixes."""
 
+MESSAGE_PROMPT_PARA1_ONLY = """You are writing a concise, personalized sales outreach email on behalf of {brand_name}.
+
+Brand tone and positioning: {tone_and_positioning}
+Brand services: {services}
+
+Prospect details:
+- First name: {first_name}
+- Designation: {designation}
+- Company: {company_name}
+- Location: {location}
+
+Technology research findings:
+{technology_research}
+
+WRITING RULES — follow every rule strictly:
+1. Address prospect by first name only (e.g. "Hi {first_name},")
+2. Do NOT use hyphens or dashes anywhere in the message
+3. Do NOT reference compliance standards by name (APRA, SOC2, PCI DSS, etc.) — say "compliance standards" instead
+4. No subject line, no signature
+5. No specific numbers, metrics, or statistics
+
+Write exactly 1 paragraph: Show understanding of the prospect's technological situation, tailored to their role ({designation}). Naturally mention specific technology names found in the research. Do NOT use prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline"). Keep to 1-2 sentences.
+
+Return ONLY the paragraph text, no labels."""
+
 
 def _get_date_window(dates_df: pd.DataFrame, city: str, state: str) -> str:
     """Look up meeting date window from dates sheet for a given city/state."""
@@ -126,13 +151,28 @@ def _format_client_references(refs_json: str) -> str:
     return "No client references available."
 
 
+def _has_case_studies(case_studies_json: str) -> bool:
+    """Check if case studies data is non-empty and valid."""
+    formatted = _format_case_studies(case_studies_json)
+    return formatted != "No case studies available."
+
+
+def _has_client_references(refs_json: str) -> bool:
+    """Check if client references data is non-empty and valid."""
+    formatted = _format_client_references(refs_json)
+    return formatted != "No client references available."
+
+
 def _generate_single_message(
     client: anthropic.Anthropic,
     row: pd.Series,
     dates_df: pd.DataFrame,
     brand_profile: dict,
-) -> str:
-    """Generate message for a single prospect. Returns message text."""
+) -> tuple[str, str]:
+    """Generate message for a single prospect.
+
+    Returns (message_text, flag_value).
+    """
     first_name = str(row.get("First_Name", "")).strip()
     designation = str(row.get("Designation", "")).strip()
     company_name = str(row.get("Company_Name", "")).strip()
@@ -143,7 +183,14 @@ def _generate_single_message(
     case_studies_json = str(row.get("Case_Studies", ""))
     refs_json = str(row.get("Industry_Client_References", ""))
 
-    # Para 1+2: GenAI via Claude
+    flag = ""
+    has_cs = _has_case_studies(case_studies_json)
+    has_refs = _has_client_references(refs_json)
+
+    if not has_cs or not has_refs:
+        flag = "TO BE DECIDED MANUALLY"
+
+    # Para 1+2: GenAI via Claude (skip Para 2 if no case studies)
     prompt = MESSAGE_PROMPT.format(
         brand_name=brand_profile.get("name", ""),
         tone_and_positioning=brand_profile.get("tone_and_positioning", ""),
@@ -157,6 +204,19 @@ def _generate_single_message(
         approved_sf_products=", ".join(APPROVED_SF_PRODUCTS),
     )
 
+    if not has_cs:
+        # Only generate Para 1 — replace prompt to ask for 1 paragraph only
+        prompt = MESSAGE_PROMPT_PARA1_ONLY.format(
+            brand_name=brand_profile.get("name", ""),
+            tone_and_positioning=brand_profile.get("tone_and_positioning", ""),
+            services=", ".join(brand_profile.get("services", [])),
+            first_name=first_name,
+            designation=designation,
+            company_name=company_name,
+            location=location,
+            technology_research=technology_research,
+        )
+
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=512,
@@ -164,9 +224,9 @@ def _generate_single_message(
     )
     warm_message = response.content[0].text.strip()
 
-    # Para 3: Fixed template
-    client_refs = _format_client_references(refs_json)
-    if client_refs and client_refs != "No client references available.":
+    # Para 3: Fixed template (skip if no client references)
+    if has_refs:
+        client_refs = _format_client_references(refs_json)
         warm_message += f"\n\nSome of our existing clients in similar space such as yours include: {client_refs}."
 
     # Para 4: Fixed template
@@ -176,7 +236,7 @@ def _generate_single_message(
     else:
         warm_message += "\n\nIt would be really good to discuss this over a brief call. Please let me know when we can connect."
 
-    return warm_message
+    return warm_message, flag
 
 
 def generate_messages(
@@ -207,6 +267,9 @@ def generate_messages(
     if "WARM_MESSAGE" not in df.columns:
         df["WARM_MESSAGE"] = ""
     df["WARM_MESSAGE"] = df["WARM_MESSAGE"].astype(object).fillna("")
+    if "FLAG" not in df.columns:
+        df["FLAG"] = ""
+    df["FLAG"] = df["FLAG"].astype(object).fillna("")
 
     # Determine ready vs skipped
     def _is_ready(row):
@@ -241,8 +304,10 @@ def generate_messages(
             except FileNotFoundError:
                 brand_cache[brand_name] = {"name": brand_name, "tone_and_positioning": "", "services": []}
 
-        message = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
+        message, flag = _generate_single_message(client, row, dates_df, brand_cache[brand_name])
         df.at[idx, "WARM_MESSAGE"] = message
+        if flag:
+            df.at[idx, "FLAG"] = flag
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="prospects", index=False)

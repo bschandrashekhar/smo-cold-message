@@ -87,7 +87,7 @@ def _render_pass1_tab():
     with col_b:
         max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5)
     with col_c:
-        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5)
+        max_clients = st.number_input("Max Client Matches", min_value=6, max_value=10, value=6)
 
     if st.button("Run Research", type="primary", key="run_research_btn"):
         from prospect_outreach.research_pipeline import research_workbook
@@ -369,7 +369,7 @@ def _render_test_tab():
     with col_ta:
         max_case_studies = st.number_input("Max Case Studies", min_value=5, max_value=8, value=5, key="test_cs")
     with col_tb:
-        max_clients = st.number_input("Max Client Matches", min_value=5, max_value=10, value=5, key="test_cl")
+        max_clients = st.number_input("Max Client Matches", min_value=6, max_value=10, value=6, key="test_cl")
 
     if not st.button("Run Test", type="primary", key="run_test_btn"):
         return

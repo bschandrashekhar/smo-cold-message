@@ -284,7 +284,7 @@ def research_workbook(
     file_bytes: bytes,
     output_path: str,
     max_case_studies: int = 5,
-    max_client_matches: int = 5,
+    max_client_matches: int = 6,
     use_cache: bool = True,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> None:
@@ -294,7 +294,7 @@ def research_workbook(
         file_bytes: Raw bytes of the uploaded .xlsx file.
         output_path: Path to write data_output.xlsx.
         max_case_studies: Max matches for find_casestudy_matches.
-        max_client_matches: Max matches for find_matches (must be >= 5).
+        max_client_matches: Max matches for find_matches (must be >= 6).
         use_cache: Whether to use Supabase cache for technology research.
         progress_callback: Optional fn(current, total, status_msg).
     """
@@ -314,7 +314,7 @@ def research_workbook(
     for col in [
         "Case_Studies", "Industry_Client_References",
         "Suggested_Brand_Name_to_use",
-        "WARM_MESSAGE", "Prospect_Technologies",
+        "WARM_MESSAGE", "Prospect_Technologies", "FLAG",
     ]:
         if col not in df.columns:
             df[col] = ""
@@ -383,7 +383,7 @@ def research_workbook(
                 prospect_industry=industry,
                 prospect_technologies=tech_names_csv,
                 prospect_country=country,
-                max_matches=max(max_client_matches, 5),
+                max_matches=max(max_client_matches, 6),
             )
             client_names = ", ".join(
                 m.client_name if hasattr(m, "client_name") else str(m)
