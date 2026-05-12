@@ -696,14 +696,6 @@ def find_matches(
             bf_scored.sort(key=lambda x: -x[1])
             backfill_entries = [c for c, _ in bf_scored]
 
-        # Debug
-        if backfill_entries:
-            generic_all_names = list(dict.fromkeys(backfill_entries))
-            debug_log.append((
-                "Case BACKFILL for Generic: shortlistAllBackFillClients",
-                ", ".join(generic_all_names),
-            ))
-
         # Cap generic backfill at deficit to reach 5
         generic_deficit = 5 - len(shortlist_names)
         if generic_deficit > 0 and backfill_entries:
@@ -729,14 +721,14 @@ def find_matches(
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, exclude_all)
                 geo_added = geo_clients[:deficit]
                 backfill_entries.extend(geo_added)
-                if geo_added:
-                    debug_log.append((
-                        "Case BACKFILL for Geo: shortlistGeoBackFillClients",
-                        ", ".join(geo_added),
-                    ))
 
         if backfill_entries:
             shortlist.extend(backfill_entries)
+            master_names = list(dict.fromkeys(shortlist))
+            debug_log.append((
+                "Master List with Geo: shortlistExistingClients",
+                ", ".join(master_names),
+            ))
 
     elif len(shortlist_names) <= 5 and flag_tier_3:
         # Branch B: Already used tech for Tier 3, just geo backfill
@@ -746,14 +738,14 @@ def find_matches(
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
                 geo_added = geo_clients[:deficit]
                 backfill_entries.extend(geo_added)
-                if geo_added:
-                    debug_log.append((
-                        "Case BACKFILL for Geo: shortlistGeoBackFillClients",
-                        ", ".join(geo_added),
-                    ))
 
         if backfill_entries:
             shortlist.extend(backfill_entries)
+            master_names = list(dict.fromkeys(shortlist))
+            debug_log.append((
+                "Master List with Geo: shortlistExistingClients",
+                ", ".join(master_names),
+            ))
 
     # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
