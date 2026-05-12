@@ -61,7 +61,6 @@ class ClientMatch:
     match_ratio: float
     similarity_score: float
     final_score: float
-    match_source: str  # "industry_exact", "industry_semantic", "backfill_exact", "backfill_semantic", "geography"
     client_id: str = ""
 
     def to_dict(self) -> dict:
@@ -81,7 +80,6 @@ class ClientMatch:
             "match_ratio": self.match_ratio,
             "similarity_score": self.similarity_score,
             "final_score": self.final_score,
-            "match_source": self.match_source,
         }
 
 
@@ -612,14 +610,13 @@ def find_matches(
 
     # Build shortlist: collect all clients with any tech match, sorted by Final_Score below
     if total_techs > 0:
-        source_label = "industry_exact" if industry_applied else "exact"
         all_matched_clients = set(exact_by_client.keys()) | set(semantic_by_client.keys())
-        shortlist = [(c, source_label) for c in all_matched_clients]
+        shortlist = list(all_matched_clients)
     else:
         # No technologies — rank industry-filtered candidates by industry_score
         candidate_names = list(dict.fromkeys(r["client_name"] for r in candidate_rows))
         candidate_names.sort(key=lambda c: (-industry_scores.get(c, 0.0), c))
-        shortlist = [(c, "industry") for c in candidate_names]
+        shortlist = list(candidate_names)
 
     # Merge exact + semantic data for scoring (clients can have both)
     all_exact = dict(exact_by_client)
@@ -628,13 +625,13 @@ def find_matches(
     # Sort shortlist by Final_Score descending before top-5 truncation
     _cached_scores = {}  # {cname: (match_ratio, similarity_score, final_score)}
     if total_techs > 0:
-        for cname, _ in shortlist:
+        for cname in shortlist:
             if cname not in _cached_scores:
                 _cached_scores[cname] = _score_client(cname, all_exact, all_semantic, total_techs)
-        shortlist.sort(key=lambda e: -_cached_scores.get(e[0], (0, 0, 0))[2])
+        shortlist.sort(key=lambda c: -_cached_scores.get(c, (0, 0, 0))[2])
 
     # Debug: Case-specific logging after core matching (after final_score sort)
-    _shortlist_names = list(dict.fromkeys(c for c, _ in shortlist))
+    _shortlist_names = list(dict.fromkeys(shortlist))
     if flag_tier_3:
         debug_log.append((
             "Tier 3: shortlistExistingClients",
@@ -649,7 +646,7 @@ def find_matches(
     # Explanation: core matching results
     explanation["prospect_techs"] = prospect_techs
     explanation["unmatched_techs"] = unmatched_techs
-    explanation["core_match_clients"] = [c for c, _ in shortlist]
+    explanation["core_match_clients"] = list(shortlist)
     explanation["core_exact_by_client"] = {c: list(set(ts)) for c, ts in exact_by_client.items()}
     explanation["core_semantic_by_client"] = {
         c: [(pt, et, sim) for pt, et, sim in ts]
@@ -659,21 +656,21 @@ def find_matches(
     # Truncate shortlist to top 5 before backfill (spec line 104)
     seen_top5 = set()
     shortlist_top5 = []
-    for entry in shortlist:
-        if entry[0] not in seen_top5:
+    for cname in shortlist:
+        if cname not in seen_top5:
             if len(seen_top5) >= 5:
                 break
-            seen_top5.add(entry[0])
-        shortlist_top5.append(entry)
+            seen_top5.add(cname)
+        shortlist_top5.append(cname)
     shortlist = shortlist_top5
 
     # Explanation: top-5 truncation
-    explanation["top5_clients"] = list(dict.fromkeys(c for c, _ in shortlist))
+    explanation["top5_clients"] = list(dict.fromkeys(shortlist))
     explanation["top5_count"] = len(seen_top5)
 
     # Step 4+5: Backfill logic — depends on FLAG_TIER_3
-    shortlist_names = set(c for c, _ in shortlist)
-    backfill_entries = []  # List[(client_name, match_source)]
+    shortlist_names = set(shortlist)
+    backfill_entries = []  # List[client_name]
 
     if len(shortlist_names) <= 5 and not flag_tier_3:
         # Branch A: Had industry matches (Tier 1/2), backfill with tech-scored remaining, then geo
@@ -697,11 +694,11 @@ def find_matches(
                     _cached_scores[c] = score
                     bf_scored.append((c, score[2]))  # (name, final_score)
             bf_scored.sort(key=lambda x: -x[1])
-            backfill_entries = [(c, "backfill") for c, _ in bf_scored]
+            backfill_entries = [c for c, _ in bf_scored]
 
         # Debug
         if backfill_entries:
-            generic_all_names = list(dict.fromkeys(c for c, _ in backfill_entries))
+            generic_all_names = list(dict.fromkeys(backfill_entries))
             debug_log.append((
                 "Case BACKFILL for Generic: shortlistAllBackFillClients",
                 ", ".join(generic_all_names),
@@ -712,18 +709,18 @@ def find_matches(
         if generic_deficit > 0 and backfill_entries:
             capped_seen = set()
             capped = []
-            for entry in backfill_entries:
-                if entry[0] not in capped_seen:
+            for cname in backfill_entries:
+                if cname not in capped_seen:
                     if len(capped_seen) >= generic_deficit:
                         break
-                    capped_seen.add(entry[0])
-                capped.append(entry)
+                    capped_seen.add(cname)
+                capped.append(cname)
             backfill_entries = capped
         elif generic_deficit <= 0:
             backfill_entries = []
 
         # Geo backfill if combined count still ≤5
-        backfill_names = set(c for c, _ in backfill_entries)
+        backfill_names = set(backfill_entries)
         combined_count = len(shortlist_names) + len(backfill_names)
         if combined_count <= 5 and prospect_ctry:
             deficit = max_matches - combined_count
@@ -731,8 +728,7 @@ def find_matches(
                 exclude_all = shortlist_names | backfill_names
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, exclude_all)
                 geo_added = geo_clients[:deficit]
-                for cname in geo_added:
-                    backfill_entries.append((cname, "geography"))
+                backfill_entries.extend(geo_added)
                 if geo_added:
                     debug_log.append((
                         "Case BACKFILL for Geo: shortlistGeoBackFillClients",
@@ -749,8 +745,7 @@ def find_matches(
             if deficit > 0:
                 geo_clients = _geography_backfill(all_rows, prospect_ctry, shortlist_names)
                 geo_added = geo_clients[:deficit]
-                for cname in geo_added:
-                    backfill_entries.append((cname, "geography"))
+                backfill_entries.extend(geo_added)
                 if geo_added:
                     debug_log.append((
                         "Case BACKFILL for Geo: shortlistGeoBackFillClients",
@@ -763,7 +758,7 @@ def find_matches(
     # Step 6: Score all shortlisted clients and build ClientMatch objects
     matches = []
     seen = set()
-    for cname, source in shortlist:
+    for cname in shortlist:
         if cname in seen:
             continue
         seen.add(cname)
@@ -784,7 +779,6 @@ def find_matches(
             match_ratio=match_ratio,
             similarity_score=similarity_score,
             final_score=final_score,
-            match_source=source,
             client_id=meta.get("client_id", ""),
         ))
 
@@ -798,7 +792,7 @@ def find_matches(
 
     # Explanation: final composition
     explanation["final_clients"] = [
-        {"name": m.client_name, "source": m.match_source, "score": m.final_score,
+        {"name": m.client_name, "score": m.final_score,
          "industry_score": m.industry_score}
         for m in matches
     ]

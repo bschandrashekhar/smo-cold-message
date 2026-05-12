@@ -527,7 +527,7 @@ def _render_test_tab():
                 col_tc2.write(f"**total_candidates:** {cl_result.get('total_candidates')}")
                 for j, m in enumerate(cl_matches):
                     md = m.to_dict() if hasattr(m, "to_dict") else (m if isinstance(m, dict) else vars(m))
-                    with st.expander(f"Match {j+1}: {md.get('client_name', '—')} | {md.get('client_industry', '—')} | {md.get('client_geography', '—')} | score={md.get('final_score', 0):.3f} | source={md.get('match_source', '—')}"):
+                    with st.expander(f"Match {j+1}: {md.get('client_name', '—')} | {md.get('client_industry', '—')} | {md.get('client_geography', '—')} | score={md.get('final_score', 0):.3f}"):
                         st.json(md)
                 with st.expander("debug_log"):
                     st.json(cl_result.get("debug_log", []))

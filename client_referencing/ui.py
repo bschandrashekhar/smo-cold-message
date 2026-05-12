@@ -748,22 +748,10 @@ def _render_vectormatch_section():
     else:
         st.info("Industry filter was not applied (too few matches or no industry provided).")
 
-    # Match source labels
-    _SOURCE_LABELS = {
-        "industry_exact": "Industry + Exact Match",
-        "industry_semantic": "Industry + Semantic Match",
-        "exact": "Exact Match",
-        "semantic": "Semantic Match",
-        "backfill_exact": "Backfill — Exact Match",
-        "backfill_semantic": "Backfill — Semantic Match",
-        "geography": "Geography Backfill",
-    }
-
     # Results
     for i, match in enumerate(results["matches"], 1):
-        source_label = _SOURCE_LABELS.get(match.match_source, match.match_source)
         with st.expander(
-            f"#{i} — {match.client_name} (Score: {match.final_score:.3f}) | {source_label}",
+            f"#{i} — {match.client_name} (Score: {match.final_score:.3f})",
             expanded=(i <= 3),
         ):
             c1, c2, c3 = st.columns(3)
