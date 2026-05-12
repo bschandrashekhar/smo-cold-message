@@ -705,7 +705,7 @@ def _render_vectormatch_section():
             )
         with col4:
             max_matches = st.number_input(
-                "Max Matches", min_value=6, max_value=20, value=6,
+                "Max Matches", min_value=6, max_value=10, value=6,
             )
         submitted = st.form_submit_button("Find Matches", type="primary")
 
