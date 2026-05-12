@@ -656,21 +656,11 @@ def _render_match_explanation(exp: dict, prospect_technologies: str, prospect_co
         st.markdown("### Step 5: Final Result")
         final = exp.get("final_clients", [])
         if final:
-            _SOURCE_LABELS = {
-                "industry_exact": "Industry + Exact",
-                "industry_semantic": "Industry + Semantic",
-                "exact": "Exact Match",
-                "semantic": "Semantic Match",
-                "backfill_exact": "Tech Backfill (Exact)",
-                "backfill_semantic": "Tech Backfill (Semantic)",
-                "geography": "Geo Backfill",
-            }
             rows = []
             for i, c in enumerate(final, 1):
                 rows.append({
                     "#": i,
                     "Client": c["name"],
-                    "Source": _SOURCE_LABELS.get(c["source"], c["source"]),
                     "Final Score": f"{c['score']:.3f}",
                     "Industry Score": f"{c['industry_score']:.4f}",
                 })
