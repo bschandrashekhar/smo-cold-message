@@ -244,11 +244,11 @@ def generate_messages(
     output_path: str,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
 ) -> dict:
-    """Run Pass 2 message generation on reviewed data_output.xlsx.
+    """Run Pass 2 message generation on reviewed Pass-1-Output.xlsx.
 
     Args:
         file_bytes: Raw bytes of the uploaded .xlsx file.
-        output_path: Path to write data_final.xlsx.
+        output_path: Path to write Pass-2-Output.xlsx.
         progress_callback: Optional fn(current, total, status_msg).
 
     Returns:

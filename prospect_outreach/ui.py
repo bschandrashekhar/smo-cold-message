@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 REQUIRED_COLUMNS = [
-    "First_Name", "Last_Name", "Designation", "Company_Name",
+    "First_Name", "Designation", "Company_Name",
     "Email", "City", "State", "Country", "Industry", "Website",
 ]
 
@@ -40,7 +40,7 @@ def _render_pass1_tab():
     st.caption(
         "Upload data.xlsx with a 'prospects' sheet (and optional 'dates' sheet). "
         "The pipeline will research each prospect, match case studies and clients, "
-        "and produce data_output.xlsx for your review."
+        "and produce Pass-1-Output.xlsx for your review."
     )
 
     uploaded = st.file_uploader("Upload data.xlsx", type=["xlsx"], key="pass1_upload")
@@ -121,9 +121,9 @@ def _render_pass1_tab():
 
             with open(output_path, "rb") as f:
                 st.download_button(
-                    "Download data_output.xlsx",
+                    "Download Pass-1-Output.xlsx",
                     data=f.read(),
-                    file_name="data_output.xlsx",
+                    file_name="Pass-1-Output.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
         except Exception as e:
@@ -137,11 +137,11 @@ def _render_pass1_tab():
 def _render_pass2_tab():
     st.subheader("Pass 2: Generate Messages")
     st.caption(
-        "Upload the reviewed data_output.xlsx. Rows with Prospect_Technologies and no existing "
+        "Upload the reviewed Pass-1-Output.xlsx. Rows with Prospect_Technologies and no existing "
         "WARM_MESSAGE will have messages generated. Rows with empty Prospect_Technologies are skipped."
     )
 
-    uploaded = st.file_uploader("Upload reviewed data_output.xlsx", type=["xlsx"], key="pass2_upload")
+    uploaded = st.file_uploader("Upload reviewed Pass-1-Output.xlsx", type=["xlsx"], key="pass2_upload")
 
     if uploaded is None:
         return
@@ -216,9 +216,9 @@ def _render_pass2_tab():
 
             with open(output_path, "rb") as f:
                 st.download_button(
-                    "Download data_final.xlsx",
+                    "Download Pass-2-Output.xlsx",
                     data=f.read(),
-                    file_name="data_final.xlsx",
+                    file_name="Pass-2-Output.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
         except Exception as e:

@@ -292,7 +292,7 @@ def research_workbook(
 
     Args:
         file_bytes: Raw bytes of the uploaded .xlsx file.
-        output_path: Path to write data_output.xlsx.
+        output_path: Path to write Pass-1-Output.xlsx.
         max_case_studies: Max matches for find_casestudy_matches.
         max_client_matches: Max matches for find_matches (must be >= 6).
         use_cache: Whether to use Supabase cache for technology research.
