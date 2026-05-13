@@ -97,26 +97,10 @@ User opens `data_output.xlsx`:
   You will be given search result snippets for a prospect company.
   Based solely on these snippets, populate the TECHNOLOGY_RESEARCH 
   Python dictionary. Only include technologies with actual evidence.
-  Confidence levels: "high" = explicitly named in official source, 
-  "medium" = indirect reliable signal, "low" = weak single mention.
-
+  
   Output only the variable assignment, nothing else:
 
-  TECHNOLOGY_RESEARCH = {
-      "company_name": "<company_name>",
-      "website": "<url>",
-      "research_date": "<YYYY-MM-DD>",
-      "tech_stack": {
-          "crm": [],
-          "data_and_analytics": [],
-          "backend_languages_frameworks": [],
-          "frontend": [],
-          "marketing_tech": [],
-          "ecommerce_cms": [],
-          "other": []
-      }
-  }
-  """
+  TECHNOLOGY_RESEARCH = { technology 1, technology 2, technology 3, technology 4 ...} 
 
 ### Step 2 (Pass 1) Pipeline orchestration:
 - Read uploaded XLSX — "prospects" sheet for prospect list, "dates" sheet for location→date mapping, if the user has indicated to use it.
@@ -199,11 +183,8 @@ User opens `data_output.xlsx`:
             #Take Claude's text response and loads it into memory as a usable Python dict.
             exec(response.content[0].text, globals())
 
-            //Update the dict with website information
-            TECHNOLOGY_RESEARCH["website"] = Website;
-            
             //Update the Cache table
-            Store `TECHNOLOGY_RESEARCH` dict in the column "Technology_research" of "Cache_Prospect_Company_Research" table.
+            Store `TECHNOLOGY_RESEARCH` dict in the column "Technology_research" of "Cache_Prospect_Company_Research" table along with current date.
 
             //Update the excel sheet
             Copy the "`TECHNOLOGY_RESEARCH` dict into "Prospect_Technologies" column of excel sheet.
@@ -309,11 +290,9 @@ For each record in the input excel sheet
             Insert the value "TO BE DECIDED MANUALLY" in excel column "FLAG";
             Skip to Para 3 generation.        
           } else {
-            - Pick up the specific technology names from Para 1 and weave them into the case study narrative (Using Case_Studies), but only carry over general-purpose/common technologies (e.g. Boomi, Snowflake, MuleSoft, .NET) — NOT prospect-specific or proprietary systems (e.g. "NextGen ApplyOnline") that wouldn't credibly appear in "work we've done for others." 
-            
-            - If Para 1 mentions Boomi, Para 2 references how we've helped clients with Boomi integration leveraging Salesforce. Reference similar work done for other clients (from case studies, anonymized as "a leading [industry] company"), showing how we solved challenges around those same technologies leveraging Salesforce. 
-
-            - Only reference these Salesforce clouds/products: Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud — do NOT mention any Salesforce products outside this list. If no specific product is a clear match, just say "Salesforce" without naming a specific Salesforce Product. Multiple clouds may be combined if relevant.
+            Para 2: Pick up the GENERAL-PURPOSE technology names from "Prospect_Technologies" (e.g. Boomi, Snowflake, MuleSoft) — NOT proprietary systems. Weave them into a case study narrative based ONLY on facts from the case studies provided above — do NOT invent, fabricate, or embellish details beyond what the case studies state. If the prospect's exact technology (e.g. Dynamics) does not appear in any case study, do NOT fabricate a story about it. Instead, bridge lightly: acknowledge the prospect's technology ecosystem and show how we have done Salesforce work alongside similar technologies (e.g. Azure, .NET) that DO appear in the case studies. If "Prospect_Technologies" mentions Boomi, Para 2 references how we've helped clients with Boomi integration leveraging Salesforce. Anonymize as "a leading [industry] company". Only reference these approved Salesforce products (and ONLY if clearly relevant): {approved_sf_products}. If no specific product fits, just say "Salesforce".
+              
+            approved_sf_products : Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud.
 
             WARM_MESSAGE += "Para 2"
           }
@@ -352,5 +331,8 @@ For each record in the input excel sheet
 | Add prospects to existing batch | Add rows with blank Claude columns, upload → Tab 1 |
 | Refresh brand knowledge | Tab 3 → Refresh button |
 
-## Supabase Keepalive via Query Parameter Scneraio
-Supabase free tier pauses the database after 7 days of inactivity. Add a hidden keepalive mechanism to the existing Streamlit app that cron-job.org can trigger every 5 days. Add a query parameter check (?keepalive=1) to the main file. When detected, run a simple SELECT on "industry_embeddings" table — skipping the normal app UI entirely. No new files, no sidebar clutter.
+## Supabase Keepalive Mechanism
+Supabase free tier pauses the database after 7 days of inactivity. This keepalive mechanism prevents this by simply executing a SELECT query on "industry_embeddings" table for a single record. The job is scheduled on cron-job.org. cron-job.org calls the Supabase REST API directly, bypassing Streamlit entirely
+- URL to call: `https://<project-ref>.supabase.co/rest/v1/industry_embeddings?select=term&limit=1`
+- Schedule: Two days of week (Monday/Friday)
+- Expected response: HTTP 200 - this can be verified by Test Running the cron job directly on cron-job.org

@@ -46,7 +46,7 @@ EMEA_COUNTRIES = {
 }
 
 TECHNOLOGY_RESEARCH_SYSTEM_PROMPT = """You will be given search result snippets for a prospect company.
-Based solely on these snippets, populate the TECHNOLOGY_RESEARCH Python dictionary.
+Based solely on these snippets, list the technologies used by the company.
 Only include technologies with actual evidence.
 Confidence levels: "high" = explicitly named in official source,
 "medium" = indirect reliable signal, "low" = weak single mention.
@@ -57,19 +57,11 @@ Return ONLY a valid JSON object (no markdown, no code blocks, no variable assign
     "company_name": "<company_name>",
     "website": "<url>",
     "research_date": "<YYYY-MM-DD>",
-    "tech_stack": {
-        "crm": [],
-        "data_and_analytics": [],
-        "backend_languages_frameworks": [],
-        "frontend": [],
-        "marketing_tech": [],
-        "ecommerce_cms": [],
-        "other": []
-    }
+    "technologies": ["Salesforce (high)", "Snowflake (medium)", ...]
 }
 
 Each array item should be a string like "Salesforce (high)" or "Snowflake (medium)".
-Omit any category that has no findings — do not include empty arrays."""
+Only include technologies with actual evidence — omit anything speculative."""
 
 TECHNOLOGY_RESEARCH_QUERIES = [
     '"{name}" technology software platform',
@@ -158,7 +150,7 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
     """Run technology research using Serper + Claude synthesis.
 
     Runs 6 Serper queries, concatenates snippets, and asks Claude to
-    populate a TECHNOLOGY_RESEARCH dict with tech_stack categories.
+    populate a TECHNOLOGY_RESEARCH dict with a flat technologies list.
 
     If verbose=True, returns a dict with keys: "result", "per_query_snippets", "claude_raw_response".
     """
@@ -237,20 +229,16 @@ def _get_technology_research(company_name: str, website: str, use_cache: bool = 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _extract_tech_names_from_dict(tech_research: dict) -> str:
-    """Flatten TECHNOLOGY_RESEARCH tech_stack into comma-separated tech names.
+    """Flatten TECHNOLOGY_RESEARCH into comma-separated tech names.
 
     Strips confidence levels like "(high)" from each entry.
     Used to feed matchers which expect comma-separated input.
     """
-    tech_stack = tech_research.get("tech_stack", {})
     names = []
-    for category_techs in tech_stack.values():
-        if isinstance(category_techs, list):
-            for item in category_techs:
-                # Strip confidence annotations like " (high)", " (medium)", " (low)"
-                name = re.sub(r"\s*\((high|medium|low)\)\s*$", "", str(item), flags=re.IGNORECASE).strip()
-                if name:
-                    names.append(name)
+    for item in tech_research.get("technologies", []):
+        name = re.sub(r"\s*\((high|medium|low)\)\s*$", "", str(item), flags=re.IGNORECASE).strip()
+        if name:
+            names.append(name)
     return ", ".join(names)
 
 
@@ -355,11 +343,9 @@ def research_workbook(
         else:
             tech_research = company_cache[website]
 
-        # Store full TECHNOLOGY_RESEARCH dict as JSON in Prospect_Technologies
-        df.at[idx, "Prospect_Technologies"] = json.dumps(tech_research)
-
-        # Extract comma-separated tech names for matchers
+        # Extract comma-separated tech names for matchers and Excel storage
         tech_names_csv = _extract_tech_names_from_dict(tech_research)
+        df.at[idx, "Prospect_Technologies"] = tech_names_csv
 
         # 4. Case study matching
         if progress_callback:
