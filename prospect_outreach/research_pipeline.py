@@ -9,7 +9,6 @@ For each prospect:
 """
 
 import json
-import re
 from datetime import datetime, timezone, timedelta
 from typing import Callable, Optional
 
@@ -47,18 +46,10 @@ EMEA_COUNTRIES = {
 
 TECHNOLOGY_RESEARCH_SYSTEM_PROMPT = """You will be given search result snippets for a prospect company.
 Based solely on these snippets, list the technologies used by the company.
-Only include technologies with actual evidence.
-Confidence levels: "high" = explicitly named in official source,
-"medium" = indirect reliable signal, "low" = weak single mention.
+Only include technologies with actual evidence — omit anything speculative or with only weak signals.
 
-Return ONLY a valid JSON object (no markdown, no code blocks, no variable assignment) with this structure:
-
-{
-    "technologies": ["Salesforce (high)", "Snowflake (medium)", ...]
-}
-
-Each array item should be a string like "Salesforce (high)" or "Snowflake (medium)".
-Only include technologies with actual evidence — omit anything speculative."""
+Return ONLY a comma-separated list of technology names. No JSON, no markdown, no code blocks.
+Example: Salesforce, Snowflake, MuleSoft, Azure"""
 
 TECHNOLOGY_RESEARCH_QUERIES = [
     '"{name}" technology software platform',
@@ -181,15 +172,8 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
         }],
     )
     raw_text = response.content[0].text.strip() if response.content else ""
-    text = raw_text
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
-    try:
-        result = json.loads(text)
-    except json.JSONDecodeError:
-        result = {"technologies": []}
+    # Claude returns plain CSV like "Salesforce, Snowflake, MuleSoft"
+    result = raw_text
 
     if verbose:
         return {
@@ -200,8 +184,8 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
     return result
 
 
-def _get_technology_research(company_name: str, website: str, use_cache: bool = True) -> dict:
-    """Get technology research from cache or run fresh."""
+def _get_technology_research(company_name: str, website: str, use_cache: bool = True) -> str:
+    """Get technology research CSV from cache or run fresh."""
     sb = _get_supabase()
     if use_cache:
         result = sb.table("Cache_Prospect_Company_Research").select("*").eq("Website", website).execute()
@@ -210,7 +194,7 @@ def _get_technology_research(company_name: str, website: str, use_cache: bool = 
             if not _is_cache_stale(row.get("Date_of_Research")):
                 cr = row.get("Technology_Research")
                 if cr is not None:
-                    return cr if isinstance(cr, dict) else json.loads(cr)
+                    return str(cr)
 
     # Run fresh research
     research = _run_technology_research(company_name, website)
@@ -223,20 +207,6 @@ def _get_technology_research(company_name: str, website: str, use_cache: bool = 
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-def _extract_tech_names_from_dict(tech_research: dict) -> str:
-    """Flatten TECHNOLOGY_RESEARCH into comma-separated tech names.
-
-    Strips confidence levels like "(high)" from each entry.
-    Used to feed matchers which expect comma-separated input.
-    """
-    names = []
-    for item in tech_research.get("technologies", []):
-        name = re.sub(r"\s*\((high|medium|low)\)\s*$", "", str(item), flags=re.IGNORECASE).strip()
-        if name:
-            names.append(name)
-    return ", ".join(names)
-
 
 
 def _apply_emea_coding(country: str) -> str:
@@ -339,8 +309,8 @@ def research_workbook(
         else:
             tech_research = company_cache[website]
 
-        # Extract comma-separated tech names for matchers and Excel storage
-        tech_names_csv = _extract_tech_names_from_dict(tech_research)
+        # tech_research is already CSV — store directly
+        tech_names_csv = tech_research
         df.at[idx, "Prospect_Technologies"] = tech_names_csv
 
         # 4. Case study matching

@@ -301,7 +301,7 @@ def _test_get_technology_research(company_name: str, website: str, use_cache: bo
                     cr = row.get("Technology_Research")
                     if cr is not None:
                         source = "CACHE HIT"
-                        data = cr if isinstance(cr, dict) else json.loads(cr)
+                        data = str(cr)
                     else:
                         source = "CACHE NULL"
                 else:
@@ -375,7 +375,7 @@ def _render_test_tab():
         return
 
     from prospect_outreach.research_pipeline import (
-        _apply_emea_coding, _extract_tech_names_from_dict,
+        _apply_emea_coding,
     )
     from client_referencing.brand_matcher import find_brand_match
     from client_referencing.casestudy_matcher import find_casestudy_matches
@@ -463,10 +463,10 @@ def _render_test_tab():
                         st.code(verbose_info["claude_raw_response"], language="json")
 
                 st.caption("↓ TECHNOLOGY_RESEARCH — synthesized by Claude from Serper results. Cached in Supabase keyed by Website.")
-                with st.expander("TECHNOLOGY_RESEARCH dict", expanded=True):
-                    st.json(tech_research)
-                tech_names_csv = _extract_tech_names_from_dict(tech_research)
-                st.write(f"**Extracted tech names (for matchers):** `{tech_names_csv}`")
+                with st.expander("TECHNOLOGY_RESEARCH", expanded=True):
+                    st.write(tech_research)
+                tech_names_csv = tech_research
+                st.write(f"**Tech names (for matchers):** `{tech_names_csv}`")
             except Exception as e:
                 st.error(f"Technology research failed: {e}")
                 tech_names_csv = ""
