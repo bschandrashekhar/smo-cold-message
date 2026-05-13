@@ -351,3 +351,6 @@ For each record in the input excel sheet
 | Change brand for a prospect | Edit brand in Excel, clear message cell, re-upload → Tab 2 |
 | Add prospects to existing batch | Add rows with blank Claude columns, upload → Tab 1 |
 | Refresh brand knowledge | Tab 3 → Refresh button |
+
+## Supabase Keepalive via Query Parameter Scneraio
+Supabase free tier pauses the database after 7 days of inactivity. Add a hidden keepalive mechanism to the existing Streamlit app that cron-job.org can trigger every 5 days. Add a query parameter check (?keepalive=1) to the main file. When detected, run a simple SELECT on "industry_embeddings" table — skipping the normal app UI entirely. No new files, no sidebar clutter.

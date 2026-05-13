@@ -19,6 +19,14 @@ st.set_page_config(page_title="SMO Workbench", layout="wide")
 
 
 def main():
+    # Supabase keepalive — cron-job.org hits ?keepalive=1
+    if st.query_params.get("keepalive"):
+        from supabase import create_client
+        from prospect_outreach.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+        sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        sb.table("industry_embeddings").select("term").limit(1).execute()
+        st.stop()
+
     # ── Sidebar ──────────────────────────────────────────────────────────
     with st.sidebar:
         st.title("SMO Workbench")
