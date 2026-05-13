@@ -54,9 +54,6 @@ Confidence levels: "high" = explicitly named in official source,
 Return ONLY a valid JSON object (no markdown, no code blocks, no variable assignment) with this structure:
 
 {
-    "company_name": "<company_name>",
-    "website": "<url>",
-    "research_date": "<YYYY-MM-DD>",
     "technologies": ["Salesforce (high)", "Snowflake (medium)", ...]
 }
 
@@ -191,9 +188,8 @@ def _run_technology_research(company_name: str, website: str, verbose: bool = Fa
         text = text.split("```")[1].split("```")[0].strip()
     try:
         result = json.loads(text)
-        result["website"] = website
     except json.JSONDecodeError:
-        result = {"company_name": company_name, "website": website}
+        result = {"technologies": []}
 
     if verbose:
         return {
