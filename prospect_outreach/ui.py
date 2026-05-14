@@ -1,14 +1,11 @@
-"""Prospect Outreach UI — 3-tab Streamlit interface.
+"""Prospect Outreach UI — 2-tab Streamlit interface.
 
 Tab 1: Pass 1 — Research prospects
 Tab 2: Pass 2 — Generate messages
-Tab 3: Settings — Brand knowledge management
 """
 
 import io
 import tempfile
-from datetime import datetime
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -21,14 +18,12 @@ REQUIRED_COLUMNS = [
 
 def render():
     """Render the Prospect Outreach pipeline."""
-    tabs = st.tabs(["Pass 1: Research", "Pass 2: Generate Messages", "Settings"])
+    tabs = st.tabs(["Pass 1: Research", "Pass 2: Generate Messages"])
 
     with tabs[0]:
         _render_pass1_tab()
     with tabs[1]:
         _render_pass2_tab()
-    with tabs[2]:
-        _render_settings_tab()
 
 
 # ── Pass 1: Research ──────────────────────────────────────────────────────
@@ -232,45 +227,3 @@ def _render_pass2_tab():
             file_name="Pass-2-Output.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-
-
-# ── Settings: Brand Knowledge ─────────────────────────────────────────────
-
-def _render_settings_tab():
-    st.subheader("Settings — Brand Knowledge")
-    st.caption("View and refresh brand profiles scraped from company websites.")
-
-    from prospect_outreach import brand_knowledge, config
-
-    status = brand_knowledge.are_brand_files_present()
-
-    for name, exists in status.items():
-        path = config.BRAND_JSONS[name]
-        st.markdown(f"**{name}**")
-
-        col_info, col_btn = st.columns([4, 1])
-        with col_info:
-            if exists:
-                mod_time = datetime.fromtimestamp(path.stat().st_mtime)
-                st.caption(f"Last updated: {mod_time.strftime('%Y-%m-%d %H:%M')}")
-            else:
-                st.caption("Not generated yet.")
-        with col_btn:
-            if st.button("\u27f3", key=f"settings_refresh_{name}"):
-                with st.spinner(f"Scraping {name}..."):
-                    try:
-                        brand_knowledge.refresh_single_brand(name)
-                        st.success(f"{name} refreshed!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
-
-        if exists:
-            with st.expander(f"View {name} profile", expanded=False):
-                try:
-                    profile = brand_knowledge.load_brand_profile(name)
-                    st.json(profile)
-                except Exception as e:
-                    st.error(f"Could not load profile: {e}")
-
-        st.divider()

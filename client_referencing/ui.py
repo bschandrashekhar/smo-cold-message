@@ -36,6 +36,8 @@ def _render_sync_tab():
         _render_industry_reference_sync()
     with st.expander("Casestudies Reference Data Refresh", expanded=False):
         _render_casestudy_sync()
+    with st.expander("Brand Reference Refresh", expanded=False):
+        _render_brand_reference_refresh()
 
 
 # ── Client Reference Data Refresh ────────────────────────────────────────
@@ -489,10 +491,10 @@ def _show_current_casestudy_data():
         st.warning(f"Could not load case study data: {e}")
 
 
-# ── Brand Knowledge Refresh ──────────────────────────────────────────────
+# ── Brand Reference Refresh ──────────────────────────────────────────────
 
-def _render_brand_knowledge_sync():
-    """Render brand knowledge refresh UI with per-brand refresh buttons."""
+def _render_brand_reference_refresh():
+    """Render brand knowledge refresh UI with per-brand refresh buttons and profile viewing."""
     from prospect_outreach import brand_knowledge, config
     from datetime import datetime
 
@@ -505,13 +507,15 @@ def _render_brand_knowledge_sync():
 
     for name, exists in status.items():
         path = config.BRAND_JSONS[name]
+        st.markdown(f"**{name}**")
+
         col_info, col_btn = st.columns([4, 1])
         with col_info:
             if exists:
                 mod_time = datetime.fromtimestamp(path.stat().st_mtime)
-                st.text(f"{name} -- last updated {mod_time.strftime('%Y-%m-%d %H:%M')}")
+                st.caption(f"Last updated: {mod_time.strftime('%Y-%m-%d %H:%M')}")
             else:
-                st.text(f"{name} -- Not generated")
+                st.caption("Not generated yet.")
         with col_btn:
             if st.button("\u27f3", key=f"sync_refresh_{name}"):
                 with st.spinner(f"Scraping {name}..."):
@@ -521,6 +525,16 @@ def _render_brand_knowledge_sync():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed: {e}")
+
+        if exists:
+            with st.expander(f"View {name} profile", expanded=False):
+                try:
+                    profile = brand_knowledge.load_brand_profile(name)
+                    st.json(profile)
+                except Exception as e:
+                    st.error(f"Could not load profile: {e}")
+
+        st.divider()
 
 
 # ── Match Explanation ────────────────────────────────────────────────────
