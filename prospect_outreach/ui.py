@@ -116,20 +116,24 @@ def _render_pass1_tab():
             status_text.text("Done!")
 
             result_df = pd.read_excel(output_path, sheet_name="prospects")
-            st.success(f"Research complete. {len(result_df)} prospects processed.")
-            st.dataframe(result_df.head(10), use_container_width=True)
-
             with open(output_path, "rb") as f:
-                st.download_button(
-                    "Download Pass-1-Output.xlsx",
-                    data=f.read(),
-                    file_name="Pass-1-Output.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
+                st.session_state["pass1_output_bytes"] = f.read()
+            st.session_state["pass1_result_df"] = result_df
         except Exception as e:
             st.error(f"Research failed: {e}")
             import traceback
             st.code(traceback.format_exc())
+
+    if "pass1_output_bytes" in st.session_state:
+        result_df = st.session_state["pass1_result_df"]
+        st.success(f"Research complete. {len(result_df)} prospects processed.")
+        st.dataframe(result_df.head(10), use_container_width=True)
+        st.download_button(
+            "Download Pass-1-Output.xlsx",
+            data=st.session_state["pass1_output_bytes"],
+            file_name="Pass-1-Output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
 
 # ── Pass 2: Generate Messages ─────────────────────────────────────────────
@@ -207,24 +211,29 @@ def _render_pass2_tab():
             progress_bar.progress(1.0)
             status_text.text("Done!")
 
-            st.success(f"Generated {stats['ready']} messages. {stats['skipped']} skipped.")
-
             result_df = pd.read_excel(output_path, sheet_name="prospects")
-            preview_cols = ["First_Name", "Last_Name", "Company_Name", "WARM_MESSAGE"]
-            available = [c for c in preview_cols if c in result_df.columns]
-            st.dataframe(result_df[available].head(10), use_container_width=True)
-
             with open(output_path, "rb") as f:
-                st.download_button(
-                    "Download Pass-2-Output.xlsx",
-                    data=f.read(),
-                    file_name="Pass-2-Output.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
+                st.session_state["pass2_output_bytes"] = f.read()
+            st.session_state["pass2_result_df"] = result_df
+            st.session_state["pass2_stats"] = stats
         except Exception as e:
             st.error(f"Message generation failed: {e}")
             import traceback
             st.code(traceback.format_exc())
+
+    if "pass2_output_bytes" in st.session_state:
+        stats = st.session_state["pass2_stats"]
+        result_df = st.session_state["pass2_result_df"]
+        st.success(f"Generated {stats['ready']} messages. {stats['skipped']} skipped.")
+        preview_cols = ["First_Name", "Last_Name", "Company_Name", "WARM_MESSAGE"]
+        available = [c for c in preview_cols if c in result_df.columns]
+        st.dataframe(result_df[available].head(10), use_container_width=True)
+        st.download_button(
+            "Download Pass-2-Output.xlsx",
+            data=st.session_state["pass2_output_bytes"],
+            file_name="Pass-2-Output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
 
 # ── Settings: Brand Knowledge ─────────────────────────────────────────────
