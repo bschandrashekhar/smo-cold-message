@@ -722,7 +722,7 @@ def _render_vectormatch_section():
             )
         with col2:
             prospect_technologies = st.text_input(
-                "Prospect Technologies (comma-separated)",
+                "Prospect Technologies (CSV)",
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
             )
         with col3:
