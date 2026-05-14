@@ -30,6 +30,11 @@ def render():
 
 def _render_sync_tab():
     """Render the sync UI (upload Excel, preview diff, apply)."""
+    st.caption(
+        "This contains controls to refresh the data about clients, casestudies and brand JSONs. "
+        "This is an admin tool to be used carefully. "
+        "The data is complete delete and reinsert, so exercise extreme caution."
+    )
     with st.expander("Client Reference Data Refresh", expanded=False):
         _render_client_referencing_sync()
     with st.expander("Industry Reference Data Refresh", expanded=False):
@@ -690,6 +695,9 @@ def _render_match_explanation(exp: dict, prospect_technologies: str, prospect_co
 
 def _render_vector_match_tab():
     """Render the Vector Existing Client Match tab."""
+    st.caption(
+        "This test tool contains full verbose for testing prospects with existing clients."
+    )
     _render_vectormatch_section()
 
 
@@ -824,8 +832,8 @@ def _render_casestudy_match_tab():
     """Render the case-study matching UI."""
     st.subheader("Case Study Matcher")
     st.caption(
-        "Match a prospect against the case study database using technology, "
-        "industry, and contextual signals."
+        "This test tool contains full verbose for testing prospects with "
+        "technologies to existing casestudies."
     )
 
     with st.form("cs_match_form"):
@@ -937,8 +945,8 @@ def _render_brand_match_tab():
     """Render the Brand Matcher UI."""
     st.subheader("Brand Matcher")
     st.caption(
-        "Match a prospect to the best brand (LendingLogik or CloudChillies) "
-        "based on industry similarity using vector embeddings."
+        "This test tool contains full verbose for testing prospects that are "
+        "matched to a respective brand i.e. LendingLogik & CloudChillies."
     )
 
     with st.form("brand_match_form"):
