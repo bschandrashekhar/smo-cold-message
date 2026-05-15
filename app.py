@@ -2,7 +2,7 @@
 
 Hosts multiple pipelines via sidebar navigation:
   - Prospect Outreach: research + message generation
-  - MR & CC Knowledge Tools: client/casestudy/brand matching
+  - Admin/Debug Tools: client/casestudy/brand matching
 
 Run with: streamlit run app.py
 """
@@ -33,7 +33,7 @@ def main():
         st.title("SMO Workbench")
         pipeline = st.radio(
             "Pipeline",
-            ["Prospect Outreach", "MR & CC Knowledge Tools"],
+            ["Prospect Outreach", "Master Casestudy Finder", "Admin/Debug Tools"],
             label_visibility="collapsed",
         )
 
@@ -41,7 +41,13 @@ def main():
     if pipeline == "Prospect Outreach":
         from prospect_outreach.ui import render
         render()
-    elif pipeline == "MR & CC Knowledge Tools":
+    elif pipeline == "Master Casestudy Finder":
+        st.markdown(
+            '<meta http-equiv="refresh" content="0; url=https://casestudyfinder.streamlit.app/">',
+            unsafe_allow_html=True,
+        )
+        st.markdown("[Open Master Casestudy Finder](https://casestudyfinder.streamlit.app/)")
+    elif pipeline == "Admin/Debug Tools":
         from client_referencing.ui import render
         render()
 
