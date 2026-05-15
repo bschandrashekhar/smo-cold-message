@@ -66,7 +66,7 @@ def summarize_with_claude(pdf_text: str, client_name: str) -> dict:
     platforms mentioned in the case study where relevant.
     """
     response = claude.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         messages=[
             {
