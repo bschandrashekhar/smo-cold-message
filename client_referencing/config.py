@@ -1,9 +1,22 @@
-"""Client Referencing pipeline configuration.
+"""Client Referencing pipeline configuration."""
 
-Reuses shared keys from prospect_outreach.config.
-"""
+import os
 
-from prospect_outreach.config import VOYAGE_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
+
+def _get_secret(key: str) -> str:
+    """Read from Streamlit secrets (cloud) or env vars (local)."""
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return os.getenv(key, "")
+
+
+VOYAGE_API_KEY = _get_secret("VOYAGE_API_KEY")
+SUPABASE_URL = _get_secret("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = _get_secret("SUPABASE_SERVICE_KEY")
 
 TABLE_NAME = "client_referencing_data"
 TECH_TABLE_NAME = "client_tech_data"
