@@ -77,7 +77,14 @@ User opens `data_output.xlsx`:
 6. **Download** button → `Pass-2-Output.xlsx` with all columns filled
 
 ## Sidebar Navigation
-The app has three sidebar menu items:
+The app has three sidebar menu items. what gets displayed upon login in depended on the login:
+We will hardcode the user login as follows in the table "user_credentials". user_credentials.username contains the username and column user_credentials.password contains the password to the respective users. The username and password will have to be entered in the login form.
+
+  - If the login Username is "admin". In this case all the three menu items on the sidebar navigation will be shown to the user. 
+  - If the login Username is "marcom", In this case only "Master Casestudy Finder" on the sidebar navigation will be shown to the user. The menu will be autoselected so that the form is displayed immediately upon login on the right hand side. 
+
+  Give a settings tab on the app as a third tab to allow for a password change, only when logged in as marcom. Respective row for this user should get updated when the password is changed from the UI.
+
 
 ### 1. Prospect Outreach
 - Tab 1: Research (Pass 1)
