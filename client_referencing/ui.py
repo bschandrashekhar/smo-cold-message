@@ -996,6 +996,7 @@ def _render_client_matcher_simple():
             "Geography": m.client_geography,
             "URL": m.client_url,
             "Exact Tech Matches": ", ".join(m.exact_techs) if m.exact_techs else "—",
+            "Score": round(m.final_score, 3),
         }
         for m in matches
     ]
