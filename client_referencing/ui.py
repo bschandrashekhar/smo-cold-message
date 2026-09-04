@@ -943,11 +943,46 @@ def _render_casestudy_match_tab():
 
 def render_master():
     """Render the Master Casestudy Finder — non-verbose Client Matcher + Casestudy Matcher."""
-    tabs = st.tabs(["Client Matcher", "Casestudy Matcher"])
-    with tabs[0]:
-        _render_client_matcher_simple()
-    with tabs[1]:
-        _render_casestudy_matcher_simple()
+    username = st.session_state.get("username", "")
+    if username == "marcom":
+        tabs = st.tabs(["Client Matcher", "Casestudy Matcher", "Settings"])
+        with tabs[0]:
+            _render_client_matcher_simple()
+        with tabs[1]:
+            _render_casestudy_matcher_simple()
+        with tabs[2]:
+            _render_password_change_tab()
+    else:
+        tabs = st.tabs(["Client Matcher", "Casestudy Matcher"])
+        with tabs[0]:
+            _render_client_matcher_simple()
+        with tabs[1]:
+            _render_casestudy_matcher_simple()
+
+
+def _render_password_change_tab():
+    """Password change for marcom user."""
+    st.subheader("Change Password")
+    with st.form("change_password_form"):
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        submitted = st.form_submit_button("Update Password", type="primary")
+
+    if submitted:
+        if not new_password:
+            st.error("Please enter a new password.")
+            return
+        if new_password != confirm_password:
+            st.error("Passwords do not match.")
+            return
+        try:
+            from supabase import create_client
+            from prospect_outreach.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+            sb.table("user_credentials").update({"password": new_password}).eq("username", "marcom").execute()
+            st.success("Password updated successfully.")
+        except Exception as e:
+            st.error(f"Failed to update password: {e}")
 
 
 def _render_client_matcher_simple():
