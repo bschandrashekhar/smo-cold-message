@@ -568,6 +568,12 @@ def find_matches(
     industry_applied = filter_level != "none"
     flag_tier_3 = filter_level == "none"
 
+    # Geography set for country tiebreaker in Tier 2/3 sorting
+    geo_client_names = (
+        set(r["client_name"] for r in all_rows if _matches_geography(r, prospect_ctry))
+        if prospect_ctry else set()
+    )
+
     # Explanation: tier selection
     if filter_level == "industry_and_geography":
         explanation["tier_used"] = "Tier 1 (Industry + Geography)"
@@ -615,7 +621,7 @@ def find_matches(
     else:
         # No technologies — rank industry-filtered candidates by industry_score
         candidate_names = list(dict.fromkeys(r["client_name"] for r in candidate_rows))
-        candidate_names.sort(key=lambda c: (-industry_scores.get(c, 0.0), c))
+        candidate_names.sort(key=lambda c: (-industry_scores.get(c, 0.0), 0 if c in geo_client_names else 1))
         shortlist = list(candidate_names)
 
     # Merge exact + semantic data for scoring (clients can have both)
@@ -628,7 +634,7 @@ def find_matches(
         for cname in shortlist:
             if cname not in _cached_scores:
                 _cached_scores[cname] = _score_client(cname, all_exact, all_semantic, total_techs)
-        shortlist.sort(key=lambda c: -_cached_scores.get(c, (0, 0, 0))[2])
+        shortlist.sort(key=lambda c: (-_cached_scores.get(c, (0, 0, 0))[2], 0 if c in geo_client_names else 1))
 
     # Debug: Case-specific logging after core matching (after final_score sort)
     _shortlist_names = list(dict.fromkeys(shortlist))

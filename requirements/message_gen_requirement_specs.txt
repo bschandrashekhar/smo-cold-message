@@ -86,8 +86,8 @@ The app has three sidebar menu items:
 ### 2. Master Casestudy Finder
 - Opens the Master Casestudy Finder application in a new browser tab
 - Contains the following tabs:
-  - **Client Matcher**: matching of a prospect against existing clients
-  - **Casestudy Matcher**: matching of a prospect against case studies by technology
+  - **Client Matcher**: matching of a prospect against existing clients.
+  - **Casestudy Matcher**: matching of a prospect against case studies by technology. I just want the name, and a download link with a score against each. 
 
 ### 3. Admin/Debug Tools
 - Intended for admin and debug use only — not for end users
