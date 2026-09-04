@@ -42,11 +42,8 @@ def main():
         from prospect_outreach.ui import render
         render()
     elif pipeline == "Master Casestudy Finder":
-        st.markdown(
-            '<meta http-equiv="refresh" content="0; url=https://casestudyfinder.streamlit.app/">',
-            unsafe_allow_html=True,
-        )
-        st.markdown("[Open Master Casestudy Finder](https://casestudyfinder.streamlit.app/)")
+        from client_referencing.ui import render_master
+        render_master()
     elif pipeline == "Admin/Debug Tools":
         from client_referencing.ui import render
         render()

@@ -7,7 +7,7 @@ import streamlit as st
 
 
 def render():
-    """Render the Client Referencing pipeline with tabs."""
+    """Render the Admin/Debug Tools pipeline with tabs."""
     tabs = st.tabs(["Data Sync", "Client Matcher", "Casestudy Matcher", "Brand Matcher", "Pass 1: Research (Test Mode)"])
 
     with tabs[0]:
@@ -939,6 +939,123 @@ def _render_casestudy_match_tab():
             for label, content in results["debug_log"]:
                 st.markdown(f"**{label}:**")
                 st.text(content)
+
+
+def render_master():
+    """Render the Master Casestudy Finder — non-verbose Client Matcher + Casestudy Matcher."""
+    tabs = st.tabs(["Client Matcher", "Casestudy Matcher"])
+    with tabs[0]:
+        _render_client_matcher_simple()
+    with tabs[1]:
+        _render_casestudy_matcher_simple()
+
+
+def _render_client_matcher_simple():
+    """Non-verbose client matcher — clean results only, no scores or debug."""
+    st.subheader("Client Matcher")
+    st.caption("Match a prospect against existing clients.")
+
+    with st.form("master_clientmatch_form"):
+        col1, col2, col3, col4 = st.columns([3, 3, 3, 2])
+        with col1:
+            prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
+        with col2:
+            prospect_technologies = st.text_input("Prospect Technologies (CSV)", placeholder="e.g. Salesforce, Boomi")
+        with col3:
+            prospect_country = st.text_input("Prospect Country", placeholder="e.g. Australia, USA")
+        with col4:
+            max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=6)
+        submitted = st.form_submit_button("Find Matches", type="primary")
+
+    if not submitted:
+        return
+
+    if not prospect_technologies.strip():
+        st.warning("Please enter at least one technology.")
+        return
+
+    from client_referencing.matcher import find_matches
+
+    with st.spinner("Matching..."):
+        try:
+            results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches)
+        except Exception as e:
+            st.error(f"Matching failed: {e}")
+            return
+
+    matches = results.get("matches", [])
+    if not matches:
+        st.info("No matching clients found.")
+        return
+
+    st.success(f"Found **{len(matches)}** matching clients.")
+    rows = [
+        {
+            "Client": m.client_name,
+            "Industry": m.client_industry,
+            "Geography": m.client_geography,
+            "URL": m.client_url,
+            "Exact Tech Matches": ", ".join(m.exact_techs) if m.exact_techs else "—",
+        }
+        for m in matches
+    ]
+    st.dataframe(rows, use_container_width=True)
+
+
+def _render_casestudy_matcher_simple():
+    """Non-verbose casestudy matcher — clean results only, no scores or debug."""
+    st.subheader("Casestudy Matcher")
+    st.caption("Match a prospect against existing case studies.")
+
+    with st.form("master_csmatch_form"):
+        prospect_context = st.text_area(
+            "Prospect Context",
+            placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
+            height=80,
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            prospect_industry = st.text_input("Industry", placeholder="e.g. Healthcare")
+            prospect_technologies = st.text_input("Technologies (CSV)", placeholder="e.g. Salesforce, Mulesoft")
+        with col2:
+            max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=8)
+        submitted = st.form_submit_button("Find Matching Case Studies", type="primary")
+
+    if not submitted:
+        return
+
+    if not prospect_technologies.strip() and not prospect_context.strip():
+        st.warning("Please provide at least technologies or prospect context.")
+        return
+
+    from client_referencing.casestudy_matcher import find_casestudy_matches
+
+    with st.spinner("Matching case studies..."):
+        results = find_casestudy_matches(
+            prospect_context=prospect_context,
+            prospect_industry=prospect_industry,
+            prospect_technologies=prospect_technologies,
+            max_matches=max_matches,
+        )
+
+    matches = results.get("matches", [])
+    if not matches:
+        st.info("No matching case studies found.")
+        return
+
+    st.success(f"Found **{len(matches)}** matching case studies.")
+    for i, m in enumerate(matches, 1):
+        with st.expander(f"#{i} — {m.casestudy_name} ({m.client_name})", expanded=(i <= 3)):
+            if m.exact_techs:
+                st.markdown(f"**Matching Technologies:** {', '.join(m.exact_techs)}")
+            if m.summary_problem:
+                st.markdown(f"**Problem:** {m.summary_problem}")
+            if m.summary_solution:
+                st.markdown(f"**Solution:** {m.summary_solution}")
+            if m.summary_outcomes:
+                st.markdown(f"**Outcomes:** {m.summary_outcomes}")
+            if m.url:
+                st.markdown(f"[View Case Study]({m.url})")
 
 
 def _render_brand_match_tab():

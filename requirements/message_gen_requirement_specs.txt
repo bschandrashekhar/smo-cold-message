@@ -1,3 +1,5 @@
+# All data for refreshing the client, case studies, mapping data is in "D:\personal-claude-automations\allclients-industry-tech-mapping\data"
+
 # Prospect Outreach Generator — Requirements & Plan
 
 ## Overview
@@ -28,7 +30,7 @@ Note that this is a two-pass workflow: Pass 1 is "Automated research & manual re
 | Suggested_Brand_Name_to_use | "LendingLogik" or "CloudChillies" — Claude's assessment based on company's industry. To use BrandMatcher module already developed.
 | Message_to_send | Personalized 3-paragraph outreach message tailored to the selected brand (to be generated in pass 2).
 | Country | Modify this field to use country as "EMEA" for all the countries that are in Middle East, and Africa. This we are doing as we have in our database limited countries to cater to this geography so we are going to have more options while researching case studies and existing clients to present to them.
-| Prospect_Technologies | The list of generic technologies that the prospect uses in JSON format, derived from Technology Research as shown below.
+| Prospect_Technologies | The list of generic technologies that the prospect uses as a plain CSV string (e.g. "Salesforce, Boomi, Snowflake"), derived from Technology Research as shown below.
 | FLAG | Any comment to be seen after final message generation will be inserted in this column by the message generator.
 
 ### Worksheet Name: "dates"
@@ -74,10 +76,31 @@ User opens `data_output.xlsx`:
 5. Pipeline runs Step 3 with progress bar
 6. **Download** button → `Pass-2-Output.xlsx` with all columns filled
 
-### Tab 3: Settings
-- Brand Knowledge Status: shows if brand JSONs exist, last-modified date
-- Refresh Brand Knowledge: button to re-scrape both websites
-- View Brand Profiles: expandable sections showing current JSON content
+## Sidebar Navigation
+The app has three sidebar menu items:
+
+### 1. Prospect Outreach
+- Tab 1: Research (Pass 1)
+- Tab 2: Generate Messages (Pass 2)
+
+### 2. Master Casestudy Finder
+- Opens the Master Casestudy Finder application in a new browser tab
+- Contains the following tabs:
+  - **Client Matcher**: matching of a prospect against existing clients
+  - **Casestudy Matcher**: matching of a prospect against case studies by technology
+
+### 3. Admin/Debug Tools
+- Intended for admin and debug use only — not for end users
+- Contains the following tabs:
+  - **Data Sync**: Manage reference data refreshes. Contains four accordions:
+    - Client Reference Data Refresh — bulk reload clients from Excel
+    - Industry Reference Data Refresh — bulk reload industry embeddings
+    - Casestudies Reference Data Refresh — bulk reload case studies
+    - Brand Reference Refresh — view/refresh brand JSONs (Brand Knowledge Status, Refresh button, View Brand Profiles)
+  - **Client Matcher**: Test tool — verbose matching of a prospect against existing clients
+  - **Casestudy Matcher**: Test tool — verbose matching of a prospect against case studies by technology
+  - **Brand Matcher**: Test tool — verbose matching of a prospect to LendingLogik or CloudChillies
+  - **Pass 1: Research (Test Mode)**: Test tool — run the full Pass 1 pipeline for a single prospect
 
 ## Pipeline Stages
 
@@ -290,7 +313,11 @@ For each record in the input excel sheet
             Insert the value "TO BE DECIDED MANUALLY" in excel column "FLAG";
             Skip to Para 3 generation.        
           } else {
-            Para 2: Pick up the GENERAL-PURPOSE technology names from "Prospect_Technologies" (e.g. Boomi, Snowflake, MuleSoft) — NOT proprietary systems. Weave them into a case study narrative based ONLY on facts from the case studies provided above — do NOT invent, fabricate, or embellish details beyond what the case studies state. If the prospect's exact technology (e.g. Dynamics) does not appear in any case study, do NOT fabricate a story about it. Instead, bridge lightly: acknowledge the prospect's technology ecosystem and show how we have done Salesforce work alongside similar technologies (e.g. Azure, .NET) that DO appear in the case studies. If "Prospect_Technologies" mentions Boomi, Para 2 references how we've helped clients with Boomi integration leveraging Salesforce. Anonymize as "a leading [industry] company". Only reference these approved Salesforce products (and ONLY if clearly relevant): {approved_sf_products}. If no specific product fits, just say "Salesforce".
+            Remove semantic_techs node from Case_Studies dict. For a cases study, We will pass only its casestudy_name, exact_techs & summary_solution as part of message generation. 
+
+            Para 2: Pick up the GENERAL-PURPOSE technology names from "Prospect_Technologies" (e.g. Boomi, Snowflake, MuleSoft) — NOT proprietary systems. Weave them into a case study narrative based ONLY on facts from the Case_Studies provided above — do NOT invent, fabricate, or embellish details beyond what the Case_Studies state. 
+
+            If the Prospect_Technologies (e.g. Dynamics) does not appear in any case study, do NOT fabricate a story about it. Instead, bridge lightly: acknowledge the prospect's technology ecosystem and show how we have done Salesforce work alongside similar technologies (e.g. Azure, .NET) that DO appear in the case studies. Anonymize as "a leading [industry] company". Only reference these approved Salesforce products (and ONLY if clearly relevant): {approved_sf_products}. If no specific product fits, just say "Salesforce".
               
             approved_sf_products : Service Cloud, Sales Cloud, Non Profit, NPSP, Experience Cloud, Commerce Cloud, Agentforce, LWC, Appexchange Product Development, Marketing Cloud, Pardot, Tableau, CPQ, Data Cloud.
 
@@ -329,7 +356,7 @@ For each record in the input excel sheet
 | Re-generate one message | Clear that cell in Excel, re-upload → Tab 2 |
 | Change brand for a prospect | Edit brand in Excel, clear message cell, re-upload → Tab 2 |
 | Add prospects to existing batch | Add rows with blank Claude columns, upload → Tab 1 |
-| Refresh brand knowledge | Tab 3 → Refresh button |
+| Refresh brand knowledge | Admin/Debug Tools → Data Sync → Brand Reference Refresh accordion |
 
 ## Supabase Keepalive Mechanism
 Supabase free tier pauses the database after 7 days of inactivity. This keepalive mechanism prevents this by simply executing a SELECT query on "industry_embeddings" table for a single record. The job is scheduled on cron-job.org. cron-job.org calls the Supabase REST API directly, bypassing Streamlit entirely
