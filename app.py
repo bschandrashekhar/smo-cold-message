@@ -26,7 +26,10 @@ def _get_supabase():
 
 
 def _login_form():
-    st.title("SMO Workbench")
+    st.markdown(
+        "<h1 style='text-align:center; margin-bottom: 2rem;'>Casestudy Finder</h1>",
+        unsafe_allow_html=True,
+    )
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.subheader("Login")
@@ -50,6 +53,12 @@ def _login_form():
                     st.error("Invalid username or password.")
             except Exception as e:
                 st.error(f"Login failed: {e}")
+
+    # Footer
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    footer_col1, footer_col2, footer_col3 = st.columns([2, 1, 2])
+    with footer_col2:
+        st.image("assets/cloudchillies_logo.svg", width=120)
 
 
 def main():
