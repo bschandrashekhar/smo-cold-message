@@ -1045,17 +1045,8 @@ def _render_casestudy_matcher_simple():
 
     st.success(f"Found **{len(matches)}** matching case studies.")
     for i, m in enumerate(matches, 1):
-        with st.expander(f"#{i} — {m.casestudy_name} ({m.client_name})", expanded=(i <= 3)):
-            if m.exact_techs:
-                st.markdown(f"**Matching Technologies:** {', '.join(m.exact_techs)}")
-            if m.summary_problem:
-                st.markdown(f"**Problem:** {m.summary_problem}")
-            if m.summary_solution:
-                st.markdown(f"**Solution:** {m.summary_solution}")
-            if m.summary_outcomes:
-                st.markdown(f"**Outcomes:** {m.summary_outcomes}")
-            if m.url:
-                st.markdown(f"[View Case Study]({m.url})")
+        download_link = f"[Download]({m.url})" if m.url else "—"
+        st.markdown(f"**{i}. {m.casestudy_name}** ({m.client_name}) — Score: {m.final_score:.3f} &nbsp; {download_link}")
 
 
 def _render_brand_match_tab():
