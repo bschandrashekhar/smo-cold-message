@@ -80,7 +80,8 @@ def main():
     # ── Sidebar ──────────────────────────────────────────────────────────
     with st.sidebar:
         st.image("assets/cloudchillies_logo.svg", width=200)
-        st.title("SMO Workbench")
+        if username == "admin":
+            st.title("SMO Workbench")
 
         if username == "admin":
             pipeline = st.radio(
