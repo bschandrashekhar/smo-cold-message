@@ -1045,19 +1045,21 @@ def _render_combined_matcher():
                 link = m.client_url or "#"
                 geo = m.client_geography or ""
                 if m.logo_url:
-                    img_tag = f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80" style="object-fit:contain; height:80px;"></a>'
+                    img_tag = f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="50" style="object-fit:contain; height:50px;"></a>'
                 else:
-                    img_tag = f'<a href="{link}" target="_blank" style="font-size:2rem;">🏢</a>'
+                    img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">🏢</a>'
                 items_html += f"""
-                <div style="text-align:center; min-width:90px;">
+                <div style="text-align:center; min-width:70px;">
                     {img_tag}
-                    <div style="font-size:0.8rem; font-weight:600; margin-top:0.4rem;">{m.client_name}</div>
-                    <div style="font-size:0.75rem; color:#aaa;">{geo}</div>
+                    <div style="font-size:0.75rem; font-weight:600; margin-top:0.3rem;">{m.client_name}</div>
+                    <div style="font-size:0.7rem; color:#aaa;">{geo}</div>
                 </div>"""
             st.markdown(f"""
-                <div style="background-color:#3a3a3a; padding:1.5rem; border-radius:8px;">
-                    <h4 style="margin-top:0; margin-bottom:1rem;">Matching Clients</h4>
-                    <div style="display:flex; flex-wrap:wrap; gap:1.2rem; align-items:flex-start;">
+                <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
+                    <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
+                        <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">Matching Clients</span>
+                    </div>
+                    <div style="padding:1.2rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
                         {items_html}
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -1078,9 +1080,13 @@ def _render_combined_matcher():
                 rows_html += f'<div style="margin-bottom:0.6rem;"><strong>{i}. {m.casestudy_name}</strong>{client_suffix} &nbsp; {dl}</div>'
                 i += 1
             st.markdown(f"""
-                <div style="background-color:#3a3a3a; padding:1.5rem; border-radius:8px;">
-                    <h4 style="margin-top:0; margin-bottom:1rem;">Matching Case Studies</h4>
-                    {rows_html}
+                <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
+                    <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
+                        <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">Matching Case Studies</span>
+                    </div>
+                    <div style="padding:1.2rem;">
+                        {rows_html}
+                    </div>
                 </div>""", unsafe_allow_html=True)
         else:
             st.info("No matching case studies found.")
