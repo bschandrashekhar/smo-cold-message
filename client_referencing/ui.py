@@ -942,21 +942,21 @@ def _render_casestudy_match_tab():
 
 
 def render_master():
-    """Render the Master Casestudy Finder — non-verbose Client Matcher + Casestudy Matcher."""
+    """Render the Master Casestudy Finder — Client + Casestudy Matcher in one tab."""
     username = st.session_state.get("username", "")
     if username == "marcom":
-        tabs = st.tabs(["Client Matcher", "Casestudy Matcher", "Settings"])
+        tabs = st.tabs(["Casestudy/Client Matcher", "Settings"])
         with tabs[0]:
             _render_client_matcher_simple()
-        with tabs[1]:
+            st.divider()
             _render_casestudy_matcher_simple()
-        with tabs[2]:
+        with tabs[1]:
             _render_password_change_tab()
     else:
-        tabs = st.tabs(["Client Matcher", "Casestudy Matcher"])
+        tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
             _render_client_matcher_simple()
-        with tabs[1]:
+            st.divider()
             _render_casestudy_matcher_simple()
 
 
@@ -997,7 +997,7 @@ def _render_client_matcher_simple():
         with col2:
             prospect_technologies = st.text_input("Prospect Technologies (CSV)", placeholder="e.g. Salesforce, Boomi")
         with col3:
-            prospect_country = st.text_input("Prospect Country", placeholder="e.g. Australia, USA")
+            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
         with col4:
             max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=6)
         submitted = st.form_submit_button("Find Matches", type="primary")
