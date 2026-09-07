@@ -945,16 +945,22 @@ def render_master():
     """Render the Master Casestudy Finder — single unified form for both matchers."""
     username = st.session_state.get("username", "")
     if username == "marcom":
-        tabs = st.tabs(["Casestudy/Client Matcher", "Settings", "Logout"])
-        with tabs[0]:
+        selection = st.radio(
+            "",
+            ["Casestudy/Client Matcher", "Settings", "Logout"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="marcom_nav",
+        )
+        st.divider()
+        if selection == "Logout":
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.rerun()
+        elif selection == "Casestudy/Client Matcher":
             _render_combined_matcher()
-        with tabs[1]:
+        elif selection == "Settings":
             _render_password_change_tab()
-        with tabs[2]:
-            if st.button("Logout", type="primary"):
-                st.session_state.logged_in = False
-                st.session_state.username = ""
-                st.rerun()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
