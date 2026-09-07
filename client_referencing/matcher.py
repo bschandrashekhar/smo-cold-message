@@ -705,8 +705,9 @@ def find_matches(
             bf_scored.sort(key=lambda x: -x[1])
             backfill_entries = [c for c, _ in bf_scored]
 
-        # Cap generic backfill at deficit to reach 5
-        generic_deficit = 5 - len(shortlist_names)
+        # Cap generic backfill: fill to max_matches if no country (geo backfill won't run),
+        # otherwise fill to 5 and let geo backfill top up to max_matches.
+        generic_deficit = (max_matches if not prospect_ctry else 5) - len(shortlist_names)
         if generic_deficit > 0 and backfill_entries:
             capped_seen = set()
             capped = []
