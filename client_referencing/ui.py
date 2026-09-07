@@ -965,6 +965,9 @@ def _render_combined_matcher():
             padding: 1.5rem;
             border-radius: 8px;
         }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type {
+            gap: 0.4rem !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     with st.form("master_combined_form"):
@@ -1095,6 +1098,13 @@ def _render_combined_matcher():
 def _render_password_change_tab():
     """Password change for marcom user."""
     st.subheader("Change Password")
+    st.markdown("""
+        <style>
+        [data-testid="stForm"][data-form-id="change_password_form"] [data-testid="stHorizontalBlock"]:last-of-type {
+            gap: 0.4rem !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     with st.form("change_password_form"):
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
