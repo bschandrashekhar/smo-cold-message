@@ -966,7 +966,15 @@ def _render_combined_matcher():
             border-radius: 8px;
         }
         [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type {
-            gap: 0.4rem !important;
+            gap: 0.3rem !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type > [data-testid="stColumn"] {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type button {
+            height: 2.4rem !important;
+            min-height: 2.4rem !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -1100,8 +1108,16 @@ def _render_password_change_tab():
     st.subheader("Change Password")
     st.markdown("""
         <style>
-        [data-testid="stForm"][data-form-id="change_password_form"] [data-testid="stHorizontalBlock"]:last-of-type {
-            gap: 0.4rem !important;
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type {
+            gap: 0.3rem !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type > [data-testid="stColumn"] {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type button {
+            height: 2.4rem !important;
+            min-height: 2.4rem !important;
         }
         </style>
     """, unsafe_allow_html=True)
