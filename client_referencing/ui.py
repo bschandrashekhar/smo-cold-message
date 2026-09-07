@@ -945,15 +945,107 @@ def render_master():
     """Render the Master Casestudy Finder — single unified form for both matchers."""
     username = st.session_state.get("username", "")
     if username == "marcom":
-        tabs = st.tabs(["Casestudy/Client Matcher", "Settings"])
+        tabs = st.tabs(["Casestudy/Client Matcher", "All Clients", "All Casestudies", "Settings"])
         with tabs[0]:
             _render_combined_matcher()
         with tabs[1]:
+            _render_all_clients_tab()
+        with tabs[2]:
+            _render_all_casestudies_tab()
+        with tabs[3]:
             _render_password_change_tab()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
             _render_combined_matcher()
+
+
+def _render_all_clients_tab():
+    """Browse all clients in the database — logo grid with name and country."""
+    from client_referencing.matcher import fetch_all_rows
+
+    with st.spinner("Loading clients..."):
+        all_rows = fetch_all_rows()
+
+    # Deduplicate by client_name (rows are joined with tech table)
+    seen = set()
+    clients = []
+    for r in all_rows:
+        name = r.get("client_name", "")
+        if name and name not in seen:
+            seen.add(name)
+            clients.append(r)
+    clients.sort(key=lambda r: r.get("client_name", "").lower())
+
+    if not clients:
+        st.info("No clients found.")
+        return
+
+    items_html = ""
+    for c in clients:
+        name = c.get("client_name", "")
+        link = c.get("client_url") or "#"
+        geo = c.get("client_geography") or ""
+        logo_url = c.get("logo_url") or ""
+        if logo_url:
+            img_tag = f'<a href="{link}" target="_blank"><img src="{logo_url}" width="50" style="object-fit:contain; height:50px;"></a>'
+        else:
+            img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">🏢</a>'
+        items_html += f"""
+        <div style="text-align:center; min-width:70px;">
+            {img_tag}
+            <div style="font-size:0.75rem; font-weight:600; margin-top:0.3rem;">{name}</div>
+            <div style="font-size:0.7rem; color:#aaa;">{geo}</div>
+        </div>"""
+
+    st.markdown(f"""
+        <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
+            <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
+                <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">All Clients</span>
+            </div>
+            <div style="padding:1.2rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
+                {items_html}
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+
+def _render_all_casestudies_tab():
+    """Browse all case studies in the database — numbered list with download links."""
+    from client_referencing.casestudy_matcher import _cache
+
+    with st.spinner("Loading case studies..."):
+        all_cs = _cache.get_case_studies()
+
+    # Deduplicate by casestudy_name
+    seen = set()
+    case_studies = []
+    for cs in all_cs:
+        name = cs.get("casestudy_name", "")
+        if name and name not in seen:
+            seen.add(name)
+            case_studies.append(cs)
+    case_studies.sort(key=lambda cs: cs.get("casestudy_name", "").lower())
+
+    if not case_studies:
+        st.info("No case studies found.")
+        return
+
+    rows_html = ""
+    for i, cs in enumerate(case_studies, 1):
+        name = cs.get("casestudy_name", "")
+        url = cs.get("url") or ""
+        dl = f'<a href="{url}" target="_blank" style="color:#4da6ff;">Download</a>' if url else "—"
+        rows_html += f'<div style="margin-bottom:0.5rem;"><strong>{i}. {name}</strong> &nbsp; {dl}</div>'
+
+    st.markdown(f"""
+        <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
+            <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
+                <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">All Case Studies</span>
+            </div>
+            <div style="padding:1.2rem;">
+                {rows_html}
+            </div>
+        </div>""", unsafe_allow_html=True)
 
 
 def _render_combined_matcher():
