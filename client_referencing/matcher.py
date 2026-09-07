@@ -185,6 +185,7 @@ class _DataCache:
                 "client_industry": c["client_industry"],
                 "client_geography": c["client_geography"],
                 "client_url": c["client_url"],
+                "logo_url": c.get("logo_url") or "",
                 "industry_array": c["industry_array"],
                 "industry_group": c["industry_group"],
                 "geo_priority": c["geo_priority"],
