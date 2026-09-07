@@ -945,11 +945,15 @@ def render_master():
     """Render the Master Casestudy Finder — single unified form for both matchers."""
     username = st.session_state.get("username", "")
     if username == "marcom":
-        tabs = st.tabs(["Casestudy/Client Matcher", "Settings"])
+        tabs = st.tabs(["Casestudy/Client Matcher", "Settings", "Logout"])
         with tabs[0]:
             _render_combined_matcher()
         with tabs[1]:
             _render_password_change_tab()
+        with tabs[2]:
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.rerun()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
@@ -958,6 +962,15 @@ def render_master():
 
 def _render_combined_matcher():
     """Single unified form that runs both Client Matcher and Casestudy Matcher."""
+    st.markdown("""
+        <style>
+        [data-testid="stForm"] {
+            background-color: #3a3a3a;
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     with st.form("master_combined_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -1009,41 +1022,43 @@ def _render_combined_matcher():
             st.error(f"Casestudy matching failed: {e}")
             cs_results = {}
 
-    # ── Client results ──
+    # ── Side-by-side results ──
     client_matches = client_results.get("matches", [])
-    st.subheader("Matching Clients")
-    if client_matches:
-        cols = st.columns(len(client_matches))
-        for col, m in zip(cols, client_matches):
-            with col:
-                link = m.client_url or "#"
-                if m.logo_url:
-                    st.markdown(
-                        f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80"></a>',
-                        unsafe_allow_html=True,
-                    )
-                st.caption(m.client_name)
-    else:
-        st.info("No matching clients found.")
-
-    st.divider()
-
-    # ── Casestudy results ──
     cs_matches = cs_results.get("matches", [])
-    st.subheader("Matching Case Studies")
-    if cs_matches:
-        seen_cs = set()
-        i = 1
-        for m in cs_matches:
-            if m.casestudy_name in seen_cs:
-                continue
-            seen_cs.add(m.casestudy_name)
-            download_link = f"[Download]({m.url})" if m.url else "—"
-            client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
-            st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
-            i += 1
-    else:
-        st.info("No matching case studies found.")
+
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.subheader("Matching Clients")
+        if client_matches:
+            logo_cols = st.columns(len(client_matches))
+            for col, m in zip(logo_cols, client_matches):
+                with col:
+                    link = m.client_url or "#"
+                    if m.logo_url:
+                        st.markdown(
+                            f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80"></a>',
+                            unsafe_allow_html=True,
+                        )
+                    st.caption(m.client_name)
+        else:
+            st.info("No matching clients found.")
+
+    with right_col:
+        st.subheader("Matching Case Studies")
+        if cs_matches:
+            seen_cs = set()
+            i = 1
+            for m in cs_matches:
+                if m.casestudy_name in seen_cs:
+                    continue
+                seen_cs.add(m.casestudy_name)
+                download_link = f"[Download]({m.url})" if m.url else "—"
+                client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
+                st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
+                i += 1
+        else:
+            st.info("No matching case studies found.")
 
 
 def _render_password_change_tab():

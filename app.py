@@ -75,20 +75,13 @@ def main():
     username = st.session_state.username
 
     if username == "marcom":
-        # ── Marcom: no sidebar, logout button in top-right of main area ──
+        # ── Marcom: no sidebar, logout is a tab inside render_master ──
         st.markdown("""
             <style>
                 [data-testid="stSidebar"] {display: none;}
                 [data-testid="collapsedControl"] {display: none;}
             </style>
         """, unsafe_allow_html=True)
-
-        _, logout_col = st.columns([8, 1])
-        with logout_col:
-            if st.button("Logout", use_container_width=True):
-                st.session_state.logged_in = False
-                st.session_state.username = ""
-                st.rerun()
 
         from client_referencing.ui import render_master
         render_master()
