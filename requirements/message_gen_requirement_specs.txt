@@ -91,7 +91,7 @@ We will hardcode the user login as follows in the table "user_credentials". user
 - Tab 2: Generate Messages (Pass 2)
 
 ### 2. Master Casestudy Finder
-- Opens the Master Casestudy Finder application in a new browser tab
+- Opens the Master Casestudy Finder application in a new browser tab. The sidepanel is no longer visible when logged in as "marcom" user.
 - Contains a tab called "Casestudy/Client Matcher":
   - **Client Matcher**: matching of a prospect against existing clients.
   - **Casestudy Matcher**: matching of a prospect against case studies by technology. I just want the name, and a download link with a score against each. 
