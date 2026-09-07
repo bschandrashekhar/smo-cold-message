@@ -990,11 +990,11 @@ def _render_combined_matcher():
 
         is_marcom = st.session_state.get("username") == "marcom"
         if is_marcom:
-            btn_col1, btn_col2 = st.columns([3, 1])
+            btn_col1, btn_col2, _ = st.columns([1, 1, 4])
             with btn_col1:
-                submitted = st.form_submit_button("Find Matches", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("Find Matches", type="primary")
             with btn_col2:
-                logout = st.form_submit_button("Logout", use_container_width=True)
+                logout = st.form_submit_button("Logout")
         else:
             submitted = st.form_submit_button("Find Matches", type="primary")
             logout = False
@@ -1092,11 +1092,11 @@ def _render_password_change_tab():
     with st.form("change_password_form"):
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        btn_col1, btn_col2 = st.columns([3, 1])
+        btn_col1, btn_col2, _ = st.columns([1, 1, 4])
         with btn_col1:
-            submitted = st.form_submit_button("Update Settings", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("Update Settings", type="primary")
         with btn_col2:
-            logout = st.form_submit_button("Logout", use_container_width=True)
+            logout = st.form_submit_button("Logout")
 
     if logout:
         st.session_state.logged_in = False
