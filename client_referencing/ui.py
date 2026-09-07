@@ -1030,10 +1030,16 @@ def _render_combined_matcher():
     cs_matches = cs_results.get("matches", [])
     st.subheader("Matching Case Studies")
     if cs_matches:
-        for i, m in enumerate(cs_matches, 1):
+        seen_cs = set()
+        i = 1
+        for m in cs_matches:
+            if m.casestudy_name in seen_cs:
+                continue
+            seen_cs.add(m.casestudy_name)
             download_link = f"[Download]({m.url})" if m.url else "—"
             client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
-        st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
+            st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
+            i += 1
     else:
         st.info("No matching case studies found.")
 
@@ -1153,10 +1159,16 @@ def _render_casestudy_matcher_simple():
         return
 
     st.success(f"Found **{len(matches)}** matching case studies.")
-    for i, m in enumerate(matches, 1):
+    seen_cs = set()
+    i = 1
+    for m in matches:
+        if m.casestudy_name in seen_cs:
+            continue
+        seen_cs.add(m.casestudy_name)
         download_link = f"[Download]({m.url})" if m.url else "—"
         client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
         st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
+        i += 1
 
 
 def _render_brand_match_tab():
