@@ -951,9 +951,10 @@ def render_master():
         with tabs[1]:
             _render_password_change_tab()
         with tabs[2]:
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.rerun()
+            if st.button("Logout", type="primary"):
+                st.session_state.logged_in = False
+                st.session_state.username = ""
+                st.rerun()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
