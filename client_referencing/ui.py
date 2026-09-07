@@ -728,7 +728,7 @@ def _render_vectormatch_section():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country",
-                ["USA", "Australia", "Canada", "UK", "EMEA"],
+                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
             )
         with col4:
             max_matches = st.number_input(
@@ -747,7 +747,7 @@ def _render_vectormatch_section():
 
     with st.spinner("Matching prospect against client database..."):
         try:
-            results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches)
+            results = find_matches(prospect_industry, prospect_technologies, "" if prospect_country == "(Any)" else prospect_country, max_matches)
         except Exception as e:
             st.error(f"Matching failed: {e}")
             import traceback
@@ -996,7 +996,7 @@ def _render_combined_matcher():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country (Used for client matching only)",
-                ["USA", "Australia", "Canada", "UK", "EMEA"],
+                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
             )
         with col4:
             max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
@@ -1031,7 +1031,7 @@ def _render_combined_matcher():
 
     with st.spinner("Matching..."):
         try:
-            client_results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches_clients)
+            client_results = find_matches(prospect_industry, prospect_technologies, "" if prospect_country == "(Any)" else prospect_country, max_matches_clients)
         except Exception as e:
             st.error(f"Client matching failed: {e}")
             client_results = {}
@@ -1155,7 +1155,7 @@ def _render_client_matcher_simple():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country (Used for client matching only)",
-                ["USA", "Australia", "Canada", "UK", "EMEA"],
+                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
             )
         with col4:
             max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=6)
@@ -1172,7 +1172,7 @@ def _render_client_matcher_simple():
 
     with st.spinner("Matching..."):
         try:
-            results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches)
+            results = find_matches(prospect_industry, prospect_technologies, "" if prospect_country == "(Any)" else prospect_country, max_matches)
         except Exception as e:
             st.error(f"Matching failed: {e}")
             return
