@@ -965,14 +965,13 @@ def _render_combined_matcher():
             padding: 1.5rem;
             border-radius: 8px;
         }
-        [data-testid="stVerticalBlock"]:has(> div > [data-testid="stFormSubmitButton"]) {
-            display: flex !important;
-            flex-direction: row !important;
+        [data-testid="stHorizontalBlock"]:has([data-testid="stFormSubmitButton"]) {
             gap: 6px !important;
-            align-items: stretch !important;
         }
-        [data-testid="stVerticalBlock"]:has(> div > [data-testid="stFormSubmitButton"]) > div {
+        [data-testid="stHorizontalBlock"]:has([data-testid="stFormSubmitButton"]) > [data-testid="stColumn"] {
+            padding: 0 !important;
             flex: 0 0 auto !important;
+            width: auto !important;
         }
         [data-testid="stFormSubmitButton"] button {
             height: 2.4rem !important;
@@ -1003,8 +1002,11 @@ def _render_combined_matcher():
 
         is_marcom = st.session_state.get("username") == "marcom"
         if is_marcom:
-            submitted = st.form_submit_button("Find Matches", type="primary")
-            logout = st.form_submit_button("Logout")
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                submitted = st.form_submit_button("Find Matches", type="primary")
+            with btn_col2:
+                logout = st.form_submit_button("Logout")
         else:
             submitted = st.form_submit_button("Find Matches", type="primary")
             logout = False
@@ -1108,8 +1110,11 @@ def _render_password_change_tab():
     with st.form("change_password_form"):
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        submitted = st.form_submit_button("Update Settings", type="primary")
-        logout = st.form_submit_button("Logout")
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            submitted = st.form_submit_button("Update Settings", type="primary")
+        with btn_col2:
+            logout = st.form_submit_button("Logout")
 
     if logout:
         st.session_state.logged_in = False
