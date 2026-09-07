@@ -728,7 +728,7 @@ def _render_vectormatch_section():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country",
-                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
+                ["(Any)", "USA", "Australia", "Canada", "UK", "EMEA"],
             )
         with col4:
             max_matches = st.number_input(
@@ -996,7 +996,7 @@ def _render_combined_matcher():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country (Used for client matching only)",
-                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
+                ["(Any)", "USA", "Australia", "Canada", "UK", "EMEA"],
             )
         with col4:
             max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
@@ -1155,7 +1155,7 @@ def _render_client_matcher_simple():
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country (Used for client matching only)",
-                ["USA", "Australia", "Canada", "UK", "EMEA", "(Any)"],
+                ["(Any)", "USA", "Australia", "Canada", "UK", "EMEA"],
             )
         with col4:
             max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=6)
