@@ -1016,10 +1016,13 @@ def _render_combined_matcher():
         cols = st.columns(len(client_matches))
         for col, m in zip(cols, client_matches):
             with col:
+                link = m.client_url or "#"
                 if m.logo_url:
-                    st.image(m.logo_url, width=80)
-                else:
-                    st.markdown(f"**{m.client_name}**")
+                    st.markdown(
+                        f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80"></a>',
+                        unsafe_allow_html=True,
+                    )
+                st.caption(m.client_name)
     else:
         st.info("No matching clients found.")
 
@@ -1110,10 +1113,13 @@ def _render_client_matcher_simple():
     cols = st.columns(len(matches))
     for col, m in zip(cols, matches):
         with col:
+            link = m.client_url or "#"
             if m.logo_url:
-                st.image(m.logo_url, width=80)
-            else:
-                st.markdown(f"**{m.client_name}**")
+                st.markdown(
+                    f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80"></a>',
+                    unsafe_allow_html=True,
+                )
+            st.caption(m.client_name)
 
 
 def _render_casestudy_matcher_simple():
