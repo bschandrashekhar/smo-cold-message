@@ -80,6 +80,11 @@ def main():
             <style>
                 [data-testid="stSidebar"] {display: none;}
                 [data-testid="collapsedControl"] {display: none;}
+                .main .block-container {
+                    max-width: 100% !important;
+                    padding-left: 3rem !important;
+                    padding-right: 3rem !important;
+                }
             </style>
         """, unsafe_allow_html=True)
 
