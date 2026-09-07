@@ -62,6 +62,7 @@ class ClientMatch:
     similarity_score: float
     final_score: float
     client_id: str = ""
+    logo_url: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -166,7 +167,7 @@ class _DataCache:
                 self._industry_term_vecs[term] = v / n
         # Client rows (metadata only)
         client_cols = ("id,client_name,client_industry,client_geography,client_url,"
-                       "industry_array,industry_group,geo_priority")
+                       "industry_array,industry_group,geo_priority,logo_url")
         client_result = sb.table(TABLE_NAME).select(client_cols).execute()
         client_lookup = {r["id"]: r for r in (client_result.data or [])}
         # Tech rows
@@ -448,7 +449,7 @@ def _compute_industry_scores(
 
 
 def _build_client_meta(rows: List[dict]) -> Dict[str, dict]:
-    """Build {client_name: {client_id, industry, geography, url}} lookup from rows."""
+    """Build {client_name: {client_id, industry, geography, url, logo_url}} lookup from rows."""
     meta = {}
     for r in rows:
         if r["client_name"] not in meta:
@@ -457,6 +458,7 @@ def _build_client_meta(rows: List[dict]) -> Dict[str, dict]:
                 "client_industry": r["client_industry"],
                 "client_geography": r["client_geography"],
                 "client_url": r["client_url"],
+                "logo_url": r.get("logo_url") or "",
             }
     return meta
 
@@ -778,6 +780,7 @@ def find_matches(
             similarity_score=similarity_score,
             final_score=final_score,
             client_id=meta.get("client_id", ""),
+            logo_url=meta.get("logo_url", ""),
         ))
 
     # Shortlist order preserved: core matches (sorted by score) first, then backfill.

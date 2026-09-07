@@ -1024,18 +1024,14 @@ def _render_client_matcher_simple():
         return
 
     st.success(f"Found **{len(matches)}** matching clients.")
-    rows = [
-        {
-            "Client": m.client_name,
-            "Industry": m.client_industry,
-            "Geography": m.client_geography,
-            "URL": m.client_url,
-            "Exact Tech Matches": ", ".join(m.exact_techs) if m.exact_techs else "—",
-            "Score": round(m.final_score, 3),
-        }
-        for m in matches
-    ]
-    st.dataframe(rows, use_container_width=True)
+    cols = st.columns(len(matches))
+    for col, m in zip(cols, matches):
+        with col:
+            if m.logo_url:
+                st.image(m.logo_url, use_container_width=True)
+            else:
+                st.markdown(f"**{m.client_name}**")
+            st.caption(f"Score: {m.final_score:.3f}")
 
 
 def _render_casestudy_matcher_simple():
