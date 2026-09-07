@@ -726,9 +726,9 @@ def _render_vectormatch_section():
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
             )
         with col3:
-            prospect_country = st.text_input(
+            prospect_country = st.selectbox(
                 "Prospect Country",
-                placeholder="e.g. USA, Australia, India",
+                ["USA", "Australia", "Canada", "UK", "EMEA"],
             )
         with col4:
             max_matches = st.number_input(
@@ -994,7 +994,10 @@ def _render_combined_matcher():
 
         col3, col4, col5 = st.columns(3)
         with col3:
-            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
+            prospect_country = st.selectbox(
+                "Prospect Country (Used for client matching only)",
+                ["USA", "Australia", "Canada", "UK", "EMEA"],
+            )
         with col4:
             max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
         with col5:
@@ -1150,7 +1153,10 @@ def _render_client_matcher_simple():
         with col2:
             prospect_technologies = st.text_input("Prospect Technologies (CSV)", placeholder="e.g. Salesforce, Boomi")
         with col3:
-            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
+            prospect_country = st.selectbox(
+                "Prospect Country (Used for client matching only)",
+                ["USA", "Australia", "Canada", "UK", "EMEA"],
+            )
         with col4:
             max_matches = st.number_input("Max Matches", min_value=6, max_value=10, value=6)
         submitted = st.form_submit_button("Find Matches", type="primary")
