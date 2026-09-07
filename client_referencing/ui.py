@@ -1032,7 +1032,8 @@ def _render_combined_matcher():
     if cs_matches:
         for i, m in enumerate(cs_matches, 1):
             download_link = f"[Download]({m.url})" if m.url else "—"
-            st.markdown(f"**{i}. {m.casestudy_name}** ({m.client_name}) — Score: {m.final_score:.3f} &nbsp; {download_link}")
+            client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
+        st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} — Score: {m.final_score:.3f} &nbsp; {download_link}")
     else:
         st.info("No matching case studies found.")
 
@@ -1155,7 +1156,8 @@ def _render_casestudy_matcher_simple():
     st.success(f"Found **{len(matches)}** matching case studies.")
     for i, m in enumerate(matches, 1):
         download_link = f"[Download]({m.url})" if m.url else "—"
-        st.markdown(f"**{i}. {m.casestudy_name}** ({m.client_name}) — Score: {m.final_score:.3f} &nbsp; {download_link}")
+        client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
+        st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} — Score: {m.final_score:.3f} &nbsp; {download_link}")
 
 
 def _render_brand_match_tab():
