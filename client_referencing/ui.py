@@ -945,21 +945,10 @@ def render_master():
     """Render the Master Casestudy Finder — single unified form for both matchers."""
     username = st.session_state.get("username", "")
     if username == "marcom":
-        selection = st.radio(
-            "",
-            ["Casestudy/Client Matcher", "Settings", "Logout"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="marcom_nav",
-        )
-        st.divider()
-        if selection == "Logout":
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.rerun()
-        elif selection == "Casestudy/Client Matcher":
+        tabs = st.tabs(["Casestudy/Client Matcher", "Settings"])
+        with tabs[0]:
             _render_combined_matcher()
-        elif selection == "Settings":
+        with tabs[1]:
             _render_password_change_tab()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
@@ -999,7 +988,21 @@ def _render_combined_matcher():
         with col5:
             max_matches_cs = st.number_input("Max Matches (casestudies)", min_value=5, max_value=10, value=6)
 
-        submitted = st.form_submit_button("Find Matches", type="primary")
+        is_marcom = st.session_state.get("username") == "marcom"
+        if is_marcom:
+            btn_col1, btn_col2 = st.columns([3, 1])
+            with btn_col1:
+                submitted = st.form_submit_button("Find Matches", type="primary", use_container_width=True)
+            with btn_col2:
+                logout = st.form_submit_button("Logout", use_container_width=True)
+        else:
+            submitted = st.form_submit_button("Find Matches", type="primary")
+            logout = False
+
+    if logout:
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
 
     if not submitted:
         return
@@ -1089,7 +1092,16 @@ def _render_password_change_tab():
     with st.form("change_password_form"):
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        submitted = st.form_submit_button("Update Password", type="primary")
+        btn_col1, btn_col2 = st.columns([3, 1])
+        with btn_col1:
+            submitted = st.form_submit_button("Update Settings", type="primary", use_container_width=True)
+        with btn_col2:
+            logout = st.form_submit_button("Logout", use_container_width=True)
+
+    if logout:
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
 
     if submitted:
         if not new_password:
