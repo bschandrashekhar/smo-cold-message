@@ -977,7 +977,7 @@ def _render_combined_matcher():
         with col4:
             max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
         with col5:
-            max_matches_cs = st.number_input("Max Matches (casestudies)", min_value=5, max_value=10, value=8)
+            max_matches_cs = st.number_input("Max Matches (casestudies)", min_value=5, max_value=10, value=6)
 
         submitted = st.form_submit_button("Find Matches", type="primary")
 
