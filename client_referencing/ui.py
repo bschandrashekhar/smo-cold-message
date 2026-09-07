@@ -1030,34 +1030,49 @@ def _render_combined_matcher():
     left_col, right_col = st.columns(2)
 
     with left_col:
-        st.subheader("Matching Clients")
         if client_matches:
-            logo_cols = st.columns(len(client_matches))
-            for col, m in zip(logo_cols, client_matches):
-                with col:
-                    link = m.client_url or "#"
-                    if m.logo_url:
-                        st.markdown(
-                            f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80"></a>',
-                            unsafe_allow_html=True,
-                        )
-                    st.caption(m.client_name)
+            items_html = ""
+            for m in client_matches:
+                link = m.client_url or "#"
+                geo = m.client_geography or ""
+                if m.logo_url:
+                    img_tag = f'<a href="{link}" target="_blank"><img src="{m.logo_url}" width="80" style="object-fit:contain; height:80px;"></a>'
+                else:
+                    img_tag = f'<a href="{link}" target="_blank" style="font-size:2rem;">🏢</a>'
+                items_html += f"""
+                <div style="text-align:center; min-width:90px;">
+                    {img_tag}
+                    <div style="font-size:0.8rem; font-weight:600; margin-top:0.4rem;">{m.client_name}</div>
+                    <div style="font-size:0.75rem; color:#aaa;">{geo}</div>
+                </div>"""
+            st.markdown(f"""
+                <div style="background-color:#3a3a3a; padding:1.5rem; border-radius:8px;">
+                    <h4 style="margin-top:0; margin-bottom:1rem;">Matching Clients</h4>
+                    <div style="display:flex; flex-wrap:wrap; gap:1.2rem; align-items:flex-start;">
+                        {items_html}
+                    </div>
+                </div>""", unsafe_allow_html=True)
         else:
             st.info("No matching clients found.")
 
     with right_col:
-        st.subheader("Matching Case Studies")
         if cs_matches:
             seen_cs = set()
+            rows_html = ""
             i = 1
             for m in cs_matches:
                 if m.casestudy_name in seen_cs:
                     continue
                 seen_cs.add(m.casestudy_name)
-                download_link = f"[Download]({m.url})" if m.url else "—"
                 client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
-                st.markdown(f"**{i}. {m.casestudy_name}**{client_suffix} &nbsp; {download_link}")
+                dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;">Download</a>' if m.url else "—"
+                rows_html += f'<div style="margin-bottom:0.6rem;"><strong>{i}. {m.casestudy_name}</strong>{client_suffix} &nbsp; {dl}</div>'
                 i += 1
+            st.markdown(f"""
+                <div style="background-color:#3a3a3a; padding:1.5rem; border-radius:8px;">
+                    <h4 style="margin-top:0; margin-bottom:1rem;">Matching Case Studies</h4>
+                    {rows_html}
+                </div>""", unsafe_allow_html=True)
         else:
             st.info("No matching case studies found.")
 
