@@ -965,14 +965,16 @@ def _render_combined_matcher():
             padding: 1.5rem;
             border-radius: 8px;
         }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type {
-            gap: 0.3rem !important;
+        [data-testid="stVerticalBlock"]:has(> div > [data-testid="stFormSubmitButton"]) {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 6px !important;
+            align-items: stretch !important;
         }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type > [data-testid="stColumn"] {
-            padding-left: 0 !important;
-            padding-right: 0 !important;
+        [data-testid="stVerticalBlock"]:has(> div > [data-testid="stFormSubmitButton"]) > div {
+            flex: 0 0 auto !important;
         }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type button {
+        [data-testid="stFormSubmitButton"] button {
             height: 2.4rem !important;
             min-height: 2.4rem !important;
         }
@@ -1001,11 +1003,8 @@ def _render_combined_matcher():
 
         is_marcom = st.session_state.get("username") == "marcom"
         if is_marcom:
-            btn_col1, btn_col2, _ = st.columns([1, 1, 4])
-            with btn_col1:
-                submitted = st.form_submit_button("Find Matches", type="primary")
-            with btn_col2:
-                logout = st.form_submit_button("Logout")
+            submitted = st.form_submit_button("Find Matches", type="primary")
+            logout = st.form_submit_button("Logout")
         else:
             submitted = st.form_submit_button("Find Matches", type="primary")
             logout = False
@@ -1106,29 +1105,11 @@ def _render_combined_matcher():
 def _render_password_change_tab():
     """Password change for marcom user."""
     st.subheader("Change Password")
-    st.markdown("""
-        <style>
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type {
-            gap: 0.3rem !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type > [data-testid="stColumn"] {
-            padding-left: 0 !important;
-            padding-right: 0 !important;
-        }
-        [data-testid="stForm"] [data-testid="stHorizontalBlock"]:last-of-type button {
-            height: 2.4rem !important;
-            min-height: 2.4rem !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
     with st.form("change_password_form"):
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        btn_col1, btn_col2, _ = st.columns([1, 1, 4])
-        with btn_col1:
-            submitted = st.form_submit_button("Update Settings", type="primary")
-        with btn_col2:
-            logout = st.form_submit_button("Logout")
+        submitted = st.form_submit_button("Update Settings", type="primary")
+        logout = st.form_submit_button("Logout")
 
     if logout:
         st.session_state.logged_in = False
