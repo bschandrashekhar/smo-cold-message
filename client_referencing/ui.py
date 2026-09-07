@@ -959,13 +959,11 @@ def render_master():
 def _render_combined_matcher():
     """Single unified form that runs both Client Matcher and Casestudy Matcher."""
     with st.form("master_combined_form"):
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
         with col2:
             prospect_technologies = st.text_input("Prospect Technologies (CSV)", placeholder="e.g. Salesforce, Boomi")
-        with col3:
-            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
 
         prospect_context = st.text_area(
             "Prospect Context (Used only for casestudy matching)",
@@ -973,7 +971,9 @@ def _render_combined_matcher():
             height=80,
         )
 
-        col4, col5 = st.columns(2)
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
         with col4:
             max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
         with col5:
