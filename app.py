@@ -41,21 +41,21 @@ def _login_form():
             password = st.text_input("Password", type="password")
             submitted = st.form_submit_button("Login", type="primary", use_container_width=True)
 
-        if submitted:
-            if not username or not password:
-                st.error("Please enter username and password.")
-                return
-            try:
-                sb = _get_supabase()
-                result = sb.table("user_credentials").select("password").eq("username", username.lower()).execute()
-                if result.data and result.data[0]["password"] == password:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username.lower()
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
-            except Exception as e:
-                st.error(f"Login failed: {e}")
+    if submitted:
+        if not username or not password:
+            st.error("Please enter username and password.")
+            return
+        try:
+            sb = _get_supabase()
+            result = sb.table("user_credentials").select("password").eq("username", username.lower()).execute()
+            if result.data and result.data[0]["password"] == password:
+                st.session_state.logged_in = True
+                st.session_state.username = username.lower()
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
+        except Exception as e:
+            st.error(f"Login failed: {e}")
 
 
 def main():
