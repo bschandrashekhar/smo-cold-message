@@ -942,22 +942,99 @@ def _render_casestudy_match_tab():
 
 
 def render_master():
-    """Render the Master Casestudy Finder — Client + Casestudy Matcher in one tab."""
+    """Render the Master Casestudy Finder — single unified form for both matchers."""
     username = st.session_state.get("username", "")
     if username == "marcom":
         tabs = st.tabs(["Casestudy/Client Matcher", "Settings"])
         with tabs[0]:
-            _render_client_matcher_simple()
-            st.divider()
-            _render_casestudy_matcher_simple()
+            _render_combined_matcher()
         with tabs[1]:
             _render_password_change_tab()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
         with tabs[0]:
-            _render_client_matcher_simple()
-            st.divider()
-            _render_casestudy_matcher_simple()
+            _render_combined_matcher()
+
+
+def _render_combined_matcher():
+    """Single unified form that runs both Client Matcher and Casestudy Matcher."""
+    with st.form("master_combined_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
+        with col2:
+            prospect_technologies = st.text_input("Prospect Technologies (CSV)", placeholder="e.g. Salesforce, Boomi")
+        with col3:
+            prospect_country = st.text_input("Prospect Country (Used for client matching only)", placeholder="e.g. Australia, USA")
+
+        prospect_context = st.text_area(
+            "Prospect Context (Used only for casestudy matching)",
+            placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
+            height=80,
+        )
+
+        col4, col5 = st.columns(2)
+        with col4:
+            max_matches_clients = st.number_input("Max Matches (existing clients)", min_value=6, max_value=10, value=6)
+        with col5:
+            max_matches_cs = st.number_input("Max Matches (casestudies)", min_value=5, max_value=10, value=8)
+
+        submitted = st.form_submit_button("Find Matches", type="primary")
+
+    if not submitted:
+        return
+
+    if not prospect_technologies.strip() and not prospect_context.strip():
+        st.warning("Please provide at least technologies or prospect context.")
+        return
+
+    from client_referencing.matcher import find_matches
+    from client_referencing.casestudy_matcher import find_casestudy_matches
+
+    with st.spinner("Matching..."):
+        try:
+            client_results = find_matches(prospect_industry, prospect_technologies, prospect_country, max_matches_clients)
+        except Exception as e:
+            st.error(f"Client matching failed: {e}")
+            client_results = {}
+
+        try:
+            cs_results = find_casestudy_matches(
+                prospect_context=prospect_context,
+                prospect_industry=prospect_industry,
+                prospect_technologies=prospect_technologies,
+                max_matches=max_matches_cs,
+            )
+        except Exception as e:
+            st.error(f"Casestudy matching failed: {e}")
+            cs_results = {}
+
+    # ── Client results ──
+    client_matches = client_results.get("matches", [])
+    st.subheader("Matching Clients")
+    if client_matches:
+        cols = st.columns(len(client_matches))
+        for col, m in zip(cols, client_matches):
+            with col:
+                if m.logo_url:
+                    st.image(m.logo_url, use_container_width=True)
+                else:
+                    st.markdown(f"**{m.client_name}**")
+                st.caption(f"Score: {m.final_score:.3f}")
+    else:
+        st.info("No matching clients found.")
+
+    st.divider()
+
+    # ── Casestudy results ──
+    cs_matches = cs_results.get("matches", [])
+    st.subheader("Matching Case Studies")
+    if cs_matches:
+        for i, m in enumerate(cs_matches, 1):
+            download_link = f"[Download]({m.url})" if m.url else "—"
+            st.markdown(f"**{i}. {m.casestudy_name}** ({m.client_name}) — Score: {m.final_score:.3f} &nbsp; {download_link}")
+    else:
+        st.info("No matching case studies found.")
 
 
 def _render_password_change_tab():
