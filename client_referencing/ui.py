@@ -1017,10 +1017,9 @@ def _render_combined_matcher():
         for col, m in zip(cols, client_matches):
             with col:
                 if m.logo_url:
-                    st.image(m.logo_url, use_container_width=True)
+                    st.image(m.logo_url, width=80)
                 else:
                     st.markdown(f"**{m.client_name}**")
-                st.caption(f"Score: {m.final_score:.3f}")
     else:
         st.info("No matching clients found.")
 
@@ -1112,7 +1111,7 @@ def _render_client_matcher_simple():
     for col, m in zip(cols, matches):
         with col:
             if m.logo_url:
-                st.image(m.logo_url, use_container_width=True)
+                st.image(m.logo_url, width=80)
             else:
                 st.markdown(f"**{m.client_name}**")
 
