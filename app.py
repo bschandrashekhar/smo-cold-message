@@ -58,7 +58,6 @@ def _login_form():
                 st.error(f"Login failed: {e}")
 
 
-
 def main():
     # Supabase keepalive — cron-job.org hits ?keepalive=1
     if st.query_params.get("keepalive"):
@@ -75,38 +74,50 @@ def main():
 
     username = st.session_state.username
 
-    # ── Sidebar ──────────────────────────────────────────────────────────
-    with st.sidebar:
-        st.image("assets/cloudchillies_logo.svg", width=200)
-        if username == "admin":
-            st.title("SMO Workbench")
+    if username == "marcom":
+        # ── Marcom: no sidebar, logout button in top-right of main area ──
+        st.markdown("""
+            <style>
+                [data-testid="stSidebar"] {display: none;}
+                [data-testid="collapsedControl"] {display: none;}
+            </style>
+        """, unsafe_allow_html=True)
 
-        if username == "admin":
+        _, logout_col = st.columns([8, 1])
+        with logout_col:
+            if st.button("Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.username = ""
+                st.rerun()
+
+        from client_referencing.ui import render_master
+        render_master()
+
+    else:
+        # ── Admin: full sidebar with navigation ──
+        with st.sidebar:
+            st.image("assets/cloudchillies_logo.svg", width=200)
+            st.title("SMO Workbench")
             pipeline = st.radio(
                 "Pipeline",
                 ["Prospect Outreach", "Master Casestudy Finder", "Admin/Debug Tools"],
                 label_visibility="collapsed",
             )
-        else:
-            # marcom sees only Master Casestudy Finder, auto-selected
-            pipeline = "Master Casestudy Finder"
+            st.divider()
+            if st.button("Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.username = ""
+                st.rerun()
 
-        st.divider()
-        if st.button("Logout", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.rerun()
-
-    # ── Main area ────────────────────────────────────────────────────────
-    if pipeline == "Prospect Outreach":
-        from prospect_outreach.ui import render
-        render()
-    elif pipeline == "Master Casestudy Finder":
-        from client_referencing.ui import render_master
-        render_master()
-    elif pipeline == "Admin/Debug Tools":
-        from client_referencing.ui import render
-        render()
+        if pipeline == "Prospect Outreach":
+            from prospect_outreach.ui import render
+            render()
+        elif pipeline == "Master Casestudy Finder":
+            from client_referencing.ui import render_master
+            render_master()
+        elif pipeline == "Admin/Debug Tools":
+            from client_referencing.ui import render
+            render()
 
 
 if __name__ == "__main__":
