@@ -1040,18 +1040,20 @@ def _render_all_casestudies_tab():
         return
 
     import pandas as pd
-    df = pd.DataFrame({
-        "#": list(range(1, len(case_studies) + 1)),
-        "Case Study": [cs.get("casestudy_name", "") for cs in case_studies],
-        "Download": [cs.get("url") or "" for cs in case_studies],
-    })
+    df = pd.DataFrame(
+        {
+            "Case Study": [cs.get("casestudy_name", "") for cs in case_studies],
+            "Download": [cs.get("url") or "" for cs in case_studies],
+        },
+        index=range(1, len(case_studies) + 1),
+    )
+    df.index.name = "#"
     st.dataframe(
         df,
         column_config={
-            "#": st.column_config.NumberColumn("#", width=55),
             "Download": st.column_config.LinkColumn("Download", display_text="Download"),
         },
-        hide_index=True,
+        hide_index=False,
         use_container_width=True,
     )
 
