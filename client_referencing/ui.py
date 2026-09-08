@@ -1189,8 +1189,8 @@ def _render_combined_matcher():
                     continue
                 seen_cs.add(m.casestudy_name)
                 client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
-                dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;">Download</a>' if m.url else "—"
-                rows_html += f'<div style="margin-bottom:0.6rem;"><strong>{i}. {m.casestudy_name}</strong>{client_suffix} &nbsp; {dl}</div>'
+                dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;font-size:0.875rem;font-weight:400;">Download</a>' if m.url else "—"
+                rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl}</div>'
                 i += 1
             st.markdown(f"""
                 <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
