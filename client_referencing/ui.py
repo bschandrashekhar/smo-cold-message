@@ -982,6 +982,7 @@ def _render_all_clients_tab():
         return
 
     # Group by country
+    import html as _html
     from collections import defaultdict
     groups: dict = defaultdict(list)
     for c in clients:
@@ -990,40 +991,31 @@ def _render_all_clients_tab():
 
     sorted_countries = sorted(groups.keys(), key=lambda g: g.lower())
 
-    sections_html = ""
+    # Build as flat list of single-line strings — avoids markdown 4-space code block rule
+    parts = [
+        '<div style="background-color:#3a3a3a;border-radius:8px;overflow:hidden;">',
+        '<div style="background-color:#2a2a2a;padding:0.6rem 1.2rem;">',
+        '<span style="font-size:0.85rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#ccc;">All Clients</span>',
+        '</div>',
+        '<div style="padding:0.8rem 0 0 0;">',
+    ]
     for country in sorted_countries:
-        items_html = ""
+        parts.append('<div style="margin-bottom:0.5rem;">')
+        parts.append(f'<div style="font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#aaa;padding:0.4rem 1.2rem;background-color:#2e2e2e;">{_html.escape(country)}</div>')
+        parts.append('<div style="padding:1rem 1.2rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;">')
         for c in groups[country]:
-            name = c.get("client_name", "")
+            name = _html.escape(c.get("client_name", ""))
             link = c.get("client_url") or "#"
             logo_url = c.get("logo_url") or ""
             if logo_url:
-                img_tag = f'<a href="{link}" target="_blank"><img src="{logo_url}" width="50" style="object-fit:contain; height:50px;"></a>'
+                img_tag = f'<a href="{link}" target="_blank"><img src="{logo_url}" width="50" style="object-fit:contain;height:50px;"></a>'
             else:
-                img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">🏢</a>'
-            items_html += f"""
-            <div style="text-align:center; min-width:70px;">
-                {img_tag}
-                <div style="font-size:0.75rem; font-weight:600; margin-top:0.3rem;">{name}</div>
-            </div>"""
+                img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">&#127970;</a>'
+            parts.append(f'<div style="text-align:center;min-width:70px;">{img_tag}<div style="font-size:0.75rem;font-weight:600;margin-top:0.3rem;">{name}</div></div>')
+        parts.append('</div></div>')
+    parts.append('</div></div>')
 
-        sections_html += f"""
-        <div style="margin-bottom:0.5rem;">
-            <div style="font-size:0.78rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#aaa; padding:0.4rem 1.2rem; background-color:#2e2e2e;">{country}</div>
-            <div style="padding:1rem 1.2rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
-                {items_html}
-            </div>
-        </div>"""
-
-    st.markdown(f"""
-        <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
-            <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
-                <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">All Clients</span>
-            </div>
-            <div style="padding:0.8rem 0 0 0;">
-                {sections_html}
-            </div>
-        </div>""", unsafe_allow_html=True)
+    st.markdown("".join(parts), unsafe_allow_html=True)
 
 
 def _render_all_casestudies_tab():
