@@ -1039,22 +1039,19 @@ def _render_all_casestudies_tab():
         st.info("No case studies found.")
         return
 
-    rows_html = ""
-    for i, cs in enumerate(case_studies, 1):
-        name = cs.get("casestudy_name", "")
-        url = cs.get("url") or ""
-        dl = f'<a href="{url}" target="_blank" style="color:#4da6ff;">Download</a>' if url else "—"
-        rows_html += f'<div style="margin-bottom:0.5rem;"><strong>{i}. {name}</strong> &nbsp; {dl}</div>'
-
-    st.markdown(f"""
-        <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
-            <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
-                <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">All Case Studies</span>
-            </div>
-            <div style="padding:1.2rem;">
-                {rows_html}
-            </div>
-        </div>""", unsafe_allow_html=True)
+    import pandas as pd
+    df = pd.DataFrame({
+        "Case Study": [cs.get("casestudy_name", "") for cs in case_studies],
+        "Download": [cs.get("url") or "" for cs in case_studies],
+    })
+    st.dataframe(
+        df,
+        column_config={
+            "Download": st.column_config.LinkColumn("Download", display_text="Download"),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
 
 
 def _render_combined_matcher():
