@@ -1048,7 +1048,7 @@ def _render_all_casestudies_tab():
     st.dataframe(
         df,
         column_config={
-            "#": st.column_config.NumberColumn("#", width="small"),
+            "#": st.column_config.NumberColumn("#", width=55),
             "Download": st.column_config.LinkColumn("Download", display_text="Download"),
         },
         hide_index=True,
