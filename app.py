@@ -82,8 +82,8 @@ def main():
                 [data-testid="collapsedControl"] {display: none;}
                 .main .block-container {
                     max-width: 100% !important;
-                    padding-left: 3rem !important;
-                    padding-right: 3rem !important;
+                    padding-left: 1rem !important;
+                    padding-right: 1rem !important;
                 }
             </style>
         """, unsafe_allow_html=True)
