@@ -981,21 +981,38 @@ def _render_all_clients_tab():
         st.info("No clients found.")
         return
 
-    items_html = ""
+    # Group by country
+    from collections import defaultdict
+    groups: dict = defaultdict(list)
     for c in clients:
-        name = c.get("client_name", "")
-        link = c.get("client_url") or "#"
-        geo = c.get("client_geography") or ""
-        logo_url = c.get("logo_url") or ""
-        if logo_url:
-            img_tag = f'<a href="{link}" target="_blank"><img src="{logo_url}" width="50" style="object-fit:contain; height:50px;"></a>'
-        else:
-            img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">🏢</a>'
-        items_html += f"""
-        <div style="text-align:center; min-width:70px;">
-            {img_tag}
-            <div style="font-size:0.75rem; font-weight:600; margin-top:0.3rem;">{name}</div>
-            <div style="font-size:0.7rem; color:#aaa;">{geo}</div>
+        geo = c.get("client_geography") or "Other"
+        groups[geo].append(c)
+
+    sorted_countries = sorted(groups.keys(), key=lambda g: g.lower())
+
+    sections_html = ""
+    for country in sorted_countries:
+        items_html = ""
+        for c in groups[country]:
+            name = c.get("client_name", "")
+            link = c.get("client_url") or "#"
+            logo_url = c.get("logo_url") or ""
+            if logo_url:
+                img_tag = f'<a href="{link}" target="_blank"><img src="{logo_url}" width="50" style="object-fit:contain; height:50px;"></a>'
+            else:
+                img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">🏢</a>'
+            items_html += f"""
+            <div style="text-align:center; min-width:70px;">
+                {img_tag}
+                <div style="font-size:0.75rem; font-weight:600; margin-top:0.3rem;">{name}</div>
+            </div>"""
+
+        sections_html += f"""
+        <div style="margin-bottom:0.5rem;">
+            <div style="font-size:0.78rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#aaa; padding:0.4rem 1.2rem; background-color:#2e2e2e;">{country}</div>
+            <div style="padding:1rem 1.2rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
+                {items_html}
+            </div>
         </div>"""
 
     st.markdown(f"""
@@ -1003,8 +1020,8 @@ def _render_all_clients_tab():
             <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
                 <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">All Clients</span>
             </div>
-            <div style="padding:1.2rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
-                {items_html}
+            <div style="padding:0.8rem 0 0 0;">
+                {sections_html}
             </div>
         </div>""", unsafe_allow_html=True)
 

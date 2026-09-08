@@ -81,10 +81,15 @@ The app has three sidebar menu items. what gets displayed upon login in depended
 We will hardcode the user login as follows in the table "user_credentials". user_credentials.username contains the username and column user_credentials.password contains the password to the respective users. The username and password will have to be entered in the login form.
 
   - If the login Username is "admin". In this case all the three menu items on the sidebar navigation will be shown to the user. 
-  - If the login Username is "marcom", In this case only "Master Casestudy Finder" on the sidebar navigation will be shown to the user. The menu will be autoselected so that the form is displayed immediately upon login on the right hand side. 
+  - If the login Username is "marcom", then do the following: {
+    - In this case only "Master Casestudy Finder" on the sidebar navigation will be shown to the user. The menu will be autoselected so that the form is displayed immediately upon login on the right hand side. 
+    
+    - Additionally, show a tab called "All Clients" : This is a simple list of all clients in the system (from client_case_studiesclient_referencing_data table). Show them with small logo, name and country underneath. Each logo to be clickable to the client website. Order the clients by country, each with its own sub section. 
 
-  Give a settings tab on the app as a third tab to allow for a password change, only when logged in as marcom. Respective row for this user should get updated when the password is changed from the UI.
+    - Additionally, show a tab called "All Casestudies" : This is a simple list of all casestudies in the system (from client_case_studies table). Show them with small download link against each name. Show it in a tabular format.
 
+    - Give a settings tab on the app as a third tab to allow for a password change, only when logged in as marcom. Respective row for this user should get updated when the password is changed from the UI.
+  }
 
 ### 1. Prospect Outreach
 - Tab 1: Research (Pass 1)
