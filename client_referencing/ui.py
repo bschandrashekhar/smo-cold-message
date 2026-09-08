@@ -1041,6 +1041,7 @@ def _render_all_casestudies_tab():
 
     import pandas as pd
     df = pd.DataFrame({
+        "#": list(range(1, len(case_studies) + 1)),
         "Case Study": [cs.get("casestudy_name", "") for cs in case_studies],
         "Download": [cs.get("url") or "" for cs in case_studies],
     })
