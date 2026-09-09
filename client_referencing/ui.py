@@ -1065,6 +1065,11 @@ def _render_combined_matcher():
     """Single unified form that runs both Client Matcher and Casestudy Matcher."""
     st.markdown("""
         <style>
+        .main .block-container {
+            max-width: 100% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
         [data-testid="stForm"] {
             background-color: #3a3a3a;
             padding: 1.5rem;
