@@ -108,6 +108,9 @@ We will hardcode the user login as follows in the table "user_credentials". user
   - Prospect Technologies (CSVs)
   - Prospect Context (Used only for casestudy matching)
   - The single submit button should be called "Find Matches"
+
+  Checks:
+    - When the user does not give any input for "Prospect Industry", "Prospect Technologies (CSV)", then the MATCHING CLIENTS box should not show anything. In that case, print the message "Specify Industry or Technologies for viewing relevant clients" in the box.
   
 
 ### 3. Admin/Debug Tools
