@@ -561,9 +561,12 @@ def _render_match_explanation(exp: dict, prospect_technologies: str, prospect_co
         else:
             st.markdown("**Tier 1 (Industry + Geography):** 0 clients")
 
-        if len(tier1) <= 4 and tier2:
+        if len(tier1) <= 4:
             st.markdown(f"**Tier 2 (Industry Only):** {len(tier2)} clients")
-            st.caption(", ".join(tier2))
+            if tier2:
+                st.caption(", ".join(tier2))
+            else:
+                st.caption("(empty)")
 
         st.markdown("---")
 
