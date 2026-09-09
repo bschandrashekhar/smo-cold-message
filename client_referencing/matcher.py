@@ -263,8 +263,10 @@ def filter_candidates(
 
     # Tier 2: Industry only (when Tier 1 has <= 4 clients)
     tier2_rows = [r for r in rows if _matches_industry(r, scores)]
+    # Country tiebreaker: clients in prospect_country rank above those with equal industry_score
+    tier2_geo = set(r["client_name"] for r in tier2_rows if _matches_geography(r, prospect_ctry)) if prospect_ctry else set()
     tier2_clients = sorted(set(r["client_name"] for r in tier2_rows),
-                           key=lambda c: -scores.get(c, 0.0))
+                           key=lambda c: (-scores.get(c, 0.0), 0 if c in tier2_geo else 1))
 
     if len(tier2_clients) > 2:
         return tier2_rows, "industry", tier1_clients, tier2_clients
