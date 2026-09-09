@@ -1134,12 +1134,15 @@ def _render_combined_matcher():
     from client_referencing.matcher import find_matches
     from client_referencing.casestudy_matcher import find_casestudy_matches
 
+    run_client_match = bool(prospect_industry.strip() or prospect_technologies.strip())
+
     with st.spinner("Matching..."):
-        try:
-            client_results = find_matches(prospect_industry, prospect_technologies, "" if prospect_country == "(Any)" else prospect_country, max_matches_clients)
-        except Exception as e:
-            st.error(f"Client matching failed: {e}")
-            client_results = {}
+        client_results = {}
+        if run_client_match:
+            try:
+                client_results = find_matches(prospect_industry, prospect_technologies, "" if prospect_country == "(Any)" else prospect_country, max_matches_clients)
+            except Exception as e:
+                st.error(f"Client matching failed: {e}")
 
         try:
             cs_results = find_casestudy_matches(
@@ -1159,7 +1162,19 @@ def _render_combined_matcher():
     left_col, right_col = st.columns(2)
 
     with left_col:
-        if client_matches:
+        if not run_client_match:
+            st.markdown(
+                '<div style="background-color:#3a3a3a;border-radius:8px;overflow:hidden;">'
+                '<div style="background-color:#2a2a2a;padding:0.6rem 1.2rem;">'
+                '<span style="font-size:0.85rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#ccc;">Matching Clients</span>'
+                '</div>'
+                '<div style="padding:1.2rem;color:#aaa;font-size:0.875rem;">'
+                'Specify Prospect Industry &amp; Technologies (CSV) to see relevant matches from existing clients.'
+                '</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        elif client_matches:
             items_html = ""
             for m in client_matches:
                 link = m.client_url or "#"
