@@ -742,8 +742,8 @@ def _render_vectormatch_section():
     if not submitted:
         return
 
-    if not prospect_technologies.strip():
-        st.warning("Please enter at least one technology.")
+    if not prospect_industry.strip() and not prospect_technologies.strip():
+        st.warning("Please provide at least Prospect Industry or Prospect Technologies.")
         return
 
     from client_referencing.matcher import find_matches
@@ -1132,8 +1132,8 @@ def _render_combined_matcher():
     if not submitted:
         return
 
-    if not prospect_technologies.strip() and not prospect_context.strip():
-        st.warning("Please provide at least technologies or prospect context.")
+    if not prospect_industry.strip() and not prospect_technologies.strip():
+        st.warning("Please provide at least Prospect Industry or Prospect Technologies.")
         return
 
     from client_referencing.matcher import find_matches
@@ -1289,8 +1289,8 @@ def _render_client_matcher_simple():
     if not submitted:
         return
 
-    if not prospect_technologies.strip():
-        st.warning("Please enter at least one technology.")
+    if not prospect_industry.strip() and not prospect_technologies.strip():
+        st.warning("Please provide at least Prospect Industry or Prospect Technologies.")
         return
 
     from client_referencing.matcher import find_matches
