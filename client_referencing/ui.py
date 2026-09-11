@@ -1112,6 +1112,16 @@ def _render_combined_matcher():
         </style>
     """, unsafe_allow_html=True)
     with st.form("master_combined_form"):
+        st.markdown(
+            "<div style='font-size:0.78rem;color:#aaa;margin-bottom:0.6rem;line-height:1.5;'>"
+            "Start in the following order from a more inclusive filtering to more exclusive results filtering, "
+            "so as not to miss out on the matches.<br>"
+            "&#8226; Start with specifying the technologies that you want to filter the results.<br>"
+            "&#8226; Add Industry as an additional filter after that for further refinements to the results.<br>"
+            "&#8226; Finally, give a context as an additional way to filter the results."
+            "</div>",
+            unsafe_allow_html=True,
+        )
         col1, col2 = st.columns(2)
         with col1:
             prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
