@@ -1115,10 +1115,10 @@ def _render_combined_matcher():
         st.markdown(
             "<div style='font-size:0.78rem;color:#c9e6ff;background-color:#1a3a52;border-left:3px solid #4a9fd4;"
             "padding:0.5rem 0.75rem;border-radius:4px;margin-bottom:0.75rem;line-height:1.6;'>"
-            "Start in the following order of filter from a more inclusive to a more exclusive one.<br>"
-            "&#8226; Start with specifying the technologies that you want to filter the results.<br>"
+            "Apply filters to be more inclusive, in the suggested order.<br>"
+            "&#8226; Start with specifying the &ldquo;Technologies&rdquo; that you want to filter the results on.<br>"
             "&#8226; Add Industry as an additional filter after that for further refinements to the results.<br>"
-            "&#8226; Finally, give a context as an additional way to filter the results."
+            "&#8226; Finally, give a context as an additional filter."
             "</div>",
             unsafe_allow_html=True,
         )
