@@ -877,7 +877,7 @@ def _render_casestudy_match_tab():
     matches = results.get("matches", [])
 
     if not matches:
-        st.info("No matching case studies found.")
+        st.info("No matching case studies found. Please specify an appropriate Technology to filter.")
     else:
         st.success(f"Found **{len(matches)}** matching case studies.")
 
@@ -1239,7 +1239,7 @@ def _render_combined_matcher():
                     </div>
                 </div>""", unsafe_allow_html=True)
         else:
-            st.info("No matching case studies found.")
+            st.info("No matching case studies found. Please specify an appropriate Technology to filter.")
 
 
 def _render_password_change_tab():
@@ -1368,7 +1368,7 @@ def _render_casestudy_matcher_simple():
 
     matches = results.get("matches", [])
     if not matches:
-        st.info("No matching case studies found.")
+        st.info("No matching case studies found. Please specify an appropriate Technology to filter.")
         return
 
     st.success(f"Found **{len(matches)}** matching case studies.")
