@@ -1113,7 +1113,8 @@ def _render_combined_matcher():
     """, unsafe_allow_html=True)
     with st.form("master_combined_form"):
         st.markdown(
-            "<div style='font-size:0.78rem;color:#aaa;margin-bottom:0.6rem;line-height:1.5;'>"
+            "<div style='font-size:0.78rem;color:#c9e6ff;background-color:#1a3a52;border-left:3px solid #4a9fd4;"
+            "padding:0.5rem 0.75rem;border-radius:4px;margin-bottom:0.75rem;line-height:1.6;'>"
             "Start in the following order of filter from a more inclusive to a more exclusive one.<br>"
             "&#8226; Start with specifying the technologies that you want to filter the results.<br>"
             "&#8226; Add Industry as an additional filter after that for further refinements to the results.<br>"
