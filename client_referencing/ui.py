@@ -1089,6 +1089,16 @@ def _render_combined_matcher():
         }
         </style>
     """, unsafe_allow_html=True)
+    if st.session_state.get("username") == "marcom":
+        import base64, os as _os
+        _logo = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "assets", "cloudchillies_logo.svg")
+        if _os.path.exists(_logo):
+            with open(_logo, "rb") as _f:
+                _b64 = base64.b64encode(_f.read()).decode()
+            st.markdown(
+                f'<img src="data:image/svg+xml;base64,{_b64}" style="height:36px;margin-bottom:0.4rem;">',
+                unsafe_allow_html=True,
+            )
     with st.form("master_combined_form"):
         col1, col2 = st.columns(2)
         with col1:
