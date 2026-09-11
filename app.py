@@ -70,7 +70,7 @@ def main():
     # Auth gate
     if not st.session_state.get("logged_in"):
         _login_form()
-        return
+        st.stop()
 
     username = st.session_state.username
 
