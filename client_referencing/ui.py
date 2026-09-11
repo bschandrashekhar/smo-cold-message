@@ -1107,7 +1107,7 @@ def _render_combined_matcher():
             prospect_technologies = st.text_input("Prospect Technologies (CSV) - * Only for Casestudies", placeholder="e.g. Salesforce, Boomi")
 
         prospect_context = st.text_area(
-            "Prospect Context (Used only for casestudy matching)",
+            "Prospect Context (Optional & used only for matching casestudies)",
             placeholder="e.g. client wants to automate prescription management from Salesforce CRM",
             height=80,
         )
