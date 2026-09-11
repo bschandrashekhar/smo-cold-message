@@ -978,7 +978,11 @@ def _render_all_clients_tab():
     from client_referencing.matcher import fetch_all_rows
 
     with st.spinner("Loading clients..."):
-        all_rows = fetch_all_rows()
+        try:
+            all_rows = fetch_all_rows()
+        except Exception as e:
+            st.error(f"Could not load clients — database may be unavailable. Please retry in a moment. ({type(e).__name__})")
+            return
 
     # Deduplicate by client_name (rows are joined with tech table)
     seen = set()
@@ -1036,7 +1040,11 @@ def _render_all_casestudies_tab():
     from client_referencing.casestudy_matcher import _cache
 
     with st.spinner("Loading case studies..."):
-        all_cs = _cache.get_case_studies()
+        try:
+            all_cs = _cache.get_case_studies()
+        except Exception as e:
+            st.error(f"Could not load case studies — database may be unavailable. Please retry in a moment. ({type(e).__name__})")
+            return
 
     # Deduplicate by casestudy_name
     seen = set()
