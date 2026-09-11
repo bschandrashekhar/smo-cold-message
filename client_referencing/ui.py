@@ -725,7 +725,7 @@ def _render_vectormatch_section():
             )
         with col2:
             prospect_technologies = st.text_input(
-                "Prospect Technologies (CSV) - * Only for Casestudies",
+                "Prospect Technologies (CSV) - Mandatory for Casestudies & Optional for Client Matching",
                 placeholder="e.g. Salesforce, Mulesoft, Snowflake",
             )
         with col3:
@@ -1104,7 +1104,7 @@ def _render_combined_matcher():
         with col1:
             prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
         with col2:
-            prospect_technologies = st.text_input("Prospect Technologies (CSV) - * Only for Casestudies", placeholder="e.g. Salesforce, Boomi")
+            prospect_technologies = st.text_input("Prospect Technologies (CSV) - Mandatory for Casestudies & Optional for Client Matching", placeholder="e.g. Salesforce, Boomi")
 
         prospect_context = st.text_area(
             "Prospect Context (Optional & used only for matching casestudies)",
@@ -1286,7 +1286,7 @@ def _render_client_matcher_simple():
         with col1:
             prospect_industry = st.text_input("Prospect Industry", placeholder="e.g. Banking, Healthcare")
         with col2:
-            prospect_technologies = st.text_input("Prospect Technologies (CSV) - * Only for Casestudies", placeholder="e.g. Salesforce, Boomi")
+            prospect_technologies = st.text_input("Prospect Technologies (CSV) - Mandatory for Casestudies & Optional for Client Matching", placeholder="e.g. Salesforce, Boomi")
         with col3:
             prospect_country = st.selectbox(
                 "Prospect Country (Used for client matching only)",
