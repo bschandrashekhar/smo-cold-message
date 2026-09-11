@@ -1067,8 +1067,8 @@ def _render_combined_matcher():
         <style>
         .main .block-container {
             max-width: 100% !important;
-            padding-left: 0.25rem !important;
-            padding-right: 0.25rem !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
         }
         [data-testid="stForm"] {
             background-color: #3a3a3a;
