@@ -958,7 +958,7 @@ def render_master():
                 f'<img src="data:image/svg+xml;base64,{_b64}" style="height:36px;margin-bottom:0.4rem;">',
                 unsafe_allow_html=True,
             )
-        tabs = st.tabs(["Casestudy/Client Matcher", "All Clients", "All Casestudies", "Settings"])
+        tabs = st.tabs(["Casestudy/Client Matcher", "All Clients", "All Casestudies", "All Capability Documents", "Settings"])
         with tabs[0]:
             _render_combined_matcher()
         with tabs[1]:
@@ -966,6 +966,8 @@ def render_master():
         with tabs[2]:
             _render_all_casestudies_tab()
         with tabs[3]:
+            _render_all_capability_docs_tab()
+        with tabs[4]:
             _render_password_change_tab()
     else:
         tabs = st.tabs(["Casestudy/Client Matcher"])
@@ -1067,6 +1069,44 @@ def _render_all_casestudies_tab():
             "Download": [cs.get("url") or "" for cs in case_studies],
         },
         index=range(1, len(case_studies) + 1),
+    )
+    df.index.name = "#"
+    st.dataframe(
+        df,
+        column_config={
+            "Download": st.column_config.LinkColumn("Download", display_text="Download"),
+        },
+        hide_index=False,
+        use_container_width=True,
+    )
+
+
+def _render_all_capability_docs_tab():
+    """Browse all capability documents — tabular list with download links."""
+    from client_referencing.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+    from supabase import create_client
+
+    with st.spinner("Loading capability documents..."):
+        try:
+            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+            result = sb.table("capability_documents").select(
+                "filename,url"
+            ).eq("doc_type", "Capability Document").execute()
+            docs = sorted(result.data or [], key=lambda d: (d.get("filename") or "").lower())
+        except Exception as e:
+            st.error(f"Could not load capability documents — database may be unavailable. Please retry in a moment. ({type(e).__name__})")
+            return
+
+    if not docs:
+        st.info("No capability documents found.")
+        return
+
+    df = pd.DataFrame(
+        {
+            "Document": [d.get("filename", "") for d in docs],
+            "Download": [d.get("url") or "" for d in docs],
+        },
+        index=range(1, len(docs) + 1),
     )
     df.index.name = "#"
     st.dataframe(
