@@ -1090,7 +1090,7 @@ def _render_all_capability_docs_tab():
         try:
             sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
             result = sb.table("capability_documents").select(
-                "filename,url"
+                "filename,url,highlight"
             ).eq("doc_type", "Capability Document").execute()
             docs = sorted(result.data or [], key=lambda d: (d.get("filename") or "").lower())
         except Exception as e:
@@ -1102,17 +1102,29 @@ def _render_all_capability_docs_tab():
         return
 
     import html as _html
-    cards = ['<div style="display:flex;flex-wrap:wrap;gap:1rem;padding:0.5rem 0;">']
+    cards = ['<div style="display:flex;flex-wrap:wrap;gap:1.25rem;padding:0.5rem 0;">']
     for d in docs:
         filename = d.get("filename") or ""
-        display_name = filename.replace("_", " ").removesuffix(".pdf")
+        ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
+        display_name = filename.replace("_", " ").removesuffix(ext)
         url = d.get("url") or ""
-        link = f'<a href="{_html.escape(url)}" target="_blank" style="display:inline-block;margin-top:0.75rem;padding:0.35rem 0.9rem;background:#4a9fd4;color:#fff;border-radius:4px;font-size:0.78rem;text-decoration:none;font-weight:600;">&#8595; Download</a>' if url else '<span style="font-size:0.75rem;color:#888;">No link</span>'
+        highlight = _html.escape(d.get("highlight") or "")
+        link = (
+            f'<a href="{_html.escape(url)}" target="_blank" style="display:inline-block;'
+            f'padding:0.35rem 0.9rem;background:#4a9fd4;color:#fff;border-radius:4px;'
+            f'font-size:0.78rem;text-decoration:none;font-weight:600;">&#8595; Download</a>'
+        ) if url else '<span style="font-size:0.75rem;color:#888;">No link</span>'
+        highlight_block = (
+            f'<div style="font-size:0.75rem;color:#aaa;line-height:1.5;margin:0.5rem 0;">{highlight}</div>'
+        ) if highlight else ""
         cards.append(
             f'<div style="background:#2e2e2e;border:1px solid #444;border-radius:8px;padding:1rem 1.2rem;'
-            f'width:220px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;">'
-            f'<div style="font-size:0.82rem;font-weight:600;color:#e0e0e0;line-height:1.4;">{_html.escape(display_name)}</div>'
-            f'{link}'
+            f'width:280px;display:flex;flex-direction:column;justify-content:space-between;">'
+            f'<div>'
+            f'<div style="font-size:0.85rem;font-weight:700;color:#e0e0e0;line-height:1.4;margin-bottom:0.25rem;">{_html.escape(display_name)}</div>'
+            f'{highlight_block}'
+            f'</div>'
+            f'<div style="margin-top:0.75rem;">{link}</div>'
             f'</div>'
         )
     cards.append('</div>')
