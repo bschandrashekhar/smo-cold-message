@@ -1125,7 +1125,7 @@ def _render_all_capability_docs_tab():
     for d in docs:
         filename = d.get("filename") or ""
         ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
-        display_name = filename.replace("_", " ").removesuffix(ext)
+        display_name = filename.replace("_", " ").removesuffix(ext).removeprefix("Flyer ").removeprefix("flyer ")
         url = d.get("url") or ""
         highlight = _html.escape(d.get("highlight") or "")
         name_lower = filename.lower()
