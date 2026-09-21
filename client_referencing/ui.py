@@ -1031,10 +1031,9 @@ def _render_all_clients_tab():
             else:
                 img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">&#127970;</a>'
             parts.append(
-                f'<div style="text-align:center;width:90px;background:#3a3a3a;border-radius:8px;'
-                f'padding:0.75rem 0.5rem 0.5rem 0.5rem;">'
+                f'<div style="text-align:center;min-width:70px;border:1px solid #555;border-radius:6px;padding:0.5rem;">'
                 f'{img_tag}'
-                f'<div style="font-size:0.72rem;font-weight:600;margin-top:0.4rem;color:#ddd;word-break:break-word;">{name}</div>'
+                f'<div style="font-size:0.75rem;font-weight:600;margin-top:0.3rem;">{name}</div>'
                 f'</div>'
             )
         parts.append('</div></div>')
