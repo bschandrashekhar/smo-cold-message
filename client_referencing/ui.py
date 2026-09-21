@@ -1102,6 +1102,25 @@ def _render_all_capability_docs_tab():
         return
 
     import html as _html
+
+    # Keyword → (accent_color, icon, bg_color)
+    _THEMES = [
+        (["security"],           ("#e85d4a", "🔒", "#3a1f1f")),
+        (["finance", "lending", "loan"], ("#4a9fd4", "💼", "#1a2e3a")),
+        (["healthcare", "health"], ("#4caf8a", "🏥", "#1a3028")),
+        (["hitech", "hi tech", "tech"], ("#9c6fd4", "💻", "#28203a")),
+        (["npo", "nonprofit", "non profit", "partners"], ("#e0704a", "🤝", "#3a2218")),
+        (["franchise"],          ("#d4a44a", "🏪", "#3a2e18")),
+        (["manufacturing"],      ("#6ab0d4", "🏭", "#1a2a38")),
+    ]
+    _DEFAULT_THEME = ("#888", "📄", "#2e2e2e")
+
+    def _get_theme(name_lower):
+        for keywords, theme in _THEMES:
+            if any(kw in name_lower for kw in keywords):
+                return theme
+        return _DEFAULT_THEME
+
     cards = ['<div style="display:flex;flex-wrap:wrap;gap:1.25rem;padding:0.5rem 0;">']
     for d in docs:
         filename = d.get("filename") or ""
@@ -1109,19 +1128,22 @@ def _render_all_capability_docs_tab():
         display_name = filename.replace("_", " ").removesuffix(ext)
         url = d.get("url") or ""
         highlight = _html.escape(d.get("highlight") or "")
+        name_lower = filename.lower()
+        accent, icon, bg = _get_theme(name_lower)
         link = (
             f'<a href="{_html.escape(url)}" target="_blank" style="display:inline-block;'
-            f'padding:0.35rem 0.9rem;background:#4a9fd4;color:#fff;border-radius:4px;'
+            f'padding:0.35rem 0.9rem;background:{accent};color:#fff;border-radius:4px;'
             f'font-size:0.78rem;text-decoration:none;font-weight:600;">&#8595; Download</a>'
         ) if url else '<span style="font-size:0.75rem;color:#888;">No link</span>'
         highlight_block = (
-            f'<div style="font-size:0.75rem;color:#aaa;line-height:1.5;margin:0.5rem 0;">{highlight}</div>'
+            f'<div style="font-size:0.75rem;color:#bbb;line-height:1.5;margin:0.5rem 0;">{highlight}</div>'
         ) if highlight else ""
         cards.append(
-            f'<div style="background:#2e2e2e;border:1px solid #444;border-radius:8px;padding:1rem 1.2rem;'
-            f'width:280px;display:flex;flex-direction:column;justify-content:space-between;">'
+            f'<div style="background:{bg};border:1px solid {accent}44;border-top:3px solid {accent};'
+            f'border-radius:8px;padding:1rem 1.2rem;width:280px;display:flex;flex-direction:column;justify-content:space-between;">'
             f'<div>'
-            f'<div style="font-size:0.85rem;font-weight:700;color:#e0e0e0;line-height:1.4;margin-bottom:0.25rem;">{_html.escape(display_name)}</div>'
+            f'<div style="font-size:1.4rem;margin-bottom:0.4rem;">{icon}</div>'
+            f'<div style="font-size:0.85rem;font-weight:700;color:#e0e0e0;line-height:1.4;">{_html.escape(display_name)}</div>'
             f'{highlight_block}'
             f'</div>'
             f'<div style="margin-top:0.75rem;">{link}</div>'
