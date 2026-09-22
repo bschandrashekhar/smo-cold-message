@@ -1322,45 +1322,56 @@ def _render_combined_matcher():
             import html as _html
             seen_cs = set()
             rows_html = ""
+            hidden_divs = ""
             i = 1
-            tooltip_css = """
-<style>
-.cs-tip{position:relative;display:inline-block;cursor:pointer;vertical-align:middle;}
-.cs-tip .cs-tip-box{
-    visibility:hidden;opacity:0;width:320px;background:#1e1e2e;color:#ddd;
-    border:1px solid #555;border-radius:8px;padding:0.75rem 1rem;
-    position:absolute;z-index:9999;bottom:130%;left:50%;transform:translateX(-50%);
-    transition:opacity 0.2s;font-size:0.76rem;line-height:1.55;
-    box-shadow:0 4px 20px rgba(0,0,0,0.6);white-space:normal;text-align:left;pointer-events:none;
-}
-.cs-tip:hover .cs-tip-box{visibility:visible;opacity:1;}
-</style>"""
             for m in cs_matches:
                 if m.casestudy_name in seen_cs:
                     continue
                 seen_cs.add(m.casestudy_name)
+                idx = i - 1
                 client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
                 dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;font-size:0.875rem;font-weight:400;">Download</a>' if m.url else "—"
                 prob = _html.escape(m.summary_problem or "—")
                 soln = _html.escape(m.summary_solution or "—")
                 outc = _html.escape(m.summary_outcomes or "—")
-                tip = (
-                    f'<span class="cs-tip">&#9432;'
-                    f'<div class="cs-tip-box">'
-                    f'<div style="margin-bottom:0.5rem;"><span style="color:#7ec8e3;font-weight:700;">Problem</span><br>{prob}</div>'
-                    f'<div style="margin-bottom:0.5rem;"><span style="color:#7ec8e3;font-weight:700;">Solution</span><br>{soln}</div>'
-                    f'<div><span style="color:#7ec8e3;font-weight:700;">Outcomes</span><br>{outc}</div>'
-                    f'</div></span>'
+                title = _html.escape(m.casestudy_name)
+                hidden_divs += (
+                    f'<div id="cs-data-{idx}" style="display:none">'
+                    f'<div style="font-size:0.95rem;font-weight:700;color:#e0e0e0;margin-bottom:1rem;">{title}</div>'
+                    f'<div style="margin-bottom:0.8rem;"><span style="color:#7ec8e3;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;">Problem</span>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{prob}</div></div>'
+                    f'<div style="margin-bottom:0.8rem;"><span style="color:#7ec8e3;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;">Solution</span>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{soln}</div></div>'
+                    f'<div><span style="color:#7ec8e3;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;">Outcomes</span>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{outc}</div></div>'
+                    f'</div>'
                 )
-                rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl} &nbsp; {tip}</div>'
+                btn = (
+                    f'<button onclick="'
+                    f'document.getElementById(\'cs-modal-body\').innerHTML=document.getElementById(\'cs-data-{idx}\').innerHTML;'
+                    f'document.getElementById(\'cs-modal\').style.display=\'flex\';" '
+                    f'style="background:#2a2a2a;border:1px solid #555;color:#aaa;border-radius:3px;'
+                    f'padding:0 4px;font-size:0.65rem;cursor:pointer;vertical-align:middle;line-height:1.4;">i</button>'
+                )
+                rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl} &nbsp; {btn}</div>'
                 i += 1
-            st.markdown(tooltip_css, unsafe_allow_html=True)
-            st.markdown(f"""
-                <div style="background-color:#3a3a3a; border-radius:8px; overflow:visible;">
+            modal_html = (
+                f'<div id="cs-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;'
+                f'background:rgba(0,0,0,0.7);z-index:99999;align-items:center;justify-content:center;" '
+                f'onclick="if(event.target===this)this.style.display=\'none\'">'
+                f'<div style="background:#1e1e2e;border:1px solid #555;border-radius:10px;padding:1.5rem 1.75rem;'
+                f'max-width:500px;width:90%;max-height:75vh;overflow-y:auto;position:relative;">'
+                f'<button onclick="document.getElementById(\'cs-modal\').style.display=\'none\'" '
+                f'style="position:absolute;top:0.6rem;right:0.9rem;background:none;border:none;color:#aaa;font-size:1.1rem;cursor:pointer;">✕</button>'
+                f'<div id="cs-modal-body"></div>'
+                f'</div></div>'
+            )
+            st.markdown(hidden_divs + modal_html + f"""
+                <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
                     <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
                         <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">Matching Case Studies</span>
                     </div>
-                    <div style="padding:1.2rem;overflow:visible;">
+                    <div style="padding:1.2rem;">
                         {rows_html}
                     </div>
                 </div>""", unsafe_allow_html=True)
