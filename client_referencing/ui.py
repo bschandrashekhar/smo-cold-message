@@ -1319,42 +1319,71 @@ def _render_combined_matcher():
 
     with right_col:
         if cs_matches:
-            st.markdown(
-                '<div style="background-color:#2a2a2a;padding:0.6rem 1.2rem;border-radius:8px 8px 0 0;">'
-                '<span style="font-size:0.85rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#ccc;">Matching Case Studies</span>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
+            import html as _html
             seen_cs = set()
+            checkboxes = ""
+            overlays = ""
+            rows_html = ""
             i = 1
             for m in cs_matches:
                 if m.casestudy_name in seen_cs:
                     continue
                 seen_cs.add(m.casestudy_name)
+                idx = i - 1
                 client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
-                name_col, dl_col, info_col = st.columns([7, 2, 1])
-                with name_col:
-                    st.markdown(
-                        f'<div style="font-size:0.875rem;color:rgba(250,250,250,0.6);padding-top:0.35rem;">'
-                        f'{i}. {m.casestudy_name}{client_suffix}</div>',
-                        unsafe_allow_html=True,
-                    )
-                with dl_col:
-                    if m.url:
-                        st.markdown(
-                            f'<a href="{m.url}" target="_blank" style="color:#4da6ff;font-size:0.875rem;">Download</a>',
-                            unsafe_allow_html=True,
-                        )
-                with info_col:
-                    with st.popover("i"):
-                        st.markdown(f"**{m.casestudy_name}**")
-                        st.markdown("**Problem**")
-                        st.caption(m.summary_problem or "—")
-                        st.markdown("**Solution**")
-                        st.caption(m.summary_solution or "—")
-                        st.markdown("**Outcomes**")
-                        st.caption(m.summary_outcomes or "—")
+                dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;font-size:0.875rem;font-weight:400;">Download</a>' if m.url else "—"
+                title = _html.escape(m.casestudy_name)
+                prob  = _html.escape(m.summary_problem  or "—")
+                soln  = _html.escape(m.summary_solution or "—")
+                outc  = _html.escape(m.summary_outcomes or "—")
+                checkboxes += f'<input type="checkbox" id="cs-chk-{idx}" style="display:none">'
+                overlays += (
+                    f'<div id="cs-ov-{idx}" style="display:none;position:fixed;top:0;left:0;'
+                    f'width:100vw;height:100vh;z-index:99999;align-items:center;justify-content:center;">'
+                    # backdrop — clicking it unchecks the checkbox and closes modal
+                    f'<label for="cs-chk-{idx}" style="position:absolute;top:0;left:0;width:100%;height:100%;'
+                    f'background:rgba(0,0,0,0.72);cursor:default;"></label>'
+                    # modal box
+                    f'<div style="position:relative;background:#1e1e2e;border:1px solid #555;border-radius:10px;'
+                    f'padding:1.5rem 1.75rem;max-width:500px;width:90%;max-height:75vh;overflow-y:auto;z-index:1;">'
+                    f'<label for="cs-chk-{idx}" style="position:absolute;top:0.6rem;right:0.9rem;'
+                    f'cursor:pointer;color:#aaa;font-size:1.1rem;line-height:1;">✕</label>'
+                    f'<div style="font-size:0.95rem;font-weight:700;color:#e0e0e0;margin-bottom:1rem;">{title}</div>'
+                    f'<div style="margin-bottom:0.8rem;">'
+                    f'<div style="color:#7ec8e3;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Problem</div>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{prob}</div></div>'
+                    f'<div style="margin-bottom:0.8rem;">'
+                    f'<div style="color:#7ec8e3;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Solution</div>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{soln}</div></div>'
+                    f'<div>'
+                    f'<div style="color:#7ec8e3;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Outcomes</div>'
+                    f'<div style="margin-top:0.3rem;font-size:0.8rem;line-height:1.6;color:#ccc;">{outc}</div></div>'
+                    f'</div></div>'
+                )
+                info_btn = (
+                    f'<label for="cs-chk-{idx}" style="background:#2a2a2a;border:1px solid #555;color:#aaa;'
+                    f'border-radius:3px;padding:0 4px;font-size:0.65rem;cursor:pointer;vertical-align:middle;'
+                    f'line-height:1.4;display:inline-block;">i</label>'
+                )
+                rows_html += (
+                    f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">'
+                    f'{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl} &nbsp; {info_btn}</div>'
+                )
                 i += 1
+            # CSS: show overlay when its paired checkbox is checked
+            css_rules = "".join(
+                f"#cs-chk-{j}:checked ~ #cs-ov-{j}{{display:flex!important;}}"
+                for j in range(i - 1)
+            )
+            st.markdown(
+                f'<style>{css_rules}</style>'
+                + checkboxes + overlays
+                + f'<div style="background-color:#3a3a3a;border-radius:8px;overflow:hidden;">'
+                f'<div style="background-color:#2a2a2a;padding:0.6rem 1.2rem;">'
+                f'<span style="font-size:0.85rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#ccc;">Matching Case Studies</span>'
+                f'</div><div style="padding:1.2rem;">{rows_html}</div></div>',
+                unsafe_allow_html=True,
+            )
         else:
             st.info("No matching case studies found. Please specify an appropriate Technology to filter.")
 
