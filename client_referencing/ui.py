@@ -1354,7 +1354,8 @@ def _render_combined_matcher():
                 )
                 rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl} &nbsp; {tip}</div>'
                 i += 1
-            st.markdown(tooltip_css + f"""
+            st.markdown(tooltip_css, unsafe_allow_html=True)
+            st.markdown(f"""
                 <div style="background-color:#3a3a3a; border-radius:8px; overflow:visible;">
                     <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
                         <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">Matching Case Studies</span>
