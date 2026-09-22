@@ -1031,9 +1031,9 @@ def _render_all_clients_tab():
             else:
                 img_tag = f'<a href="{link}" target="_blank" style="font-size:1.5rem;">&#127970;</a>'
             parts.append(
-                f'<div style="text-align:center;min-width:70px;border:1px solid #555;border-radius:6px;padding:0.5rem;">'
+                f'<div style="text-align:center;min-width:70px;border:1px solid #aaa;border-radius:6px;padding:0.5rem;background-color:#ffffff;">'
                 f'{img_tag}'
-                f'<div style="font-size:0.75rem;font-weight:600;margin-top:0.3rem;">{name}</div>'
+                f'<div style="font-size:0.75rem;font-weight:600;margin-top:0.3rem;color:#111;">{name}</div>'
                 f'</div>'
             )
         parts.append('</div></div>')
@@ -1319,23 +1319,47 @@ def _render_combined_matcher():
 
     with right_col:
         if cs_matches:
+            import html as _html
             seen_cs = set()
             rows_html = ""
             i = 1
+            tooltip_css = """
+<style>
+.cs-tip{position:relative;display:inline-block;cursor:pointer;vertical-align:middle;}
+.cs-tip .cs-tip-box{
+    visibility:hidden;opacity:0;width:320px;background:#1e1e2e;color:#ddd;
+    border:1px solid #555;border-radius:8px;padding:0.75rem 1rem;
+    position:absolute;z-index:9999;bottom:130%;left:50%;transform:translateX(-50%);
+    transition:opacity 0.2s;font-size:0.76rem;line-height:1.55;
+    box-shadow:0 4px 20px rgba(0,0,0,0.6);white-space:normal;text-align:left;pointer-events:none;
+}
+.cs-tip:hover .cs-tip-box{visibility:visible;opacity:1;}
+</style>"""
             for m in cs_matches:
                 if m.casestudy_name in seen_cs:
                     continue
                 seen_cs.add(m.casestudy_name)
                 client_suffix = f" ({m.client_name})" if m.client_name and m.client_name != m.casestudy_name else ""
                 dl = f'<a href="{m.url}" target="_blank" style="color:#4da6ff;font-size:0.875rem;font-weight:400;">Download</a>' if m.url else "—"
-                rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl}</div>'
+                prob = _html.escape(m.summary_problem or "—")
+                soln = _html.escape(m.summary_solution or "—")
+                outc = _html.escape(m.summary_outcomes or "—")
+                tip = (
+                    f'<span class="cs-tip">&#9432;'
+                    f'<div class="cs-tip-box">'
+                    f'<div style="margin-bottom:0.5rem;"><span style="color:#7ec8e3;font-weight:700;">Problem</span><br>{prob}</div>'
+                    f'<div style="margin-bottom:0.5rem;"><span style="color:#7ec8e3;font-weight:700;">Solution</span><br>{soln}</div>'
+                    f'<div><span style="color:#7ec8e3;font-weight:700;">Outcomes</span><br>{outc}</div>'
+                    f'</div></span>'
+                )
+                rows_html += f'<div style="margin-bottom:0.6rem;font-size:0.875rem;font-weight:400;color:rgba(250,250,250,0.6);">{i}. {m.casestudy_name}{client_suffix} &nbsp; {dl} &nbsp; {tip}</div>'
                 i += 1
-            st.markdown(f"""
-                <div style="background-color:#3a3a3a; border-radius:8px; overflow:hidden;">
+            st.markdown(tooltip_css + f"""
+                <div style="background-color:#3a3a3a; border-radius:8px; overflow:visible;">
                     <div style="background-color:#2a2a2a; padding:0.6rem 1.2rem;">
                         <span style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#ccc;">Matching Case Studies</span>
                     </div>
-                    <div style="padding:1.2rem;">
+                    <div style="padding:1.2rem;overflow:visible;">
                         {rows_html}
                     </div>
                 </div>""", unsafe_allow_html=True)

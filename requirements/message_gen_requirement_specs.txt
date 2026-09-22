@@ -88,7 +88,9 @@ We will hardcode the user login as follows in the table "user_credentials". user
 
     - Additionally, show a tab called "All Casestudies" : This is a simple list of all casestudies in the system (from client_case_studies table). Show them with small download link against each name. Show it in a tabular format.
 
-    - Give a settings tab on the app as a third tab to allow for a password change, only when logged in as marcom. Respective row for this user should get updated when the password is changed from the UI.
+    - Additionally, show a tab called "All Capability Documents" : This is a simple list of all casestudies in the system (from capability_documents table) where the document type (indicated in the field doc_type is "Capability Document". Show them with small download link against each name. Show it in a tabular format, just like "All Casestudies" tab from above.
+
+    - Give a settings tab on the app as a last tab to allow for a password change, only when logged in as marcom. Respective row for this user should get updated when the password is changed from the UI.
   }
 
 ### 1. Prospect Outreach
